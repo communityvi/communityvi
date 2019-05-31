@@ -1,0 +1,7 @@
+[package]
+name = "communityvi"
+version = "0.1.0"
+authors = ["Max Bruckner <max@maxbruckner.de>"]
+edition = "2018"
+
+[dependencies]
