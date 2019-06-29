@@ -1,4 +1,3 @@
-use_small_heuristics = "Default"
 hard_tabs = true
 max_width = 120
 newline_style = "Unix"
