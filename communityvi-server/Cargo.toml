@@ -1,0 +1,10 @@
+[package]
+name = "communityvi-server"
+version = "0.1.0"
+authors = ["Max Bruckner <max@maxbruckner.de>"]
+edition = "2018"
+
+[dependencies]
+communityvi-lib = {path = "../communityvi-lib"}
+futures = "0.1.28"
+tokio = "0.1.21"

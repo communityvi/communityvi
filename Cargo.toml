@@ -1,2 +1,2 @@
 [workspace]
-members = ["communityvi-lib"]
+members = ["communityvi-lib", "communityvi-server"]

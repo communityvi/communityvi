@@ -147,6 +147,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "communityvi-server"
+version = "0.1.0"
+dependencies = [
+ "communityvi-lib 0.1.0",
+ "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "config"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
