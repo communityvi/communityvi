@@ -10,7 +10,7 @@ use warp::filters::ws::Ws2;
 use warp::Filter;
 
 pub fn create_server<ShutdownHandleType>(
-	address: impl Into<SocketAddr>,
+	address: impl Into<SocketAddr> + 'static,
 	shutdown_handle: ShutdownHandleType,
 ) -> impl Future<Item = (), Error = ()>
 where
