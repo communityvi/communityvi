@@ -1,4 +1,6 @@
 use crate::state::State;
+use core::borrow::Borrow;
+use futures::sink::Sink;
 use futures::stream::Stream;
 use futures::Future;
 use std::convert::Into;
@@ -6,7 +8,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use warp::filters::ws::Ws2;
+use warp::filters::ws::{Message, Ws2};
 use warp::Filter;
 
 pub fn create_server<ShutdownHandleType>(
@@ -29,17 +31,22 @@ where
 		.map(move |new_offset| state_for_post.offset.store(new_offset, Ordering::SeqCst))
 		.map(|_| http::response::Builder::new().status(204).body(""));
 
-	let websocket_filter = warp::path("ws").and(warp::ws2()).map(|ws2: Ws2| {
-		ws2.on_upgrade(|websocket| {
+	let state_for_websocket = state.clone();
+	let websocket_filter = warp::path("ws").and(warp::ws2()).map(move |ws2: Ws2| {
+		let state = state_for_websocket.clone();
+		ws2.on_upgrade(move |websocket| {
+			let state = state;
 			let (sink, stream) = websocket.split();
 			stream
-				.inspect(|message| println!("{:?}", message))
 				.take_while(|message| futures::future::ok(!message.is_close()))
-				.forward(sink)
-				.map(|_| ())
-				.map_err(|error| {
-					eprintln!("{}", error);
+				.map_err(|_| ())
+				.and_then(move |message| {
+					let state = state.borrow();
+					handle_message(state, message)
 				})
+				.forward(sink.sink_map_err(|_| ()))
+				.map(|_| ())
+				.map_err(|_| ())
 		})
 	});
 
@@ -48,4 +55,10 @@ where
 
 	let (_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
 	future
+}
+
+fn handle_message(state: &State, message: Message) -> impl Future<Item = Message, Error = ()> {
+	println!("Message: {:?}", message);
+	let offset = state.offset.load(Ordering::SeqCst).to_string();
+	futures::future::ok(Message::text(offset))
 }
