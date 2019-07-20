@@ -16,3 +16,5 @@ http = "0.1.17"
 
 [dev-dependencies]
 reqwest = "0.9.18"
+tokio-tungstenite = "0.8.0"
+url = "1.7.2"
