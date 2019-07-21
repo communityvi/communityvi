@@ -1,4 +1,4 @@
-use crate::state::State;
+use crate::room::Room;
 use core::borrow::Borrow;
 use futures::sink::Sink;
 use futures::stream::Stream;
@@ -18,22 +18,22 @@ pub fn create_server<ShutdownHandleType>(
 where
 	ShutdownHandleType: Future<Item = ()> + Send + 'static,
 {
-	let state = Arc::new(State {
+	let room = Arc::new(Room {
 		offset: AtomicU64::new(42),
 	});
 
-	let state_for_get = state.clone();
+	let state_for_get = room.clone();
 	let get_state = warp::get2().map(move || state_for_get.offset.load(Ordering::SeqCst).to_string());
 
-	let state_for_post = state.clone();
+	let state_for_post = room.clone();
 	let post_state = warp::post2()
 		.and(warp::path::param2())
 		.map(move |new_offset| state_for_post.offset.store(new_offset, Ordering::SeqCst))
 		.map(|_| http::response::Builder::new().status(204).body(""));
 
-	let state_for_websocket = state.clone();
+	let room_for_websocket = room.clone();
 	let websocket_filter = warp::path("ws").and(warp::ws2()).map(move |ws2: Ws2| {
-		let state = state_for_websocket.clone();
+		let state = room_for_websocket.clone();
 		ws2.on_upgrade(move |websocket| {
 			let state = state;
 			let (sink, stream) = websocket.split();
@@ -57,8 +57,8 @@ where
 	future
 }
 
-fn handle_message(state: &State, message: Message) -> impl Future<Item = Message, Error = ()> {
+fn handle_message(room: &Room, message: Message) -> impl Future<Item = Message, Error = ()> {
 	println!("Message: {:?}", message);
-	let offset = state.offset.load(Ordering::SeqCst).to_string();
+	let offset = room.offset.load(Ordering::SeqCst).to_string();
 	futures::future::ok(Message::text(offset))
 }
