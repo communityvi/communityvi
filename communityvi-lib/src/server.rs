@@ -5,7 +5,7 @@ use futures::stream::Stream;
 use futures::Future;
 use std::convert::Into;
 use std::net::SocketAddr;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use warp::filters::ws::{Message, Ws2};
@@ -19,7 +19,7 @@ where
 	ShutdownHandleType: Future<Item = ()> + Send + 'static,
 {
 	let room = Arc::new(Room {
-		offset: AtomicU64::new(42),
+		offset: AtomicI64::new(42),
 	});
 
 	let state_for_get = room.clone();

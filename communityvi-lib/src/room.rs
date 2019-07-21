@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::AtomicI64;
 
 pub struct Room {
-	pub offset: AtomicU64,
+	pub offset: AtomicI64,
 }
