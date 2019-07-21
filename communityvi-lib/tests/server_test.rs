@@ -70,19 +70,15 @@ fn should_respond_to_websocket_messages() {
 			text: "Hello World!".into(),
 		});
 		let send_future = sink.send(message).map(|_| ());
-		let receive_future = stream
-			.take(1)
-			.collect()
-			.inspect(|messages| {
-				assert_eq!(messages.len(), 1);
-				assert_eq!(
-					messages[0],
-					Message::Pong(TextMessage {
-						text: "Hello World!".into()
-					})
-				);
-			})
-			.map(|_| ());
+		let receive_future = stream.take(1).collect().map(|messages| {
+			assert_eq!(messages.len(), 1);
+			assert_eq!(
+				messages[0],
+				Message::Pong(TextMessage {
+					text: "Hello World!".into()
+				})
+			);
+		});
 		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
 			vec![Box::new(send_future), Box::new(receive_future)];
 		join_all(futures)
@@ -91,7 +87,34 @@ fn should_respond_to_websocket_messages() {
 }
 
 #[test]
-fn should_broadcast_messages() {}
+fn should_broadcast_messages() {
+	let future = websocket_connection()
+		.and_then(|(sink1, stream1)| websocket_connection().map(|(_sink2, stream2)| (sink1, stream1, stream2)))
+		.and_then(|(sink, stream1, stream2)| {
+			let message = Message::Chat(TextMessage {
+				text: r#"Hello everyone \o/"#.into(),
+			});
+			let message_for_receive_future1 = message.clone();
+			let message_for_receive_future2 = message.clone();
+
+			let send_future = sink.send(message).map(|_| ());
+			let receive_future1 = stream1.take(1).collect().map(move |messages| {
+				assert_eq!(messages.len(), 1);
+				assert_eq!(messages[0], message_for_receive_future1);
+			});
+			let receive_future2 = stream2.take(1).collect().map(move |messages| {
+				assert_eq!(messages.len(), 1);
+				assert_eq!(messages[0], message_for_receive_future2);
+			});
+			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> = vec![
+				Box::new(send_future),
+				Box::new(receive_future1),
+				Box::new(receive_future2),
+			];
+			join_all(futures).map(|_| ()).map_err(|_| ())
+		});
+	test_future_with_running_server(future);
+}
 
 fn test_future_with_running_server<ItemType, ErrorType, FutureType>(future_to_test: FutureType) -> ItemType
 where

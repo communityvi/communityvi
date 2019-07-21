@@ -1,14 +1,13 @@
 use crate::message::{Message, WebSocketMessage};
-use crate::room::Room;
+use crate::room::{Client, Room};
 use core::borrow::Borrow;
-use futures::future::join_all;
+use futures::future::{join_all, Either};
 use futures::sink::Sink;
 use futures::stream::Stream;
 use futures::{Future, IntoFuture};
 use std::convert::Into;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
-use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use warp::filters::ws::Ws2;
@@ -21,9 +20,7 @@ pub fn create_server<ShutdownHandleType>(
 where
 	ShutdownHandleType: Future<Item = ()> + Send + 'static,
 {
-	let room = Arc::new(Room {
-		offset: AtomicI64::new(42),
-	});
+	let room = Arc::new(Room::default());
 
 	let room_for_get = room.clone();
 	let get_state = warp::get2().map(move || room_for_get.offset.load(Ordering::SeqCst).to_string());
@@ -42,6 +39,7 @@ where
 
 			let (websocket_sink, websocket_stream) = websocket.split();
 			let (message_sender, message_receiver) = futures::sync::mpsc::channel::<Message>(1);
+			let client = room.add_client(message_sender.clone());
 			let message_receive_future = message_receiver
 				.map(WebSocketMessage::from)
 				.forward(websocket_sink.sink_map_err(|_| ()))
@@ -57,10 +55,9 @@ where
 				})
 				.and_then(move |message| {
 					let room = room.borrow();
-					handle_message(room, message)
+					handle_message(room, &client, message)
 				})
-				.forward(message_sender.sink_map_err(|_| ()))
-				.map(|_| ());
+				.for_each(|()| futures::future::ok(()));
 
 			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
 				vec![Box::new(message_receive_future), Box::new(stream_future)];
@@ -75,10 +72,10 @@ where
 	future
 }
 
-fn handle_message(_room: &Room, message: Message) -> impl Future<Item = Message, Error = ()> {
-	let response = match message {
-		Message::Ping(text_message) => Message::Pong(text_message),
+fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = ()> {
+	match message {
+		Message::Ping(text_message) => Either::A(client.send(Message::Pong(text_message))),
+		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
 		_ => unimplemented!(),
-	};
-	futures::future::ok(response)
+	}
 }
