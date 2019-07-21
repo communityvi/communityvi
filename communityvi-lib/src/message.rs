@@ -1,10 +1,10 @@
 use chrono::{DateTime, Duration, Utc};
 use serde_derive::{Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
@@ -12,6 +12,8 @@ pub enum Message {
 	Offset(OffsetMessage),
 	/// The server reference time value at the given point in Utc time.
 	ServerTime(ServerTimeMessage),
+	Ping(TextMessage),
+	Pong(TextMessage),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -29,6 +31,11 @@ pub struct ServerTimeMessage {
 	/// Real time in UTC where the given server time belongs to.
 	#[serde(with = "millisecond_timestamp")]
 	pub real_time: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct TextMessage {
+	pub text: String,
 }
 
 pub type WebSocketMessage = warp::filters::ws::Message;
@@ -169,5 +176,27 @@ mod test {
 		let deserialized_server_time_message: Message =
 			serde_json::from_str(&json).expect("Failed to deserialize ServerTimeMessage from JSON");
 		assert_eq!(deserialized_server_time_message, server_time_message);
+	}
+
+	#[test]
+	fn ping_message_should_serialize_and_deserialize() {
+		let ping_message = Message::Ping(TextMessage { text: "hello".into() });
+		let json = serde_json::to_string(&ping_message).expect("Failed to serialize PingMessage to JSON");
+		assert_eq!(json, r#"{"type":"ping","text":"hello"}"#);
+
+		let deserialized_ping_message: Message =
+			serde_json::from_str(&json).expect("Failed to deserialize PingMessage from JSON");
+		assert_eq!(deserialized_ping_message, ping_message);
+	}
+
+	#[test]
+	fn pong_message_should_serialize_and_deserialize() {
+		let pong_message = Message::Pong(TextMessage { text: "hello".into() });
+		let json = serde_json::to_string(&pong_message).expect("Failed to serialize PongMessage to JSON");
+		assert_eq!(json, r#"{"type":"pong","text":"hello"}"#);
+
+		let deserialized_pong_message: Message =
+			serde_json::from_str(&json).expect("Failed to deserialize PongMessage from JSON");
+		assert_eq!(deserialized_pong_message, pong_message);
 	}
 }
