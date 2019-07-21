@@ -14,6 +14,7 @@ pub enum Message {
 	ServerTime(ServerTimeMessage),
 	Ping(TextMessage),
 	Pong(TextMessage),
+	Chat(TextMessage),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -198,5 +199,16 @@ mod test {
 		let deserialized_pong_message: Message =
 			serde_json::from_str(&json).expect("Failed to deserialize PongMessage from JSON");
 		assert_eq!(deserialized_pong_message, pong_message);
+	}
+
+	#[test]
+	fn chat_message_should_serialize_and_deserialize() {
+		let chat_message = Message::Chat(TextMessage { text: "hello".into() });
+		let json = serde_json::to_string(&chat_message).expect("Failed to serialize ChatMessage to JSON");
+		assert_eq!(json, r#"{"type":"chat","text":"hello"}"#);
+
+		let deserialized_chat_message: Message =
+			serde_json::from_str(&json).expect("Failed to deserialize ChatMessage from JSON");
+		assert_eq!(deserialized_chat_message, chat_message);
 	}
 }
