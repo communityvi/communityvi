@@ -30,50 +30,68 @@ fn should_set_and_get_offset() {
 	assert_eq!(offset, new_offset);
 }
 
-#[test]
-fn should_respond_to_websocket_messages() {
+fn websocket_connection() -> impl Future<
+	Item = (
+		impl Sink<SinkItem = Message, SinkError = ()>,
+		impl Stream<Item = Message, Error = ()>,
+	),
+	Error = (),
+> {
 	let mut websocket_url = Url::parse(&format!("{}/ws", URL)).expect("Failed to parse URL");
 	websocket_url.set_scheme("ws").expect("Failed to set URL scheme.");
 	let request = tungstenite::handshake::client::Request {
 		url: websocket_url,
 		extra_headers: None,
 	};
-	let future = tokio_tungstenite::connect_async(request)
-		.map_err(|error| panic!("{}", error))
-		.and_then(|(web_socket_stream, _response)| {
-			let (sink, stream) = web_socket_stream.split();
-			let message = Message::Ping(TextMessage {
-				text: "Hello World!".into(),
-			});
-			let websocket_message =
-				tungstenite::Message::text(serde_json::to_string(&message).expect("Failed to convert message to JSON"));
-			let send_future = sink
-				.sink_map_err(|error| panic!("{}", error))
-				.send(websocket_message)
-				.map(|_| ());
-			let receive_future = stream
+	tokio_tungstenite::connect_async(request)
+		.map_err(|error| panic!("Websocket connection failed: {}", error))
+		.map(|(websocket_stream, _response)| {
+			let (sink, stream) = websocket_stream.split();
+			let stream = stream
+				.map_err(|error| panic!("Stream error: {}", error))
 				.map(|websocket_message| {
 					let json = websocket_message.to_text().expect("No text message received.");
 					Message::try_from(json).expect("Failed to parse JSON response")
-				})
-				.take(1)
-				.collect()
-				.map(|messages| {
-					assert_eq!(messages.len(), 1);
-					assert_eq!(
-						messages[0],
-						Message::Pong(TextMessage {
-							text: "Hello World!".into()
-						})
-					);
-				})
-				.map_err(|error| panic!("{}", error));
-			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
-				vec![Box::new(send_future), Box::new(receive_future)];
-			join_all(futures)
+				});
+			let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message: Message| {
+				let websocket_message = tungstenite::Message::text(
+					serde_json::to_string(&message).expect("Failed to convert message to JSON"),
+				);
+				futures::future::ok(websocket_message)
+			});
+			(sink, stream)
+		})
+}
+
+#[test]
+fn should_respond_to_websocket_messages() {
+	let future = websocket_connection().and_then(|(sink, stream)| {
+		let message = Message::Ping(TextMessage {
+			text: "Hello World!".into(),
 		});
+		let send_future = sink.send(message).map(|_| ());
+		let receive_future = stream
+			.take(1)
+			.collect()
+			.inspect(|messages| {
+				assert_eq!(messages.len(), 1);
+				assert_eq!(
+					messages[0],
+					Message::Pong(TextMessage {
+						text: "Hello World!".into()
+					})
+				);
+			})
+			.map(|_| ());
+		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
+			vec![Box::new(send_future), Box::new(receive_future)];
+		join_all(futures)
+	});
 	test_future_with_running_server(future);
 }
+
+#[test]
+fn should_broadcast_messages() {}
 
 fn test_future_with_running_server<ItemType, ErrorType, FutureType>(future_to_test: FutureType) -> ItemType
 where
