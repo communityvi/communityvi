@@ -116,6 +116,15 @@ impl Display for MessageError {
 
 impl Error for MessageError {}
 
+impl TryFrom<&str> for Message {
+	type Error = MessageError;
+
+	fn try_from(json: &str) -> Result<Self, Self::Error> {
+		serde_json::from_str(&json)
+			.map_err(|error| MessageError::DeserializationFailed(error.to_string(), json.to_string()))
+	}
+}
+
 impl TryFrom<WebSocketMessage> for Message {
 	type Error = MessageError;
 
@@ -123,8 +132,7 @@ impl TryFrom<WebSocketMessage> for Message {
 		let json = websocket_message
 			.to_str()
 			.map_err(|()| MessageError::WrongMessageType(websocket_message.clone()))?;
-		serde_json::from_str(&json)
-			.map_err(|error| MessageError::DeserializationFailed(error.to_string(), json.to_string()))
+		json.try_into()
 	}
 }
 
