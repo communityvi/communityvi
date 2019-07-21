@@ -1,14 +1,17 @@
+use crate::message::{Message, WebSocketMessage};
 use crate::room::Room;
 use core::borrow::Borrow;
+use futures::future::join_all;
 use futures::sink::Sink;
 use futures::stream::Stream;
-use futures::Future;
+use futures::{Future, IntoFuture};
 use std::convert::Into;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use warp::filters::ws::{Message, Ws2};
+use warp::filters::ws::Ws2;
 use warp::Filter;
 
 pub fn create_server<ShutdownHandleType>(
@@ -22,8 +25,8 @@ where
 		offset: AtomicI64::new(42),
 	});
 
-	let state_for_get = room.clone();
-	let get_state = warp::get2().map(move || state_for_get.offset.load(Ordering::SeqCst).to_string());
+	let room_for_get = room.clone();
+	let get_state = warp::get2().map(move || room_for_get.offset.load(Ordering::SeqCst).to_string());
 
 	let state_for_post = room.clone();
 	let post_state = warp::post2()
@@ -33,20 +36,35 @@ where
 
 	let room_for_websocket = room.clone();
 	let websocket_filter = warp::path("ws").and(warp::ws2()).map(move |ws2: Ws2| {
-		let state = room_for_websocket.clone();
+		let room = room_for_websocket.clone();
 		ws2.on_upgrade(move |websocket| {
-			let state = state;
-			let (sink, stream) = websocket.split();
-			stream
-				.take_while(|message| futures::future::ok(!message.is_close()))
-				.map_err(|_| ())
-				.and_then(move |message| {
-					let state = state.borrow();
-					handle_message(state, message)
+			let room = room;
+
+			let (websocket_sink, websocket_stream) = websocket.split();
+			let (message_sender, message_receiver) = futures::sync::mpsc::channel::<Message>(1);
+			let message_receive_future = message_receiver
+				.map(WebSocketMessage::from)
+				.forward(websocket_sink.sink_map_err(|_| ()))
+				.map(|_| ());
+
+			let stream_future = websocket_stream
+				.take_while(|websocket_message| futures::future::ok(!websocket_message.is_close()))
+				.map_err(|error| eprintln!("Error streaming websocket messages: {}", error))
+				.and_then(|websocket_message| {
+					Message::try_from(websocket_message)
+						.into_future()
+						.map_err(|error| eprintln!("Error converting messages: {}", error))
 				})
-				.forward(sink.sink_map_err(|_| ()))
-				.map(|_| ())
-				.map_err(|_| ())
+				.and_then(move |message| {
+					let room = room.borrow();
+					handle_message(room, message)
+				})
+				.forward(message_sender.sink_map_err(|_| ()))
+				.map(|_| ());
+
+			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
+				vec![Box::new(message_receive_future), Box::new(stream_future)];
+			join_all(futures).map(|_| ()).map_err(|_| ())
 		})
 	});
 
@@ -57,8 +75,10 @@ where
 	future
 }
 
-fn handle_message(room: &Room, message: Message) -> impl Future<Item = Message, Error = ()> {
-	println!("Message: {:?}", message);
-	let offset = room.offset.load(Ordering::SeqCst).to_string();
-	futures::future::ok(Message::text(offset))
+fn handle_message(_room: &Room, message: Message) -> impl Future<Item = Message, Error = ()> {
+	let response = match message {
+		Message::Ping(text_message) => Message::Pong(text_message),
+		_ => unimplemented!(),
+	};
+	futures::future::ok(response)
 }

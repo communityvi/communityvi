@@ -1,11 +1,12 @@
+use communityvi_lib::message::{Message, TextMessage};
 use communityvi_lib::server::create_server;
 use futures::future::join_all;
 use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
+use std::convert::TryFrom;
 use std::fmt::Debug;
 use tokio::runtime::Runtime;
-use tungstenite::Message;
 use url::Url;
 
 const URL: &str = "http://localhost:8000";
@@ -31,34 +32,40 @@ fn should_set_and_get_offset() {
 
 #[test]
 fn should_respond_to_websocket_messages() {
-	let client = reqwest::r#async::Client::new();
-	let new_offset = 99u64;
-	let post_request = client
-		.post(&format!("{url}/{offset}", url = URL, offset = new_offset))
-		.build()
-		.unwrap();
-
 	let mut websocket_url = Url::parse(&format!("{}/ws", URL)).expect("Failed to parse URL");
 	websocket_url.set_scheme("ws").expect("Failed to set URL scheme.");
 	let request = tungstenite::handshake::client::Request {
 		url: websocket_url,
 		extra_headers: None,
 	};
-	let future = client
-		.execute(post_request)
-		.map_err(|error| panic!("{}", error))
-		.and_then(|_response| tokio_tungstenite::connect_async(request))
+	let future = tokio_tungstenite::connect_async(request)
 		.map_err(|error| panic!("{}", error))
 		.and_then(|(web_socket_stream, _response)| {
 			let (sink, stream) = web_socket_stream.split();
-			let message = Message::Text("Hello World!".into());
-			let send_future = sink.sink_map_err(|error| panic!("{}", error)).send(message).map(|_| ());
+			let message = Message::Ping(TextMessage {
+				text: "Hello World!".into(),
+			});
+			let websocket_message =
+				tungstenite::Message::text(serde_json::to_string(&message).expect("Failed to convert message to JSON"));
+			let send_future = sink
+				.sink_map_err(|error| panic!("{}", error))
+				.send(websocket_message)
+				.map(|_| ());
 			let receive_future = stream
+				.map(|websocket_message| {
+					let json = websocket_message.to_text().expect("No text message received.");
+					Message::try_from(json).expect("Failed to parse JSON response")
+				})
 				.take(1)
 				.collect()
 				.map(|messages| {
 					assert_eq!(messages.len(), 1);
-					assert_eq!(messages[0], Message::Text("99".into()));
+					assert_eq!(
+						messages[0],
+						Message::Pong(TextMessage {
+							text: "Hello World!".into()
+						})
+					);
 				})
 				.map_err(|error| panic!("{}", error));
 			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
