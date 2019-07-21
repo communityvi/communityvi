@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde_derive::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::error::Error;
@@ -17,13 +17,15 @@ pub enum Message {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub struct OffsetMessage {
 	/// Server time in milliseconds when the playback of the medium has started
-	pub offset: u64,
+	#[serde(with = "millisecond_duration")]
+	pub offset: Duration,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ServerTimeMessage {
 	/// Monotonic time in milliseconds the server uses for synchronising playback
-	pub server_time: u64,
+	#[serde(with = "millisecond_duration")]
+	pub server_time: Duration,
 	/// Real time in UTC where the given server time belongs to.
 	#[serde(with = "millisecond_timestamp")]
 	pub real_time: DateTime<Utc>,
@@ -60,6 +62,28 @@ mod millisecond_timestamp {
 			}
 		};
 		Ok(date_time)
+	}
+}
+
+// see https://serde.rs/custom-date-format.html
+mod millisecond_duration {
+	use chrono::Duration;
+	use serde::{self, Deserialize, Deserializer, Serializer};
+
+	pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let timestamp = duration.num_milliseconds();
+		serializer.serialize_i64(timestamp)
+	}
+
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let timestamp = i64::deserialize(deserializer)?;
+		Ok(Duration::milliseconds(timestamp))
 	}
 }
 
@@ -111,7 +135,9 @@ mod test {
 
 	#[test]
 	fn offset_message_should_serialize_and_deserialize() {
-		let offset_message = Message::Offset(OffsetMessage { offset: 42 });
+		let offset_message = Message::Offset(OffsetMessage {
+			offset: Duration::milliseconds(42),
+		});
 		let json = serde_json::to_string(&offset_message).expect("Failed to serialize OffsetMessage to JSON.");
 		assert_eq!(json, r#"{"type":"offset","offset":42}"#);
 
@@ -123,7 +149,7 @@ mod test {
 	#[test]
 	fn server_time_message_should_serialize_and_deserialize() {
 		let server_time_message = Message::ServerTime(ServerTimeMessage {
-			server_time: 1337,
+			server_time: Duration::milliseconds(1337),
 			real_time: Utc.ymd(2019, 7, 21).and_hms_milli(13, 37, 42, 666),
 		});
 		let json = serde_json::to_string(&server_time_message).expect("Failed to serialize ServerTimeMessage to JSON.");
