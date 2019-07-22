@@ -5,6 +5,13 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct OrderedMessage {
+	pub number: u64,
+	#[serde(flatten)]
+	pub message: Message,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
@@ -102,6 +109,13 @@ impl From<Message> for WebSocketMessage {
 	}
 }
 
+impl From<OrderedMessage> for WebSocketMessage {
+	fn from(broadcast_message: OrderedMessage) -> Self {
+		let json = serde_json::to_string(&broadcast_message).expect("Failed to serialize BroadcastMessage to JSON.");
+		WebSocketMessage::text(json)
+	}
+}
+
 #[derive(Debug)]
 pub enum MessageError {
 	/// (error_message, message_content)
@@ -133,7 +147,27 @@ impl TryFrom<&str> for Message {
 	}
 }
 
+impl TryFrom<&str> for OrderedMessage {
+	type Error = MessageError;
+
+	fn try_from(json: &str) -> Result<Self, Self::Error> {
+		serde_json::from_str(&json)
+			.map_err(|error| MessageError::DeserializationFailed(error.to_string(), json.to_string()))
+	}
+}
+
 impl TryFrom<WebSocketMessage> for Message {
+	type Error = MessageError;
+
+	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
+		let json = websocket_message
+			.to_str()
+			.map_err(|()| MessageError::WrongMessageType(websocket_message.clone()))?;
+		json.try_into()
+	}
+}
+
+impl TryFrom<WebSocketMessage> for OrderedMessage {
 	type Error = MessageError;
 
 	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
@@ -210,5 +244,21 @@ mod test {
 		let deserialized_chat_message: Message =
 			serde_json::from_str(&json).expect("Failed to deserialize ChatMessage from JSON");
 		assert_eq!(deserialized_chat_message, chat_message);
+	}
+
+	#[test]
+	fn ordered_message_should_serialize_and_deserialize() {
+		let ordered_message = OrderedMessage {
+			number: 12,
+			message: Message::Chat(TextMessage {
+				text: "announcement".to_string(),
+			}),
+		};
+		let json = serde_json::to_string(&ordered_message).expect("Failed to serialize OrderedMessage to JSON");
+		assert_eq!(json, r#"{"number":12,"type":"chat","text":"announcement"}"#);
+
+		let deserialized_ordered_message: OrderedMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize BroadcastMessage from JSON");
+		assert_eq!(deserialized_ordered_message, ordered_message);
 	}
 }
