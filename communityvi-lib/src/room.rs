@@ -1,15 +1,15 @@
-use crate::message::Message;
+use crate::message::{Message, OrderedMessage};
 use contrie::ConSet;
 use futures::future::join_all;
 use futures::sync::mpsc::Sender;
 use futures::{Future, Sink};
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
 
 pub struct Room {
 	pub offset: AtomicI64,
 	next_client_id: AtomicUsize,
+	next_sequence_number: AtomicU64,
 	pub clients: ConSet<Client>,
 }
 
@@ -18,6 +18,7 @@ impl Default for Room {
 		Room {
 			offset: AtomicI64::new(0),
 			next_client_id: AtomicUsize::new(0),
+			next_sequence_number: AtomicU64::new(0),
 			clients: ConSet::new(),
 		}
 	}
@@ -25,7 +26,7 @@ impl Default for Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, sender: Sender<Message>) -> Client {
+	pub fn add_client(&self, sender: Sender<OrderedMessage>) -> Client {
 		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
 		let client = Client { id, sender };
 		let existing_client = self.clients.insert(client.clone());
@@ -35,8 +36,20 @@ impl Room {
 		client
 	}
 
+	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = ()> {
+		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
+		let ordered_message = OrderedMessage { number, message };
+		client.send(ordered_message)
+	}
+
 	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = ()> {
-		let futures: Vec<_> = self.clients.iter().map(|client| client.send(message.clone())).collect();
+		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
+		let ordered_message = OrderedMessage { number, message };
+		let futures: Vec<_> = self
+			.clients
+			.iter()
+			.map(|client| client.send(ordered_message.clone()))
+			.collect();
 		join_all(futures).map(|_| ()).map_err(|_| ())
 	}
 }
@@ -44,11 +57,11 @@ impl Room {
 #[derive(Clone)]
 pub struct Client {
 	id: usize,
-	pub sender: Sender<Message>,
+	sender: Sender<OrderedMessage>,
 }
 
 impl Client {
-	pub fn send(&self, message: Message) -> impl Future<Item = (), Error = ()> {
+	pub(self) fn send(&self, message: OrderedMessage) -> impl Future<Item = (), Error = ()> {
 		self
 			.sender
 			.clone()

@@ -1,4 +1,4 @@
-use crate::message::{Message, WebSocketMessage};
+use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
 use core::borrow::Borrow;
 use futures::future::{join_all, Either};
@@ -38,7 +38,7 @@ where
 			let room = room;
 
 			let (websocket_sink, websocket_stream) = websocket.split();
-			let (message_sender, message_receiver) = futures::sync::mpsc::channel::<Message>(1);
+			let (message_sender, message_receiver) = futures::sync::mpsc::channel::<OrderedMessage>(1);
 			let client = room.add_client(message_sender.clone());
 			let message_receive_future = message_receiver
 				.map(WebSocketMessage::from)
@@ -74,7 +74,7 @@ where
 
 fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = ()> {
 	match message {
-		Message::Ping(text_message) => Either::A(client.send(Message::Pong(text_message))),
+		Message::Ping(text_message) => Either::A(room.singlecast(client, Message::Pong(text_message))),
 		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
 		_ => unimplemented!(),
 	}

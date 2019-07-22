@@ -1,4 +1,4 @@
-use communityvi_lib::message::{Message, TextMessage};
+use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
 use communityvi_lib::server::create_server;
 use futures::future::join_all;
 use futures::future::Future;
@@ -33,7 +33,7 @@ fn should_set_and_get_offset() {
 fn websocket_connection() -> impl Future<
 	Item = (
 		impl Sink<SinkItem = Message, SinkError = ()>,
-		impl Stream<Item = Message, Error = ()>,
+		impl Stream<Item = OrderedMessage, Error = ()>,
 	),
 	Error = (),
 > {
@@ -51,7 +51,7 @@ fn websocket_connection() -> impl Future<
 				.map_err(|error| panic!("Stream error: {}", error))
 				.map(|websocket_message| {
 					let json = websocket_message.to_text().expect("No text message received.");
-					Message::try_from(json).expect("Failed to parse JSON response")
+					OrderedMessage::try_from(json).expect("Failed to parse JSON response")
 				});
 			let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message: Message| {
 				let websocket_message = tungstenite::Message::text(
@@ -74,9 +74,12 @@ fn should_respond_to_websocket_messages() {
 			assert_eq!(messages.len(), 1);
 			assert_eq!(
 				messages[0],
-				Message::Pong(TextMessage {
-					text: "Hello World!".into()
-				})
+				OrderedMessage {
+					number: 0,
+					message: Message::Pong(TextMessage {
+						text: "Hello World!".into()
+					})
+				}
 			);
 		});
 		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
@@ -94,17 +97,20 @@ fn should_broadcast_messages() {
 			let message = Message::Chat(TextMessage {
 				text: r#"Hello everyone \o/"#.into(),
 			});
-			let message_for_receive_future1 = message.clone();
-			let message_for_receive_future2 = message.clone();
+			let ordered_message1 = OrderedMessage {
+				number: 0,
+				message: message.clone(),
+			};
+			let ordered_message2 = ordered_message1.clone();
 
 			let send_future = sink.send(message).map(|_| ());
 			let receive_future1 = stream1.take(1).collect().map(move |messages| {
 				assert_eq!(messages.len(), 1);
-				assert_eq!(messages[0], message_for_receive_future1);
+				assert_eq!(messages[0], ordered_message1);
 			});
 			let receive_future2 = stream2.take(1).collect().map(move |messages| {
 				assert_eq!(messages.len(), 1);
-				assert_eq!(messages[0], message_for_receive_future2);
+				assert_eq!(messages[0], ordered_message2);
 			});
 			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> = vec![
 				Box::new(send_future),
@@ -113,6 +119,39 @@ fn should_broadcast_messages() {
 			];
 			join_all(futures).map(|_| ()).map_err(|_| ())
 		});
+	test_future_with_running_server(future);
+}
+
+#[test]
+fn test_messages_should_have_sequence_numbers() {
+	let future = websocket_connection().and_then(|(sink, stream)| {
+		let first_message = Message::Chat(TextMessage { text: "first".into() });
+		let second_message = Message::Chat(TextMessage { text: "second".into() });
+
+		let first_ordered_message = OrderedMessage {
+			number: 0,
+			message: first_message.clone(),
+		};
+		let second_ordered_message = OrderedMessage {
+			number: 1,
+			message: second_message.clone(),
+		};
+
+		let send_future = sink
+			.send(first_message)
+			.and_then(move |sink| sink.send(second_message))
+			.map(|_sink| ());
+
+		let receive_future = stream.take(2).collect().map(move |ordered_messages| {
+			assert_eq!(ordered_messages.len(), 2);
+			assert_eq!(ordered_messages[0], first_ordered_message);
+			assert_eq!(ordered_messages[1], second_ordered_message);
+		});
+
+		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
+			vec![Box::new(send_future), Box::new(receive_future)];
+		join_all(futures).map(|_results| ())
+	});
 	test_future_with_running_server(future);
 }
 
