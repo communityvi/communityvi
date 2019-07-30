@@ -1,16 +1,21 @@
 use crate::message::{Message, OrderedMessage};
+use crate::Never;
 use contrie::ConSet;
 use futures::future::join_all;
-use futures::sync::mpsc::Sender;
+use futures::sync::mpsc::{SendError, Sender};
 use futures::{Future, Sink};
+use log::info;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 pub struct Room {
 	pub offset: AtomicI64,
 	next_client_id: AtomicUsize,
 	next_sequence_number: AtomicU64,
-	pub clients: ConSet<Client>,
+	pub clients: Arc<ConSet<Client>>,
 }
 
 impl Default for Room {
@@ -19,7 +24,7 @@ impl Default for Room {
 			offset: AtomicI64::new(0),
 			next_client_id: AtomicUsize::new(0),
 			next_sequence_number: AtomicU64::new(0),
-			clients: ConSet::new(),
+			clients: Arc::new(ConSet::new()),
 		}
 	}
 }
@@ -36,39 +41,80 @@ impl Room {
 		client
 	}
 
-	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = ()> {
+	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = Never> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
-		client.send(ordered_message)
+		let clients = self.clients.clone();
+		client.send(ordered_message).then(move |result| {
+			let _ = result.map_err(|error| {
+				// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
+				clients.remove(&error.client);
+				info!("Client with id {} has gone away.", error.client.id())
+			});
+			Ok(())
+		})
 	}
 
-	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = ()> {
+	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = Never> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
+		let clients = self.clients.clone();
 		let futures: Vec<_> = self
 			.clients
 			.iter()
-			.map(|client| client.send(ordered_message.clone()))
+			.map(move |client| {
+				let clients = clients.clone();
+				client.send(ordered_message.clone()).then(move |result| {
+					let _ = result.map_err(|error| {
+						// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
+						clients.remove(&error.client);
+						info!("Client with id {} has gone away.", error.client.id());
+					});
+					Ok(())
+				})
+			})
 			.collect();
-		join_all(futures).map(|_| ()).map_err(|_| ())
+		join_all(futures).map(|_results: Vec<()>| ())
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
 	id: usize,
 	sender: Sender<OrderedMessage>,
 }
 
+#[derive(Debug)]
+struct ClientSendError {
+	pub client: Client,
+}
+
+impl Display for ClientSendError {
+	fn fmt(&self, formatter: &mut Formatter) -> Result<(), std::fmt::Error> {
+		write!(formatter, "Failed to send message to client: {}", self.client.id())
+	}
+}
+
+impl From<Client> for ClientSendError {
+	fn from(client: Client) -> Self {
+		ClientSendError { client }
+	}
+}
+
+impl Error for ClientSendError {}
+
 impl Client {
-	pub(self) fn send(&self, message: OrderedMessage) -> impl Future<Item = (), Error = ()> {
-		self
-			.sender
+	pub(self) fn id(&self) -> usize {
+		self.id
+	}
+
+	pub(self) fn send(&self, message: OrderedMessage) -> impl Future<Item = (), Error = ClientSendError> {
+		let client = self.clone();
+		self.sender
 			.clone()
 			.send(message)
 			.map(|_| ())
-			// Discarding the SendError is ok since the other end might have been legitimately dropped
-			.map_err(|_send_error| ())
+			.map_err(move |_send_error: SendError<OrderedMessage>| client.into())
 	}
 }
 

@@ -1,5 +1,6 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
+use crate::Never;
 use core::borrow::Borrow;
 use futures::future::{join_all, Either};
 use futures::sink::Sink;
@@ -55,7 +56,7 @@ where
 				})
 				.and_then(move |message| {
 					let room = room.borrow();
-					handle_message(room, &client, message)
+					handle_message(room, &client, message).map_err(|_: Never| ())
 				})
 				.for_each(|()| futures::future::ok(()));
 
@@ -72,7 +73,7 @@ where
 	future
 }
 
-fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = ()> {
+fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Never> {
 	match message {
 		Message::Ping(text_message) => Either::A(room.singlecast(client, Message::Pong(text_message))),
 		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
