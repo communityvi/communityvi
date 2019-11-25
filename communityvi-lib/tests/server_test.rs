@@ -4,12 +4,18 @@ use futures::future::join_all;
 use futures::future::Future;
 use futures::sink::Sink;
 use futures::stream::Stream;
+use lazy_static::lazy_static;
+use parking_lot::Mutex;
 use std::convert::TryFrom;
 use std::fmt::Debug;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use url::Url;
 
 const URL: &str = "http://localhost:8000";
+lazy_static! {
+	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
+}
 
 #[test]
 fn should_set_and_get_offset() {
@@ -161,6 +167,7 @@ where
 	ErrorType: Send + Debug + 'static,
 	FutureType: Future<Item = ItemType, Error = ErrorType> + Send + 'static,
 {
+	let guard = TEST_MUTEX.lock();
 	let (sender, receiver) = futures::sync::oneshot::channel();
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
 	let mut runtime = Runtime::new().expect("Failed to create runtime");
@@ -172,6 +179,8 @@ where
 	});
 
 	let result = runtime.block_on(future);
+	std::thread::sleep(Duration::from_millis(20)); // Wait for port to be free to use again
+	std::mem::drop(guard);
 	match result {
 		Err(error) => panic!("{:?}", error),
 		Ok(value) => value,
