@@ -2,10 +2,10 @@ use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
 use crate::Never;
 use core::borrow::Borrow;
-use futures::future::{join_all, Either};
-use futures::sink::Sink;
-use futures::stream::Stream;
-use futures::{Future, IntoFuture};
+use futures01::future::{join_all, Either};
+use futures01::sink::Sink;
+use futures01::stream::Stream;
+use futures01::{Future, IntoFuture};
 use std::convert::Into;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
@@ -39,7 +39,7 @@ where
 			let room = room;
 
 			let (websocket_sink, websocket_stream) = websocket.split();
-			let (message_sender, message_receiver) = futures::sync::mpsc::channel::<OrderedMessage>(1);
+			let (message_sender, message_receiver) = futures01::sync::mpsc::channel::<OrderedMessage>(1);
 			let client = room.add_client(message_sender.clone());
 			let message_receive_future = message_receiver
 				.map(WebSocketMessage::from)
@@ -47,7 +47,7 @@ where
 				.map(|_| ());
 
 			let stream_future = websocket_stream
-				.take_while(|websocket_message| futures::future::ok(!websocket_message.is_close()))
+				.take_while(|websocket_message| futures01::future::ok(!websocket_message.is_close()))
 				.map_err(|error| eprintln!("Error streaming websocket messages: {}", error))
 				.and_then(|websocket_message| {
 					Message::try_from(websocket_message)
@@ -58,7 +58,7 @@ where
 					let room = room.borrow();
 					handle_message(room, &client, message).map_err(|_: Never| ())
 				})
-				.for_each(|()| futures::future::ok(()));
+				.for_each(|()| futures01::future::ok(()));
 
 			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
 				vec![Box::new(message_receive_future), Box::new(stream_future)];

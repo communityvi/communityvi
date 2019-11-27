@@ -1,9 +1,9 @@
 use crate::message::{Message, OrderedMessage};
 use crate::Never;
 use contrie::ConSet;
-use futures::future::join_all;
-use futures::sync::mpsc::{SendError, Sender};
-use futures::{Future, Sink};
+use futures01::future::join_all;
+use futures01::sync::mpsc::{SendError, Sender};
+use futures01::{Future, Sink};
 use log::info;
 use std::error::Error;
 use std::fmt::{Display, Formatter};

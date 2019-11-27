@@ -1,9 +1,9 @@
 use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
 use communityvi_lib::server::create_server;
-use futures::future::join_all;
-use futures::future::Future;
-use futures::sink::Sink;
-use futures::stream::Stream;
+use futures01::future::join_all;
+use futures01::future::Future;
+use futures01::sink::Sink;
+use futures01::stream::Stream;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
@@ -63,7 +63,7 @@ fn websocket_connection() -> impl Future<
 				let websocket_message = tungstenite::Message::text(
 					serde_json::to_string(&message).expect("Failed to convert message to JSON"),
 				);
-				futures::future::ok(websocket_message)
+				futures01::future::ok(websocket_message)
 			});
 			(sink, stream)
 		})
@@ -168,7 +168,7 @@ where
 	FutureType: Future<Item = ItemType, Error = ErrorType> + Send + 'static,
 {
 	let guard = TEST_MUTEX.lock();
-	let (sender, receiver) = futures::sync::oneshot::channel();
+	let (sender, receiver) = futures01::sync::oneshot::channel();
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
 	let mut runtime = Runtime::new().expect("Failed to create runtime");
 	runtime.spawn(server);
