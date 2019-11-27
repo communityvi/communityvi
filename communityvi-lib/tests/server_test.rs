@@ -9,7 +9,7 @@ use parking_lot::Mutex;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::time::Duration;
-use tokio::runtime::Runtime;
+use tokio_compat::runtime::Runtime;
 use url::Url;
 
 const URL: &str = "http://localhost:8000";
@@ -170,7 +170,7 @@ where
 	let guard = TEST_MUTEX.lock();
 	let (sender, receiver) = futures01::sync::oneshot::channel();
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
-	let mut runtime = Runtime::new().expect("Failed to create runtime");
+	let runtime = Runtime::new().expect("Failed to create runtime");
 	runtime.spawn(server);
 
 	let future = future_to_test.then(|test_result| {
