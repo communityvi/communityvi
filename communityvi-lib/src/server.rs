@@ -2,6 +2,9 @@ use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
 use crate::Never;
 use core::borrow::Borrow;
+use futures::compat::Future01CompatExt;
+use futures::FutureExt;
+use futures::TryFutureExt;
 use futures01::future::{join_all, Either};
 use futures01::sink::Sink;
 use futures01::stream::Stream;
@@ -17,9 +20,9 @@ use warp::Filter;
 pub fn create_server<ShutdownHandleType>(
 	address: impl Into<SocketAddr> + 'static,
 	shutdown_handle: ShutdownHandleType,
-) -> impl Future<Item = (), Error = ()>
+) -> impl std::future::Future<Output = ()>
 where
-	ShutdownHandleType: Future<Item = ()> + Send + 'static,
+	ShutdownHandleType: std::future::Future<Output = ()> + Send + 'static,
 {
 	let room = Arc::new(Room::default());
 
@@ -69,8 +72,9 @@ where
 	let filter = websocket_filter.or(get_state).or(post_state);
 	let server = warp::serve(filter);
 
-	let (_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
-	future
+	let compat_shutdown_handle = shutdown_handle.unit_error().boxed().compat();
+	let (_address, future) = server.bind_with_graceful_shutdown(address, compat_shutdown_handle);
+	future.compat().then(|_| futures::future::ready(()))
 }
 
 fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Never> {

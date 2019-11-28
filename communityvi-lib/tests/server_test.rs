@@ -1,5 +1,6 @@
 use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
 use communityvi_lib::server::create_server;
+use futures::FutureExt;
 use futures01::future::join_all;
 use futures01::future::Future;
 use futures01::sink::Sink;
@@ -168,10 +169,11 @@ where
 	FutureType: Future<Item = ItemType, Error = ErrorType> + Send + 'static,
 {
 	let guard = TEST_MUTEX.lock();
-	let (sender, receiver) = futures01::sync::oneshot::channel();
+	let (sender, receiver) = futures::channel::oneshot::channel();
+	let receiver = receiver.then(|_| futures::future::ready(()));
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
 	let runtime = Runtime::new().expect("Failed to create runtime");
-	runtime.spawn(server);
+	runtime.spawn_std(server);
 
 	let future = future_to_test.then(|test_result| {
 		sender.send(()).expect("Must send shutdown signal.");
