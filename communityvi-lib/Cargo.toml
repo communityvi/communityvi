@@ -5,12 +5,12 @@ authors = ["Max Bruckner <max@maxbruckner.de>"]
 edition = "2018"
 
 [dependencies]
-config = "0.9"
+config = "0.10.1"
 log = "0.4.6"
 env_logger = "0.7.1"
 warp = "0.1.18"
 tungstenite = "0.9.2"
-futures01 = { package = "futures", version = "0.1.27" }
+futures01 = { package = "futures", version = "0.1.29" }
 futures = "0.3.1"
 tokio-compat = "0.1.2"
 tokio = { version = "0.2.1", features = ["full"] }
