@@ -1,10 +1,10 @@
 use crate::message::{Message, OrderedMessage};
-use crate::Never;
 use contrie::ConSet;
 use futures01::future::join_all;
 use futures01::sync::mpsc::{SendError, Sender};
 use futures01::{Future, Sink};
 use log::info;
+use std::convert::Infallible;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -41,7 +41,7 @@ impl Room {
 		client
 	}
 
-	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = Never> {
+	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = Infallible> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
 		let clients = self.clients.clone();
@@ -55,7 +55,7 @@ impl Room {
 		})
 	}
 
-	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = Never> {
+	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = Infallible> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
 		let clients = self.clients.clone();

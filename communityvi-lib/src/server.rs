@@ -1,6 +1,5 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
-use crate::Never;
 use core::borrow::Borrow;
 use futures::compat::Future01CompatExt;
 use futures::FutureExt;
@@ -9,8 +8,8 @@ use futures01::future::{join_all, Either};
 use futures01::sink::Sink;
 use futures01::stream::Stream;
 use futures01::{Future, IntoFuture};
-use std::convert::Into;
 use std::convert::TryFrom;
+use std::convert::{Infallible, Into};
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -59,7 +58,7 @@ where
 				})
 				.and_then(move |message| {
 					let room = room.borrow();
-					handle_message(room, &client, message).map_err(|_: Never| ())
+					handle_message(room, &client, message).map_err(|_: Infallible| ())
 				})
 				.for_each(|()| futures01::future::ok(()));
 
@@ -77,7 +76,7 @@ where
 	future.compat().then(|_| futures::future::ready(()))
 }
 
-fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Never> {
+fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Infallible> {
 	match message {
 		Message::Ping(text_message) => Either::A(room.singlecast(client, Message::Pong(text_message))),
 		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
