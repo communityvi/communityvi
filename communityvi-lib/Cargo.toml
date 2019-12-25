@@ -12,7 +12,7 @@ warp = "0.1.18"
 tungstenite = "0.9.2"
 futures01 = { package = "futures", version = "0.1.27" }
 futures = "0.3.1"
-tokio-compat = { git = "https://github.com/tokio-rs/tokio-compat" }
+tokio-compat = "0.1.2"
 tokio = { version = "0.2.1", features = ["full"] }
 http = "0.1.17"
 chrono = "0.4.7"

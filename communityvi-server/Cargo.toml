@@ -7,4 +7,4 @@ edition = "2018"
 [dependencies]
 communityvi-lib = {path = "../communityvi-lib"}
 futures = { version = "0.3.0", features = ["compat"] }
-tokio-compat = { git = "https://github.com/tokio-rs/tokio-compat"}
+tokio-compat = "0.1.2"

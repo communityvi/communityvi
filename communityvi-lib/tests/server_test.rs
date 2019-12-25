@@ -172,7 +172,7 @@ where
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
-	let runtime = Runtime::new().expect("Failed to create runtime");
+	let mut runtime = Runtime::new().expect("Failed to create runtime");
 	runtime.spawn_std(server);
 
 	let future = future_to_test.then(|test_result| {
