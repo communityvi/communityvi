@@ -1,7 +1,7 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
 use core::borrow::Borrow;
-use futures::compat::Future01CompatExt;
+use futures::compat::{Compat, Future01CompatExt};
 use futures::FutureExt;
 use futures::TryFutureExt;
 use futures01::future::{join_all, Either};
@@ -62,7 +62,7 @@ where
 				})
 				.for_each(|()| futures01::future::ok(()));
 
-			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
+			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
 				vec![Box::new(message_receive_future), Box::new(stream_future)];
 			join_all(futures).map(|_| ()).map_err(|_| ())
 		})
@@ -78,7 +78,14 @@ where
 
 fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Infallible> {
 	match message {
-		Message::Ping(text_message) => Either::A(room.singlecast(client, Message::Pong(text_message))),
+		Message::Ping(text_message) => {
+			let future = room
+				.singlecast(client, Message::Pong(text_message))
+				.never_error()
+				.boxed();
+			let compat = Compat::new(future);
+			Either::A(compat)
+		}
 		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
 		_ => unimplemented!(),
 	}

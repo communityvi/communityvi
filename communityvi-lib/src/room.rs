@@ -10,6 +10,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use futures::compat::Future01CompatExt;
 
 pub struct Room {
 	pub offset: AtomicI64,
@@ -41,18 +42,18 @@ impl Room {
 		client
 	}
 
-	pub fn singlecast(&self, client: &Client, message: Message) -> impl Future<Item = (), Error = Infallible> {
+	pub fn singlecast(&self, client: &Client, message: Message) -> impl std::future::Future<Output = ()> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
 		let clients = self.clients.clone();
-		client.send(ordered_message).then(move |result| {
-			let _ = result.map_err(|error| {
+		let client = client.clone();
+		async move {
+			let _ = client.send_async(ordered_message).await.map_err(|error| {
 				// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 				clients.remove(&error.client);
-				info!("Client with id {} has gone away.", error.client.id())
+				info!("Client with id {} has gone away.", error.client.id());
 			});
-			Ok(())
-		})
+		}
 	}
 
 	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = Infallible> {
@@ -115,6 +116,14 @@ impl Client {
 			.send(message)
 			.map(|_| ())
 			.map_err(move |_send_error: SendError<OrderedMessage>| client.into())
+	}
+
+	async fn send_async(&self, message: OrderedMessage) -> Result<(), ClientSendError> {
+		let client = self.clone();
+		let send_result = self.sender.clone().send(message).compat().await;
+		send_result
+			.map(|_: Sender<_>| ())
+			.map_err(|_: SendError<_>| client.into())
 	}
 }
 
