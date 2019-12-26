@@ -41,31 +41,26 @@ impl Room {
 		client
 	}
 
-	pub fn singlecast(&self, client: &Client, message: Message) -> impl std::future::Future<Output = ()> {
+	pub async fn singlecast(&self, client: &Client, message: Message) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
-		let clients = self.clients.clone();
-		let client = client.clone();
-		async move {
-			let _ = client.send(ordered_message).await.map_err(|error| {
-				// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
-				clients.remove(&error.client);
-				info!("Client with id {} has gone away.", error.client.id());
-			});
-		}
+		let _ = client.send(ordered_message).await.map_err(|error| {
+			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
+			self.clients.remove(&error.client);
+			info!("Client with id {} has gone away.", error.client.id());
+		});
 	}
 
-	pub fn broadcast(&self, message: Message) -> impl std::future::Future<Output = ()> {
+	pub async fn broadcast(&self, message: Message) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
-		let clients = self.clients.clone();
 		let futures: Vec<_> = self
 			.clients
 			.iter()
-			.map(move |client| {
-				let clients = clients.clone();
+			.map(|client| {
 				let ordered_message = ordered_message.clone();
 				async move {
+					let clients = self.clients.clone();
 					let _ = client.send(ordered_message).await.map_err(|error| {
 						// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 						clients.remove(&error.client);
@@ -74,7 +69,7 @@ impl Room {
 				}
 			})
 			.collect();
-		futures::future::join_all(futures).map(|_: Vec<()>| ())
+		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
 	}
 }
 
