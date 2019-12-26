@@ -1,15 +1,14 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
-use core::borrow::Borrow;
-use futures::compat::{Compat, Future01CompatExt};
+use futures::compat::Future01CompatExt;
 use futures::FutureExt;
 use futures::TryFutureExt;
 use futures01::future::join_all;
 use futures01::sink::Sink;
 use futures01::stream::Stream;
 use futures01::{Future, IntoFuture};
+use std::convert::Into;
 use std::convert::TryFrom;
-use std::convert::{Infallible, Into};
 use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -57,8 +56,8 @@ where
 						.map_err(|error| eprintln!("Error converting messages: {}", error))
 				})
 				.and_then(move |message| {
-					let room = room.borrow();
-					handle_message(room, &client, message).map_err(|_: Infallible| ())
+					let room = room.clone();
+					handle_message(room, &client, message).unit_error().boxed().compat()
 				})
 				.for_each(|()| futures01::future::ok(()));
 
@@ -76,19 +75,13 @@ where
 	future.compat().then(|_| futures::future::ready(()))
 }
 
-fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future<Item = (), Error = Infallible> {
-	match message {
-		Message::Ping(text_message) => {
-			let future = room
-				.singlecast(client, Message::Pong(text_message))
-				.never_error()
-				.boxed();
-			Compat::new(future)
+fn handle_message(room: Arc<Room>, client: &Client, message: Message) -> impl std::future::Future<Output = ()> {
+	let client = client.clone();
+	async move {
+		match message {
+			Message::Ping(text_message) => room.singlecast(&client, Message::Pong(text_message)).await,
+			Message::Chat(text_message) => room.broadcast(Message::Chat(text_message)).await,
+			_ => unimplemented!(),
 		}
-		Message::Chat(text_message) => {
-			let future = room.broadcast(Message::Chat(text_message)).never_error().boxed();
-			Compat::new(future)
-		}
-		_ => unimplemented!(),
 	}
 }
