@@ -86,7 +86,11 @@ fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future
 			let compat = Compat::new(future);
 			Either::A(compat)
 		}
-		Message::Chat(text_message) => Either::B(room.broadcast(Message::Chat(text_message))),
+		Message::Chat(text_message) => {
+			let future = room.broadcast(Message::Chat(text_message)).never_error().boxed();
+			let compat = Compat::new(future);
+			Either::B(compat)
+		}
 		_ => unimplemented!(),
 	}
 }

@@ -1,16 +1,15 @@
 use crate::message::{Message, OrderedMessage};
 use contrie::ConSet;
-use futures01::future::join_all;
+use futures::compat::Future01CompatExt;
+use futures::FutureExt;
 use futures01::sync::mpsc::{SendError, Sender};
-use futures01::{Future, Sink};
+use futures01::Sink;
 use log::info;
-use std::convert::Infallible;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use futures::compat::Future01CompatExt;
 
 pub struct Room {
 	pub offset: AtomicI64,
@@ -48,7 +47,7 @@ impl Room {
 		let clients = self.clients.clone();
 		let client = client.clone();
 		async move {
-			let _ = client.send_async(ordered_message).await.map_err(|error| {
+			let _ = client.send(ordered_message).await.map_err(|error| {
 				// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 				clients.remove(&error.client);
 				info!("Client with id {} has gone away.", error.client.id());
@@ -56,7 +55,7 @@ impl Room {
 		}
 	}
 
-	pub fn broadcast(&self, message: Message) -> impl Future<Item = (), Error = Infallible> {
+	pub fn broadcast(&self, message: Message) -> impl std::future::Future<Output = ()> {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
 		let ordered_message = OrderedMessage { number, message };
 		let clients = self.clients.clone();
@@ -65,17 +64,17 @@ impl Room {
 			.iter()
 			.map(move |client| {
 				let clients = clients.clone();
-				client.send(ordered_message.clone()).then(move |result| {
-					let _ = result.map_err(|error| {
+				let ordered_message = ordered_message.clone();
+				async move {
+					let _ = client.send(ordered_message).await.map_err(|error| {
 						// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 						clients.remove(&error.client);
 						info!("Client with id {} has gone away.", error.client.id());
 					});
-					Ok(())
-				})
+				}
 			})
 			.collect();
-		join_all(futures).map(|_results: Vec<()>| ())
+		futures::future::join_all(futures).map(|_: Vec<()>| ())
 	}
 }
 
@@ -109,16 +108,7 @@ impl Client {
 		self.id
 	}
 
-	pub(self) fn send(&self, message: OrderedMessage) -> impl Future<Item = (), Error = ClientSendError> {
-		let client = self.clone();
-		self.sender
-			.clone()
-			.send(message)
-			.map(|_| ())
-			.map_err(move |_send_error: SendError<OrderedMessage>| client.into())
-	}
-
-	async fn send_async(&self, message: OrderedMessage) -> Result<(), ClientSendError> {
+	async fn send(&self, message: OrderedMessage) -> Result<(), ClientSendError> {
 		let client = self.clone();
 		let send_result = self.sender.clone().send(message).compat().await;
 		send_result
