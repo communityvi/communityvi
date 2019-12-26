@@ -54,7 +54,7 @@ async fn websocket_connection() -> (
 		url: websocket_url,
 		extra_headers: None,
 	};
-	let (websocket_stream, _response) = tokio2_tungstenite::connect_async(request)
+	let (websocket_stream, _response) = tokio_tungstenite::connect_async(request)
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
 		.unwrap();
