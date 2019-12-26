@@ -1,6 +1,6 @@
 use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
 use communityvi_lib::server::create_server;
-use futures::FutureExt;
+use futures::{FutureExt, SinkExt, StreamExt};
 use futures01::future::join_all;
 use futures01::future::Future;
 use futures01::sink::Sink;
@@ -82,30 +82,55 @@ fn websocket_connection() -> impl Future<
 		})
 }
 
+async fn websocket_connection_async() -> (
+	impl futures::Sink<Message, Error = ()>,
+	impl futures::Stream<Item = OrderedMessage>,
+) {
+	let mut websocket_url = Url::parse(&format!("{}/ws", URL)).expect("Failed to parse URL");
+	websocket_url.set_scheme("ws").expect("Failed to set URL scheme.");
+	let request = tungstenite::handshake::client::Request {
+		url: websocket_url,
+		extra_headers: None,
+	};
+	let (websocket_stream, _response) = tokio2_tungstenite::connect_async(request)
+		.await
+		.map_err(|error| panic!("Websocket connection failed: {}", error))
+		.unwrap();
+	let (sink, stream) = websocket_stream.split();
+	let stream = stream.map(|result| {
+		let websocket_message = result.expect("Stream error.");
+		let json = websocket_message.to_text().expect("No text message received.");
+		OrderedMessage::try_from(json).expect("Failed to parse JSON response")
+	});
+	let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message| {
+		let websocket_message =
+			tungstenite::Message::text(serde_json::to_string(&message).expect("Failed to convert message to JSON"));
+		futures::future::ok(websocket_message)
+	});
+	(sink, stream)
+}
+
 #[test]
 fn should_respond_to_websocket_messages() {
-	let future = websocket_connection().and_then(|(sink, stream)| {
+	let future = async {
+		let (mut sink, stream) = websocket_connection_async().await;
 		let message = Message::Ping(TextMessage {
 			text: "Hello World!".into(),
 		});
-		let send_future = sink.send(message).map(|_| ());
-		let receive_future = stream.take(1).collect().map(|messages| {
-			assert_eq!(messages.len(), 1);
-			assert_eq!(
-				messages[0],
-				OrderedMessage {
-					number: 0,
-					message: Message::Pong(TextMessage {
-						text: "Hello World!".into()
-					})
-				}
-			);
-		});
-		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
-			vec![Box::new(send_future), Box::new(receive_future)];
-		join_all(futures)
-	});
-	test_future_with_running_server(future);
+		sink.send(message).await.expect("Failed to sink message.");
+		stream.take(1).collect().await
+	};
+	let messages: Vec<_> = test_std_future_with_running_server(future);
+	assert_eq!(messages.len(), 1);
+	assert_eq!(
+		messages[0],
+		OrderedMessage {
+			number: 0,
+			message: Message::Pong(TextMessage {
+				text: "Hello World!".into()
+			})
+		}
+	);
 }
 
 #[test]
