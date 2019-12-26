@@ -23,6 +23,7 @@ contrie = "0.1.4"
 
 [dev-dependencies]
 reqwest = "0.9.18"
+reqwest10 = { package = "reqwest", git = "https://github.com/seanmonstar/reqwest", rev = "47734f55f4cf60b928973e61afb957f9e6bcaf61", features = [ "json" ] }
 tokio-tungstenite = "0.9.0"
 url = "2.1.0"
 parking_lot = "0.10.0"
