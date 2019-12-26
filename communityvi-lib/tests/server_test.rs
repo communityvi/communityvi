@@ -135,35 +135,32 @@ fn should_respond_to_websocket_messages() {
 
 #[test]
 fn should_broadcast_messages() {
-	let future = websocket_connection()
-		.and_then(|(sink1, stream1)| websocket_connection().map(|(_sink2, stream2)| (sink1, stream1, stream2)))
-		.and_then(|(sink, stream1, stream2)| {
-			let message = Message::Chat(TextMessage {
-				text: r#"Hello everyone \o/"#.into(),
-			});
-			let ordered_message1 = OrderedMessage {
-				number: 0,
-				message: message.clone(),
-			};
-			let ordered_message2 = ordered_message1.clone();
+	let message = Message::Chat(TextMessage {
+		text: r#"Hello everyone \o/"#.into(),
+	});
+	let ordered_message = OrderedMessage {
+		number: 0,
+		message: message.clone(),
+	};
+	let message_for_future = message.clone();
+	let future = async move {
+		let (mut sink1, stream1) = websocket_connection_async().await;
+		let (_sink2, stream2) = websocket_connection_async().await;
 
-			let send_future = sink.send(message).map(|_| ());
-			let receive_future1 = stream1.take(1).collect().map(move |messages| {
-				assert_eq!(messages.len(), 1);
-				assert_eq!(messages[0], ordered_message1);
-			});
-			let receive_future2 = stream2.take(1).collect().map(move |messages| {
-				assert_eq!(messages.len(), 1);
-				assert_eq!(messages[0], ordered_message2);
-			});
-			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> = vec![
-				Box::new(send_future),
-				Box::new(receive_future1),
-				Box::new(receive_future2),
-			];
-			join_all(futures).map(|_| ()).map_err(|_| ())
-		});
-	test_future_with_running_server(future);
+		sink1
+			.send(message_for_future)
+			.await
+			.expect("Failed to sink broadcast message.");
+
+		let received_messages1: Vec<_> = stream1.take(1).collect().await;
+		let received_messages2: Vec<_> = stream2.take(1).collect().await;
+		(received_messages1, received_messages2)
+	};
+	let (received_messages1, received_messages2) = test_std_future_with_running_server(future);
+	assert_eq!(received_messages1.len(), 1);
+	assert_eq!(received_messages2.len(), 1);
+	assert_eq!(received_messages1[0], ordered_message);
+	assert_eq!(received_messages2[0], ordered_message);
 }
 
 #[test]
