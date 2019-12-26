@@ -4,7 +4,7 @@ use core::borrow::Borrow;
 use futures::compat::{Compat, Future01CompatExt};
 use futures::FutureExt;
 use futures::TryFutureExt;
-use futures01::future::{join_all, Either};
+use futures01::future::join_all;
 use futures01::sink::Sink;
 use futures01::stream::Stream;
 use futures01::{Future, IntoFuture};
@@ -83,13 +83,11 @@ fn handle_message(room: &Room, client: &Client, message: Message) -> impl Future
 				.singlecast(client, Message::Pong(text_message))
 				.never_error()
 				.boxed();
-			let compat = Compat::new(future);
-			Either::A(compat)
+			Compat::new(future)
 		}
 		Message::Chat(text_message) => {
 			let future = room.broadcast(Message::Chat(text_message)).never_error().boxed();
-			let compat = Compat::new(future);
-			Either::B(compat)
+			Compat::new(future)
 		}
 		_ => unimplemented!(),
 	}
