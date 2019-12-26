@@ -20,20 +20,32 @@ lazy_static! {
 
 #[test]
 fn should_set_and_get_offset() {
-	let client = reqwest::r#async::Client::new();
+	let client = reqwest10::Client::new();
 	let new_offset = 1337u64;
-	let post_request = client
-		.post(&format!("{url}/{offset}", url = URL, offset = new_offset))
-		.build()
-		.unwrap();
-	let get_request = client.get(URL).build().unwrap();
+	let future = async move {
+		let set_offset_request = client
+			.post(&format!("{url}/{offset}", url = URL, offset = new_offset))
+			.build()
+			.unwrap();
+		let set_offset_was_successful = client
+			.execute(set_offset_request)
+			.await
+			.expect("Error during post request.")
+			.status()
+			.is_success();
+		assert!(set_offset_was_successful);
 
-	let post_future = client.execute(post_request);
-	let get_future = client.execute(get_request).and_then(|mut response| response.json());
+		let get_offset_request = client.get(URL).build().unwrap();
+		client
+			.execute(get_offset_request)
+			.await
+			.expect("Error during get request.")
+			.json()
+			.await
+			.expect("Failed to decode response.")
+	};
 
-	let future = post_future.and_then(|_| get_future);
-
-	let offset: u64 = test_future_with_running_server(future);
+	let offset: u64 = test_std_future_with_running_server(future);
 	assert_eq!(offset, new_offset);
 }
 
@@ -187,4 +199,27 @@ where
 		Err(error) => panic!("{:?}", error),
 		Ok(value) => value,
 	}
+}
+
+fn test_std_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
+where
+	OutputType: Send + 'static,
+	FutureType: std::future::Future<Output = OutputType> + Send + 'static,
+{
+	let _guard = TEST_MUTEX.lock();
+	let (sender, receiver) = futures::channel::oneshot::channel();
+	let receiver = receiver.then(|_| futures::future::ready(()));
+	let server = create_server(([127, 0, 0, 1], 8000), receiver);
+	let mut runtime = Runtime::new().expect("Failed to create runtime");
+	runtime.spawn_std(server);
+
+	let future = async {
+		let output = future_to_test.await;
+		sender.send(()).expect("Failed to send shutdown");
+		output
+	};
+
+	let output = runtime.block_on_std(future);
+	std::thread::sleep(Duration::from_millis(20)); // Wait for port to be free to use again
+	output
 }
