@@ -1,14 +1,9 @@
 use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
 use communityvi_lib::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
-use futures01::future::join_all;
-use futures01::future::Future;
-use futures01::sink::Sink;
-use futures01::stream::Stream;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
-use std::fmt::Debug;
 use std::time::Duration;
 use tokio_compat::runtime::Runtime;
 use url::Url;
@@ -45,44 +40,11 @@ fn should_set_and_get_offset() {
 			.expect("Failed to decode response.")
 	};
 
-	let offset: u64 = test_std_future_with_running_server(future);
+	let offset: u64 = test_future_with_running_server(future);
 	assert_eq!(offset, new_offset);
 }
 
-fn websocket_connection() -> impl Future<
-	Item = (
-		impl Sink<SinkItem = Message, SinkError = ()>,
-		impl Stream<Item = OrderedMessage, Error = ()>,
-	),
-	Error = (),
-> {
-	let mut websocket_url = Url::parse(&format!("{}/ws", URL)).expect("Failed to parse URL");
-	websocket_url.set_scheme("ws").expect("Failed to set URL scheme.");
-	let request = tungstenite::handshake::client::Request {
-		url: websocket_url,
-		extra_headers: None,
-	};
-	tokio_tungstenite::connect_async(request)
-		.map_err(|error| panic!("Websocket connection failed: {}", error))
-		.map(|(websocket_stream, _response)| {
-			let (sink, stream) = websocket_stream.split();
-			let stream = stream
-				.map_err(|error| panic!("Stream error: {}", error))
-				.map(|websocket_message| {
-					let json = websocket_message.to_text().expect("No text message received.");
-					OrderedMessage::try_from(json).expect("Failed to parse JSON response")
-				});
-			let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message: Message| {
-				let websocket_message = tungstenite::Message::text(
-					serde_json::to_string(&message).expect("Failed to convert message to JSON"),
-				);
-				futures01::future::ok(websocket_message)
-			});
-			(sink, stream)
-		})
-}
-
-async fn websocket_connection_async() -> (
+async fn websocket_connection() -> (
 	impl futures::Sink<Message, Error = ()>,
 	impl futures::Stream<Item = OrderedMessage>,
 ) {
@@ -113,14 +75,14 @@ async fn websocket_connection_async() -> (
 #[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
-		let (mut sink, stream) = websocket_connection_async().await;
+		let (mut sink, stream) = websocket_connection().await;
 		let message = Message::Ping(TextMessage {
 			text: "Hello World!".into(),
 		});
 		sink.send(message).await.expect("Failed to sink message.");
 		stream.take(1).collect().await
 	};
-	let messages: Vec<_> = test_std_future_with_running_server(future);
+	let messages: Vec<_> = test_future_with_running_server(future);
 	assert_eq!(messages.len(), 1);
 	assert_eq!(
 		messages[0],
@@ -144,8 +106,8 @@ fn should_broadcast_messages() {
 	};
 	let message_for_future = message.clone();
 	let future = async move {
-		let (mut sink1, stream1) = websocket_connection_async().await;
-		let (_sink2, stream2) = websocket_connection_async().await;
+		let (mut sink1, stream1) = websocket_connection().await;
+		let (_sink2, stream2) = websocket_connection().await;
 
 		sink1
 			.send(message_for_future)
@@ -156,7 +118,7 @@ fn should_broadcast_messages() {
 		let received_messages2: Vec<_> = stream2.take(1).collect().await;
 		(received_messages1, received_messages2)
 	};
-	let (received_messages1, received_messages2) = test_std_future_with_running_server(future);
+	let (received_messages1, received_messages2) = test_future_with_running_server(future);
 	assert_eq!(received_messages1.len(), 1);
 	assert_eq!(received_messages2.len(), 1);
 	assert_eq!(received_messages1[0], ordered_message);
@@ -165,65 +127,38 @@ fn should_broadcast_messages() {
 
 #[test]
 fn test_messages_should_have_sequence_numbers() {
-	let future = websocket_connection().and_then(|(sink, stream)| {
-		let first_message = Message::Chat(TextMessage { text: "first".into() });
-		let second_message = Message::Chat(TextMessage { text: "second".into() });
+	let first_message = Message::Chat(TextMessage { text: "first".into() });
+	let second_message = Message::Chat(TextMessage { text: "second".into() });
+	let first_ordered_message = OrderedMessage {
+		number: 0,
+		message: first_message.clone(),
+	};
+	let second_ordered_message = OrderedMessage {
+		number: 1,
+		message: second_message.clone(),
+	};
 
-		let first_ordered_message = OrderedMessage {
-			number: 0,
-			message: first_message.clone(),
-		};
-		let second_ordered_message = OrderedMessage {
-			number: 1,
-			message: second_message.clone(),
-		};
+	let first_message_for_future = first_message.clone();
+	let second_message_for_future = second_message.clone();
+	let future = async move {
+		let (mut sink, stream) = websocket_connection().await;
 
-		let send_future = sink
-			.send(first_message)
-			.and_then(move |sink| sink.send(second_message))
-			.map(|_sink| ());
+		let first_message = first_message_for_future;
+		let second_message = second_message_for_future.clone();
 
-		let receive_future = stream.take(2).collect().map(move |ordered_messages| {
-			assert_eq!(ordered_messages.len(), 2);
-			assert_eq!(ordered_messages[0], first_ordered_message);
-			assert_eq!(ordered_messages[1], second_ordered_message);
-		});
+		sink.send(first_message).await.expect("Failed to sink first message.");
+		sink.send(second_message).await.expect("Failed to sink second message.");
 
-		let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send + Sync>> =
-			vec![Box::new(send_future), Box::new(receive_future)];
-		join_all(futures).map(|_results| ())
-	});
-	test_future_with_running_server(future);
+		let received_messages: Vec<_> = stream.take(2).collect().await;
+		received_messages
+	};
+	let received_messages = test_future_with_running_server(future);
+	assert_eq!(received_messages.len(), 2);
+	assert_eq!(received_messages[0], first_ordered_message);
+	assert_eq!(received_messages[1], second_ordered_message);
 }
 
-fn test_future_with_running_server<ItemType, ErrorType, FutureType>(future_to_test: FutureType) -> ItemType
-where
-	ItemType: Send + 'static,
-	ErrorType: Send + Debug + 'static,
-	FutureType: Future<Item = ItemType, Error = ErrorType> + Send + 'static,
-{
-	let guard = TEST_MUTEX.lock();
-	let (sender, receiver) = futures::channel::oneshot::channel();
-	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(([127, 0, 0, 1], 8000), receiver);
-	let mut runtime = Runtime::new().expect("Failed to create runtime");
-	runtime.spawn_std(server);
-
-	let future = future_to_test.then(|test_result| {
-		sender.send(()).expect("Must send shutdown signal.");
-		test_result
-	});
-
-	let result = runtime.block_on(future);
-	std::thread::sleep(Duration::from_millis(20)); // Wait for port to be free to use again
-	std::mem::drop(guard);
-	match result {
-		Err(error) => panic!("{:?}", error),
-		Ok(value) => value,
-	}
-}
-
-fn test_std_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
+fn test_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
 where
 	OutputType: Send + 'static,
 	FutureType: std::future::Future<Output = OutputType> + Send + 'static,
