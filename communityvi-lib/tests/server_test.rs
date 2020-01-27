@@ -15,7 +15,7 @@ lazy_static! {
 
 #[test]
 fn should_set_and_get_offset() {
-	let client = reqwest10::Client::new();
+	let client = reqwest::Client::new();
 	let new_offset = 1337u64;
 	let future = async move {
 		let set_offset_request = client
