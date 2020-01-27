@@ -1,12 +1,11 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
-use futures::compat::Future01CompatExt;
-use futures::FutureExt;
+use futures::compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt};
+use futures::future::join_all;
 use futures::TryFutureExt;
-use futures01::future::join_all;
-use futures01::sink::Sink;
-use futures01::stream::Stream;
-use futures01::{Future, IntoFuture};
+use futures::{FutureExt, SinkExt};
+use futures::{StreamExt, TryStreamExt};
+use futures01::Stream as Stream01;
 use std::convert::Into;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
@@ -40,30 +39,42 @@ where
 			let room = room;
 
 			let (websocket_sink, websocket_stream) = websocket.split();
-			let (message_sender, message_receiver) = futures01::sync::mpsc::channel::<OrderedMessage>(1);
+			let websocket_sink = Compat01As03Sink::new(websocket_sink);
+			let websocket_stream = Compat01As03::new(websocket_stream);
+			let (message_sender, message_receiver) = futures::channel::mpsc::channel::<OrderedMessage>(1);
 			let client = room.add_client(message_sender.clone());
 			let message_receive_future = message_receiver
 				.map(WebSocketMessage::from)
+				.map(Ok)
 				.forward(websocket_sink.sink_map_err(|_| ()))
 				.map(|_| ());
 
 			let stream_future = websocket_stream
-				.take_while(|websocket_message| futures01::future::ok(!websocket_message.is_close()))
+				.take_while(|websocket_message_result| {
+					let continue_on = websocket_message_result
+						.as_ref()
+						.map(|message| !message.is_close())
+						.unwrap_or(false);
+					futures::future::ready(continue_on)
+				})
 				.map_err(|error| eprintln!("Error streaming websocket messages: {}", error))
 				.and_then(|websocket_message| {
-					Message::try_from(websocket_message)
-						.into_future()
-						.map_err(|error| eprintln!("Error converting messages: {}", error))
+					async {
+						Message::try_from(websocket_message)
+							.map_err(|error| eprintln!("Error converting messages: {}", error))
+					}
 				})
 				.and_then(move |message| {
 					let room = room.clone();
-					handle_message(room, &client, message).unit_error().boxed().compat()
+					handle_message(room, &client, message).unit_error()
 				})
-				.for_each(|()| futures01::future::ok(()));
+				.for_each(|_: Result<(), ()>| futures::future::ready(()));
 
-			let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> =
-				vec![Box::new(message_receive_future), Box::new(stream_future)];
-			join_all(futures).map(|_| ()).map_err(|_| ())
+			let futures: Vec<Box<dyn std::future::Future<Output = ()> + Send + Unpin>> = vec![
+				Box::new(message_receive_future.boxed()),
+				Box::new(stream_future.boxed()),
+			];
+			Compat::new(join_all(futures).map(|_: Vec<()>| ()).unit_error().boxed())
 		})
 	});
 

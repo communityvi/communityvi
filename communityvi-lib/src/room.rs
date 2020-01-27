@@ -1,9 +1,8 @@
 use crate::message::{Message, OrderedMessage};
 use contrie::ConSet;
-use futures::compat::Future01CompatExt;
+use futures::channel::mpsc::{SendError, Sender};
 use futures::FutureExt;
-use futures01::sync::mpsc::{SendError, Sender};
-use futures01::Sink;
+use futures::SinkExt;
 use log::info;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -105,10 +104,8 @@ impl Client {
 
 	async fn send(&self, message: OrderedMessage) -> Result<(), ClientSendError> {
 		let client = self.clone();
-		let send_result = self.sender.clone().send(message).compat().await;
-		send_result
-			.map(|_: Sender<_>| ())
-			.map_err(|_: SendError<_>| client.into())
+		let send_result = self.sender.clone().send(message).await;
+		send_result.map_err(|_: SendError| client.into())
 	}
 }
 
