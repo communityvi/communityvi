@@ -37,7 +37,7 @@ pub struct ServerTimeMessage {
 	#[serde(with = "millisecond_duration")]
 	pub server_time: Duration,
 	/// Real time in UTC where the given server time belongs to.
-	#[serde(with = "millisecond_timestamp")]
+	#[serde(with = "chrono::serde::ts_milliseconds")]
 	pub real_time: DateTime<Utc>,
 }
 
@@ -47,38 +47,6 @@ pub struct TextMessage {
 }
 
 pub type WebSocketMessage = warp::filters::ws::Message;
-
-// see https://serde.rs/custom-date-format.html
-mod millisecond_timestamp {
-	use chrono::{DateTime, LocalResult, TimeZone, Utc};
-	use serde::{self, Deserialize, Deserializer, Serializer};
-
-	pub fn serialize<S>(date_time: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		let timestamp = date_time.timestamp_millis();
-		serializer.serialize_i64(timestamp)
-	}
-
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		let timestamp = i64::deserialize(deserializer)?;
-		let date_time_result = Utc.timestamp_millis_opt(timestamp);
-		let date_time = match date_time_result {
-			LocalResult::Single(date_time) => date_time,
-			_ => {
-				return Err(serde::de::Error::custom(format!(
-					"Invalid millisecond timestamp: {}",
-					timestamp
-				)))
-			}
-		};
-		Ok(date_time)
-	}
-}
 
 // see https://serde.rs/custom-date-format.html
 mod millisecond_duration {
