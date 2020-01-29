@@ -1,5 +1,5 @@
-use communityvi_lib::message::{Message, OrderedMessage, TextMessage};
-use communityvi_lib::server::create_server;
+use crate::message::{Message, OrderedMessage, TextMessage};
+use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;

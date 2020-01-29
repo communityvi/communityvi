@@ -1,6 +1,12 @@
-use communityvi_lib::server::create_server;
+use crate::server::create_server;
 use futures::FutureExt;
 use tokio::task::JoinError;
+
+mod message;
+mod room;
+mod server;
+#[cfg(test)]
+mod server_tests;
 
 #[tokio::main]
 async fn main() -> Result<(), JoinError> {
