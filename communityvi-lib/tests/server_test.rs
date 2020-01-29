@@ -4,8 +4,8 @@ use futures::{FutureExt, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
-use std::time::Duration;
-use tokio_compat::runtime::Runtime;
+use tokio::runtime;
+use tokio_tungstenite::tungstenite;
 use url::Url;
 
 const URL: &str = "http://localhost:8000";
@@ -164,19 +164,18 @@ where
 	FutureType: std::future::Future<Output = OutputType> + Send + 'static,
 {
 	let _guard = TEST_MUTEX.lock();
+	let mut runtime = runtime::Builder::new()
+		.threaded_scheduler()
+		.enable_all()
+		.build()
+		.expect("Failed to create runtime");
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
 	let server = create_server(([127, 0, 0, 1], 8000), receiver);
-	let mut runtime = Runtime::new().expect("Failed to create runtime");
-	runtime.spawn_std(server);
+	let server_handle = runtime.spawn(server);
 
-	let future = async {
-		let output = future_to_test.await;
-		sender.send(()).expect("Failed to send shutdown");
-		output
-	};
-
-	let output = runtime.block_on_std(future);
-	std::thread::sleep(Duration::from_millis(20)); // Wait for port to be free to use again
+	let output = runtime.block_on(future_to_test);
+	sender.send(()).expect("Failed to send shutdown.");
+	runtime.block_on(server_handle).expect("Failed to join server.");
 	output
 }
