@@ -1,17 +1,30 @@
 use crate::message::{Message, OrderedMessage};
+use crate::state::PlaybackState;
+use crate::state::PlaybackState::Playing;
+use chrono::Duration;
 use contrie::ConSet;
 use futures::channel::mpsc::{SendError, Sender};
 use futures::FutureExt;
 use futures::SinkExt;
 use log::info;
+use parking_lot::Mutex;
+use sched_clock::Clock as _;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+#[cfg(target_os = "linux")]
+type MonotonicClock = sched_clock::clocks::linux::MonotonicRawClock;
+#[cfg(not(target_os = "linux"))]
+type MonotonicClock = sched_clock::clocks::DefaultClock;
+
 pub struct Room {
 	pub offset: AtomicI64,
+	playback_state: Mutex<PlaybackState>,
+	monotonic_clock: MonotonicClock,
 	next_client_id: AtomicUsize,
 	next_sequence_number: AtomicU64,
 	pub clients: Arc<ConSet<Client>>,
@@ -21,6 +34,8 @@ impl Default for Room {
 	fn default() -> Self {
 		Room {
 			offset: AtomicI64::new(0),
+			playback_state: Mutex::default(),
+			monotonic_clock: MonotonicClock::default(),
 			next_client_id: AtomicUsize::new(0),
 			next_sequence_number: AtomicU64::new(0),
 			clients: Arc::new(ConSet::new()),
@@ -69,6 +84,67 @@ impl Room {
 			})
 			.collect();
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
+	}
+
+	pub fn play(&self) {
+		let mut playback_state = self.playback_state.lock();
+		*playback_state = match playback_state.deref() {
+			PlaybackState::Playing { start } => PlaybackState::Playing { start: *start },
+			PlaybackState::Paused { position } => {
+				let now = self.monotonic_clock.now();
+				let start = now - *position;
+				PlaybackState::Playing { start }
+			}
+			PlaybackState::Empty => PlaybackState::Empty, // TODO: Maybe error handling in this case?
+		}
+	}
+
+	pub fn pause(&self) {
+		let mut playback_state = self.playback_state.lock();
+		*playback_state = match playback_state.deref() {
+			PlaybackState::Playing { start } => {
+				let now = self.monotonic_clock.now();
+				let position = now - *start;
+				PlaybackState::Paused { position }
+			}
+			PlaybackState::Paused { position } => PlaybackState::Paused { position: *position },
+			PlaybackState::Empty => PlaybackState::Empty, // TODO: Maybe error handling in this case?
+		}
+	}
+
+	pub fn skip_by(&self, offset: Duration) {
+		// TODO: Ensure this doesn't skip past or before the video.
+		// TODO: Somehow ensure there is no overflow
+		let offset_duration = sched_clock::Duration::from_nanos(offset.num_nanoseconds().unwrap());
+		let mut playback_state = self.playback_state.lock();
+		*playback_state = match playback_state.deref() {
+			PlaybackState::Playing { start } => {
+				let new_start = *start - offset_duration;
+				PlaybackState::Playing { start: new_start }
+			}
+			PlaybackState::Paused { position } => PlaybackState::Paused {
+				position: *position + offset_duration,
+			},
+			PlaybackState::Empty => PlaybackState::Empty, // TODO: Maybe error handling in this case?
+		}
+	}
+
+	pub fn skip_to(&self, position: Duration) {
+		// TODO: Ensure this doesn't skip past or before the video.
+		// TODO: Somehow ensure there is no overflow
+		let position_duration = sched_clock::Duration::from_nanos(position.num_nanoseconds().unwrap());
+		let mut playback_state = self.playback_state.lock();
+		*playback_state = match playback_state.deref() {
+			PlaybackState::Playing { start } => {
+				let now = self.monotonic_clock.now();
+				let new_start = now - position_duration;
+				PlaybackState::Playing { start: new_start }
+			}
+			PlaybackState::Paused { position } => PlaybackState::Paused {
+				position: position_duration,
+			},
+			PlaybackState::Empty => PlaybackState::Empty, // TODO: Maybe error handling in this case.
+		}
 	}
 }
 

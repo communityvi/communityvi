@@ -18,10 +18,10 @@ serde_derive = "1.0"
 serde_json = "1.0"
 contrie = "0.1"
 sched-clock = "0.1"
+parking_lot = "0.10"
 
 [dev-dependencies]
 reqwest = {version = "0.10", features = ["json"]}
 tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite", rev = "master" }
 url = "2.1"
-parking_lot = "0.10"
 lazy_static = "1.4"
