@@ -17,6 +17,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 contrie = "0.1"
+sched-clock = "0.1"
 
 [dev-dependencies]
 reqwest = {version = "0.10", features = ["json"]}
