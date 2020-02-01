@@ -5,7 +5,6 @@ authors = ["Max Bruckner <max@maxbruckner.de>"]
 edition = "2018"
 
 [dependencies]
-config = "0.10"
 log = "0.4"
 env_logger = "0.7"
 warp = "0.2"
