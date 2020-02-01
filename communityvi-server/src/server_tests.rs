@@ -1,6 +1,7 @@
 use crate::message::{Message, OrderedMessage, TextMessage};
 use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
+use http::Request;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
@@ -48,12 +49,10 @@ async fn websocket_connection() -> (
 	impl futures::Sink<Message, Error = ()>,
 	impl futures::Stream<Item = OrderedMessage>,
 ) {
-	let mut websocket_url = Url::parse(&format!("{}/ws", URL)).expect("Failed to parse URL");
-	websocket_url.set_scheme("ws").expect("Failed to set URL scheme.");
-	let request = tungstenite::handshake::client::Request {
-		url: websocket_url,
-		extra_headers: None,
-	};
+	let request = Request::builder()
+		.uri(format!("{}/ws", URL))
+		.body(())
+		.expect("Failed to build handshake request.");
 	let (websocket_stream, _response) = tokio_tungstenite::connect_async(request)
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))

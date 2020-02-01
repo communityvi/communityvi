@@ -22,6 +22,6 @@ parking_lot = "0.10"
 
 [dev-dependencies]
 reqwest = {version = "0.10", features = ["json"]}
-tokio-tungstenite = { git = "https://github.com/snapview/tokio-tungstenite", rev = "master" }
+tokio-tungstenite = "0.10"
 url = "2.1"
 lazy_static = "1.4"
