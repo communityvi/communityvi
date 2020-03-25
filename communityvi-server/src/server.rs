@@ -38,8 +38,6 @@ pub async fn create_server<ShutdownHandleType>(
 		.and_then(move |ws: Ws| {
 			let room = room_for_websocket.clone();
 			let reply = ws.on_upgrade(move |websocket| {
-				let room = room;
-
 				let (websocket_sink, websocket_stream) = websocket.split();
 				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<OrderedMessage>(1);
 				let client = room.add_client(message_sender.clone());
@@ -58,15 +56,14 @@ pub async fn create_server<ShutdownHandleType>(
 						futures::future::ready(continue_on)
 					})
 					.map_err(|error| eprintln!("Error streaming websocket messages: {}", error))
-					.and_then(|websocket_message| {
-						async {
-							Message::try_from(websocket_message)
-								.map_err(|error| eprintln!("Error converting messages: {}", error))
-						}
+					.and_then(|websocket_message| async {
+						Message::try_from(websocket_message)
+							.map_err(|error| eprintln!("Error converting messages: {}", error))
 					})
 					.and_then(move |message| {
 						let room = room.clone();
-						handle_message(room, &client, message).unit_error()
+						let client = client.clone();
+						async move { handle_message(&room, &client, message).unit_error().await }
 					})
 					.for_each(|_: Result<(), ()>| futures::future::ready(()));
 
@@ -86,13 +83,10 @@ pub async fn create_server<ShutdownHandleType>(
 	future.await
 }
 
-fn handle_message(room: Arc<Room>, client: &Client, message: Message) -> impl std::future::Future<Output = ()> {
-	let client = client.clone();
-	async move {
-		match message {
-			Message::Ping(text_message) => room.singlecast(&client, Message::Pong(text_message)).await,
-			Message::Chat(text_message) => room.broadcast(Message::Chat(text_message)).await,
-			_ => unimplemented!(),
-		}
+async fn handle_message(room: &Room, client: &Client, message: Message) {
+	match message {
+		Message::Ping(text_message) => room.singlecast(&client, Message::Pong(text_message)).await,
+		Message::Chat(text_message) => room.broadcast(Message::Chat(text_message)).await,
+		_ => unimplemented!(),
 	}
 }
