@@ -16,7 +16,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 pub struct Room {
-	pub offset: AtomicI64,
 	playback_state: Mutex<PlaybackState>,
 	next_client_id: AtomicUsize,
 	next_sequence_number: AtomicU64,
@@ -26,7 +25,6 @@ pub struct Room {
 impl Default for Room {
 	fn default() -> Self {
 		Room {
-			offset: AtomicI64::new(0),
 			playback_state: Mutex::default(),
 			next_client_id: AtomicUsize::new(0),
 			next_sequence_number: AtomicU64::new(0),

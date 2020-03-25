@@ -14,37 +14,6 @@ lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-#[test]
-fn should_set_and_get_offset() {
-	let client = reqwest::Client::new();
-	let new_offset = 1337u64;
-	let future = async move {
-		let set_offset_request = client
-			.post(&format!("{url}/{offset}", url = URL, offset = new_offset))
-			.build()
-			.unwrap();
-		let set_offset_was_successful = client
-			.execute(set_offset_request)
-			.await
-			.expect("Error during post request.")
-			.status()
-			.is_success();
-		assert!(set_offset_was_successful);
-
-		let get_offset_request = client.get(URL).build().unwrap();
-		client
-			.execute(get_offset_request)
-			.await
-			.expect("Error during get request.")
-			.json()
-			.await
-			.expect("Failed to decode response.")
-	};
-
-	let offset: u64 = test_future_with_running_server(future);
-	assert_eq!(offset, new_offset);
-}
-
 async fn websocket_connection() -> (
 	impl futures::Sink<Message, Error = ()>,
 	impl futures::Stream<Item = OrderedMessage>,

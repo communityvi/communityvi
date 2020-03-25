@@ -18,25 +18,11 @@ pub async fn create_server<ShutdownHandleType>(
 	ShutdownHandleType: std::future::Future<Output = ()> + Send + 'static,
 {
 	let room = Arc::new(Room::default());
-
-	let room_for_get = room.clone();
-	let get_state = warp::get()
-		.and(warp::path::end())
-		.map(move || room_for_get.offset.load(Ordering::SeqCst).to_string());
-
-	let state_for_post = room.clone();
-	let post_state = warp::post()
-		.and(warp::path::param())
-		.and(warp::path::end())
-		.map(move |new_offset| state_for_post.offset.store(new_offset, Ordering::SeqCst))
-		.map(|_| http::response::Builder::new().status(204).body("").unwrap());
-
-	let room_for_websocket = room.clone();
 	let websocket_filter = warp::path("ws")
 		.and(warp::path::end())
 		.and(warp::ws())
 		.and_then(move |ws: Ws| {
-			let room = room_for_websocket.clone();
+			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| {
 				let (websocket_sink, websocket_stream) = websocket.split();
 				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<OrderedMessage>(1);
@@ -76,8 +62,7 @@ pub async fn create_server<ShutdownHandleType>(
 			futures::future::ok::<_, Rejection>(reply)
 		});
 
-	let filter = websocket_filter.or(get_state).or(post_state);
-	let server = warp::serve(filter);
+	let server = warp::serve(websocket_filter);
 
 	let (_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
 	future.await
