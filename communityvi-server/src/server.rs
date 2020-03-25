@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use warp::filters::ws::Ws;
-use warp::{Filter, Rejection};
+use warp::{Filter, Rejection, Reply};
 
 pub async fn create_server<ShutdownHandleType>(
 	address: impl Into<SocketAddr> + 'static,
@@ -39,12 +39,11 @@ pub async fn create_server<ShutdownHandleType>(
 
 				let stream_future = receive_messages(websocket_stream, client, room);
 
-				// erase the types because otherwise the compiler can't handle the nested types anymore
-				let message_receive_future: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(message_receive_future);
-				let stream_future: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(stream_future);
-				join(message_receive_future, stream_future).map(|_| ())
+				Box::pin(join(message_receive_future, stream_future).map(|_| ()))
+					as Pin<Box<dyn Future<Output = ()> + Send>> // type erasure for faster compile times!
 			});
-			futures::future::ok::<_, Rejection>(reply)
+			Box::pin(async { Ok(Box::new(reply) as Box<dyn Reply>) })
+				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
 		});
 
 	let server = warp::serve(websocket_filter);
