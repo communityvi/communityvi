@@ -1,11 +1,15 @@
 use crate::message::{Message, OrderedMessage, WebSocketMessage};
 use crate::room::{Client, Room};
+use futures::future::join;
 use futures::future::join_all;
-use futures::{FutureExt, SinkExt};
+use futures::{FutureExt, Sink, SinkExt, Stream};
 use futures::{StreamExt, TryStreamExt};
-use std::convert::Into;
+use log::error;
 use std::convert::TryFrom;
+use std::convert::{Infallible, Into};
+use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use warp::filters::ws::Ws;
@@ -33,31 +37,12 @@ pub async fn create_server<ShutdownHandleType>(
 					.forward(websocket_sink.sink_map_err(|_| ()))
 					.map(|_| ());
 
-				let stream_future = websocket_stream
-					.take_while(|websocket_message_result| {
-						let continue_on = websocket_message_result
-							.as_ref()
-							.map(|message| !message.is_close())
-							.unwrap_or(false);
-						futures::future::ready(continue_on)
-					})
-					.map_err(|error| eprintln!("Error streaming websocket messages: {}", error))
-					.and_then(|websocket_message| async {
-						Message::try_from(websocket_message)
-							.map_err(|error| eprintln!("Error converting messages: {}", error))
-					})
-					.and_then(move |message| {
-						let room = room.clone();
-						let client = client.clone();
-						async move { handle_message(&room, &client, message).unit_error().await }
-					})
-					.for_each(|_: Result<(), ()>| futures::future::ready(()));
+				let stream_future = receive_messages(websocket_stream, client, room);
 
-				let futures: Vec<Box<dyn std::future::Future<Output = ()> + Send + Unpin>> = vec![
-					Box::new(message_receive_future.boxed()),
-					Box::new(stream_future.boxed()),
-				];
-				join_all(futures).map(|_: Vec<()>| ())
+				// erase the types because otherwise the compiler can't handle the nested types anymore
+				let message_receive_future: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(message_receive_future);
+				let stream_future: Pin<Box<dyn Future<Output = ()> + Send>> = Box::pin(stream_future);
+				join(message_receive_future, stream_future).map(|_| ())
 			});
 			futures::future::ok::<_, Rejection>(reply)
 		});
@@ -66,6 +51,33 @@ pub async fn create_server<ShutdownHandleType>(
 
 	let (_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
 	future.await
+}
+
+async fn receive_messages(
+	mut websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin,
+	client: Client,
+	room: Arc<Room>,
+) {
+	loop {
+		let websocket_message = match websocket_stream.next().await {
+			Some(Ok(message)) => message,
+			Some(Err(error)) => {
+				error!("Error streaming websocket messages: {}", error);
+				return; // stop reading from websocket when it is broken
+			}
+			None => return, // websocket has been closed
+		};
+
+		let message = match Message::try_from(websocket_message) {
+			Ok(message) => message,
+			Err(error) => {
+				error!("Error converting messages: {}", error);
+				continue; // single message wasn't deserializable, continue with next one
+			}
+		};
+
+		handle_message(room.as_ref(), &client, message).await
+	}
 }
 
 async fn handle_message(room: &Room, client: &Client, message: Message) {
