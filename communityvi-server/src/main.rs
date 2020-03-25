@@ -12,9 +12,9 @@ mod state;
 #[tokio::main]
 async fn main() -> Result<(), JoinError> {
 	env_logger::init();
-	let (_sender, receiver) = futures::channel::oneshot::channel::<()>();
-	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(([127, 0, 0, 1], 8000), receiver);
+	let (_shutdown_sender, shutdown_receiver) = futures::channel::oneshot::channel::<()>();
+	let shutdown_handle = shutdown_receiver.then(|_| futures::future::ready(()));
+	let server = create_server(([127, 0, 0, 1], 8000), shutdown_handle);
 
 	tokio::spawn(server).await
 }
