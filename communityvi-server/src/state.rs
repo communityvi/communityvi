@@ -1,5 +1,4 @@
-use sched_clock::Duration;
-use sched_clock::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy)]
 pub enum PlaybackState {

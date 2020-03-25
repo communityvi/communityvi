@@ -160,7 +160,6 @@ dependencies = [
  "log 0.4.8",
  "parking_lot",
  "reqwest",
- "sched-clock",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1268,15 +1267,6 @@ checksum = "039c25b130bd8c1321ee2d7de7fde2659fa9c2744e4bb29711cfc852ea53cd19"
 dependencies = [
  "lazy_static",
  "winapi 0.3.8",
-]
-
-[[package]]
-name = "sched-clock"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6724014a3bcd5bae79df5cf0efa06c7c244a14ba09e5d5f1ea35a72711bf265a"
-dependencies = [
- "libc",
 ]
 
 [[package]]
