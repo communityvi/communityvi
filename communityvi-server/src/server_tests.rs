@@ -9,7 +9,7 @@ use tokio::runtime;
 use tokio_tungstenite::tungstenite;
 use url::Url;
 
-const URL: &str = "http://localhost:8000";
+const URL: &str = "ws://localhost:8000";
 lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
