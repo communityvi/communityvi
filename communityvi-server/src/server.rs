@@ -4,7 +4,7 @@ use futures::future::join;
 use futures::future::join_all;
 use futures::{FutureExt, SinkExt, Stream};
 use futures::{StreamExt, TryStreamExt};
-use log::{debug, error};
+use log::{debug, error, info};
 use std::convert::Into;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -89,6 +89,6 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 	match request {
 		ClientRequest::Ping => room.singlecast(&client, ServerResponse::Pong).await,
 		ClientRequest::Chat { message } => room.broadcast(ServerResponse::Chat { message }).await,
-		_ => unimplemented!(),
+		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
 	}
 }
