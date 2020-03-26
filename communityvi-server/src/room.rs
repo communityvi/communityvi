@@ -76,10 +76,9 @@ impl Room {
 	}
 
 	async fn send(&self, client: &Client, message: Message<ServerResponse>) {
-		let _ = client.send(message).await.map_err(|error| {
+		let _ = client.send(message).await.map_err(|()| {
 			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 			self.clients.remove(&client.clone());
-			info!("Client with id {} has gone away.", client.id());
 		});
 	}
 
@@ -145,33 +144,16 @@ pub struct Client {
 	sender: Sender<Message<ServerResponse>>,
 }
 
-#[derive(Debug)]
-struct ClientSendError {
-	pub client: Client,
-}
-
-impl Display for ClientSendError {
-	fn fmt(&self, formatter: &mut Formatter) -> Result<(), std::fmt::Error> {
-		write!(formatter, "Failed to send message to client: {}", self.client.id())
-	}
-}
-
-impl From<Client> for ClientSendError {
-	fn from(client: Client) -> Self {
-		ClientSendError { client }
-	}
-}
-
-impl Error for ClientSendError {}
-
 impl Client {
 	pub fn id(&self) -> usize {
 		self.id
 	}
 
-	async fn send(&self, message: Message<ServerResponse>) -> Result<(), ClientSendError> {
+	async fn send(&self, message: Message<ServerResponse>) -> Result<(), ()> {
 		let send_result = self.sender.clone().send(message).await;
-		send_result.map_err(|_: SendError| self.clone().into())
+		send_result.map_err(|_: SendError| {
+			info!("Client with id {} has gone away.", self.id);
+		})
 	}
 }
 

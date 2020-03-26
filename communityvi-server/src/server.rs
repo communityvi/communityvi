@@ -29,7 +29,7 @@ pub async fn create_server<ShutdownHandleType>(
 			let reply = ws.on_upgrade(move |websocket| {
 				let (websocket_sink, websocket_stream) = websocket.split();
 				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<Message<ServerResponse>>(1);
-				let client = room.add_client(message_sender.clone());
+				let client = room.add_client(message_sender);
 				let message_receive_future = message_receiver
 					.map(|message| WebSocketMessage::from(&message))
 					.map(Ok)
