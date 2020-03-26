@@ -7,15 +7,14 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Message<MessageType>
-where
-	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
-{
+pub struct OrderedMessage<MessageType: Message> {
 	pub number: u64,
-	#[serde(bound(deserialize = "MessageType: DeserializeOwned"))]
+	#[serde(bound(deserialize = "MessageType: Message"))]
 	#[serde(flatten)]
 	pub message: MessageType,
 }
+
+pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
@@ -26,6 +25,8 @@ pub enum ClientRequest {
 	Chat { message: String },
 }
 
+impl Message for ClientRequest {}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -35,13 +36,12 @@ pub enum ServerResponse {
 	Chat { message: String },
 }
 
+impl Message for ServerResponse {}
+
 pub type WebSocketMessage = warp::filters::ws::Message;
 
-impl<MessageType> From<&Message<MessageType>> for WebSocketMessage
-where
-	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
-{
-	fn from(message: &Message<MessageType>) -> Self {
+impl<MessageType: Message> From<&OrderedMessage<MessageType>> for WebSocketMessage {
+	fn from(message: &OrderedMessage<MessageType>) -> Self {
 		let json = serde_json::to_string(message).expect("Failed to serialize message to JSON.");
 		WebSocketMessage::text(json)
 	}
@@ -72,10 +72,7 @@ impl Display for MessageError {
 
 impl Error for MessageError {}
 
-impl<MessageType> TryFrom<&str> for Message<MessageType>
-where
-	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
-{
+impl<MessageType: Message> TryFrom<&str> for OrderedMessage<MessageType> {
 	type Error = MessageError;
 
 	fn try_from(json: &str) -> Result<Self, Self::Error> {
@@ -86,10 +83,7 @@ where
 	}
 }
 
-impl<MessageType> TryFrom<WebSocketMessage> for Message<MessageType>
-where
-	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
-{
+impl<MessageType: Message> TryFrom<WebSocketMessage> for OrderedMessage<MessageType> {
 	type Error = MessageError;
 
 	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
@@ -105,11 +99,8 @@ mod test {
 	use super::*;
 	use chrono::TimeZone;
 
-	fn first_message<MessageType>(message: MessageType) -> Message<MessageType>
-	where
-		MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
-	{
-		Message { number: 0, message }
+	fn first_message<MessageType: Message>(message: MessageType) -> OrderedMessage<MessageType> {
+		OrderedMessage { number: 0, message }
 	}
 
 	#[test]
@@ -118,7 +109,7 @@ mod test {
 		let json = serde_json::to_string(&ping_message).expect("Failed to serialize PingMessage to JSON");
 		assert_eq!(json, r#"{"number":0,"type":"ping"}"#);
 
-		let deserialized_ping_message: Message<ClientRequest> =
+		let deserialized_ping_message: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize PingMessage from JSON");
 		assert_eq!(deserialized_ping_message, ping_message);
 	}
@@ -129,7 +120,7 @@ mod test {
 		let json = serde_json::to_string(&pong_message).expect("Failed to serialize PongMessage to JSON");
 		assert_eq!(json, r#"{"number":0,"type":"pong"}"#);
 
-		let deserialized_pong_message: Message<ClientRequest> =
+		let deserialized_pong_message: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize PongMessage from JSON");
 		assert_eq!(deserialized_pong_message, pong_message);
 	}
@@ -142,7 +133,7 @@ mod test {
 		let json = serde_json::to_string(&chat_message).expect("Failed to serialize ChatMessage to JSON");
 		assert_eq!(json, r#"{"number":0,"type":"chat","message":"hello"}"#);
 
-		let deserialized_chat_message: Message<ClientRequest> =
+		let deserialized_chat_message: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize ChatMessage from JSON");
 		assert_eq!(deserialized_chat_message, chat_message);
 	}

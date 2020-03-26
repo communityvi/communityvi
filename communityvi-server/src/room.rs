@@ -1,4 +1,4 @@
-use crate::message::{ClientRequest, Message, ServerResponse};
+use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::state::PlaybackState::{self, *};
 use contrie::ConSet;
 use futures::channel::mpsc::{SendError, Sender};
@@ -36,7 +36,7 @@ impl Default for Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, response_sender: Sender<Message<ServerResponse>>) -> Client {
+	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Client {
 		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
 		let client = Client {
 			id,
@@ -51,7 +51,7 @@ impl Room {
 
 	pub async fn singlecast(&self, client: &Client, response: ServerResponse) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
-		let message = Message {
+		let message = OrderedMessage {
 			number,
 			message: response,
 		};
@@ -60,7 +60,7 @@ impl Room {
 
 	pub async fn broadcast(&self, response: ServerResponse) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
-		let message = Message {
+		let message = OrderedMessage {
 			number,
 			message: response,
 		};
@@ -75,7 +75,7 @@ impl Room {
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
 	}
 
-	async fn send(&self, client: &Client, message: Message<ServerResponse>) {
+	async fn send(&self, client: &Client, message: OrderedMessage<ServerResponse>) {
 		let _ = client.send(message).await.map_err(|()| {
 			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
 			self.clients.remove(&client.clone());
@@ -141,7 +141,7 @@ impl Room {
 #[derive(Clone, Debug)]
 pub struct Client {
 	id: usize,
-	sender: Sender<Message<ServerResponse>>,
+	sender: Sender<OrderedMessage<ServerResponse>>,
 }
 
 impl Client {
@@ -149,7 +149,7 @@ impl Client {
 		self.id
 	}
 
-	async fn send(&self, message: Message<ServerResponse>) -> Result<(), ()> {
+	async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {
 		let send_result = self.sender.clone().send(message).await;
 		send_result.map_err(|_: SendError| {
 			info!("Client with id {} has gone away.", self.id);

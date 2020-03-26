@@ -1,4 +1,4 @@
-use crate::message::{ClientRequest, Message, ServerResponse, WebSocketMessage};
+use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMessage};
 use crate::room::{Client, Room};
 use futures::future::join;
 use futures::future::join_all;
@@ -28,7 +28,8 @@ pub async fn create_server<ShutdownHandleType>(
 			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| {
 				let (websocket_sink, websocket_stream) = websocket.split();
-				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<Message<ServerResponse>>(1);
+				let (message_sender, message_receiver) =
+					futures::channel::mpsc::channel::<OrderedMessage<ServerResponse>>(1);
 				let client = room.add_client(message_sender);
 				let message_receive_future = message_receiver
 					.map(|message| WebSocketMessage::from(&message))
@@ -66,7 +67,7 @@ async fn receive_messages(
 			None => return, // websocket has been closed
 		};
 
-		let Message { number, message } = match Message::<ClientRequest>::try_from(websocket_message) {
+		let OrderedMessage { number, message } = match OrderedMessage::<ClientRequest>::try_from(websocket_message) {
 			Ok(message) => message,
 			Err(error) => {
 				error!("Error converting messages: {}", error);

@@ -1,4 +1,4 @@
-use crate::message::{ClientRequest, Message, ServerResponse};
+use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
 use http::Request;
@@ -15,8 +15,8 @@ lazy_static! {
 }
 
 async fn websocket_connection() -> (
-	impl futures::Sink<Message<ClientRequest>, Error = ()>,
-	impl futures::Stream<Item = Message<ServerResponse>>,
+	impl futures::Sink<OrderedMessage<ClientRequest>, Error = ()>,
+	impl futures::Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
 	let request = Request::builder()
 		.uri(format!("{}/ws", URL))
@@ -30,7 +30,7 @@ async fn websocket_connection() -> (
 	let stream = stream.map(|result| {
 		let websocket_message = result.expect("Stream error.");
 		let json = websocket_message.to_text().expect("No text message received.");
-		Message::<ServerResponse>::try_from(json).expect("Failed to parse JSON response")
+		OrderedMessage::<ServerResponse>::try_from(json).expect("Failed to parse JSON response")
 	});
 	let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message| {
 		let websocket_message =
@@ -44,7 +44,7 @@ async fn websocket_connection() -> (
 fn should_respond_to_websocket_messages() {
 	let future = async {
 		let (mut sink, stream) = websocket_connection().await;
-		let message = Message {
+		let message = OrderedMessage {
 			number: 42,
 			message: ClientRequest::Ping,
 		};
@@ -55,7 +55,7 @@ fn should_respond_to_websocket_messages() {
 	assert_eq!(messages.len(), 1);
 	assert_eq!(
 		messages[0],
-		Message {
+		OrderedMessage {
 			number: 0,
 			message: ServerResponse::Pong,
 		}
@@ -66,7 +66,7 @@ fn should_respond_to_websocket_messages() {
 fn should_broadcast_messages() {
 	let future = async move {
 		let message = r#"Hello everyone \o/"#;
-		let request = Message {
+		let request = OrderedMessage {
 			number: 1337,
 			message: ClientRequest::Chat {
 				message: message.to_string(),
@@ -75,7 +75,7 @@ fn should_broadcast_messages() {
 		let (mut sink1, mut stream1) = websocket_connection().await;
 		let (_sink2, mut stream2) = websocket_connection().await;
 
-		let expected_response = Message {
+		let expected_response = OrderedMessage {
 			number: 0,
 			message: ServerResponse::Chat {
 				message: message.to_string(),
@@ -99,26 +99,26 @@ fn should_broadcast_messages() {
 #[test]
 fn test_messages_should_have_sequence_numbers() {
 	let future = async move {
-		let first_request = Message {
+		let first_request = OrderedMessage {
 			number: 0,
 			message: ClientRequest::Chat {
 				message: "first".into(),
 			},
 		};
-		let second_request = Message {
+		let second_request = OrderedMessage {
 			number: 1,
 			message: ClientRequest::Chat {
 				message: "second".into(),
 			},
 		};
 
-		let expected_first_response = Message {
+		let expected_first_response = OrderedMessage {
 			number: 0,
 			message: ServerResponse::Chat {
 				message: "first".into(),
 			},
 		};
-		let expected_second_response = Message {
+		let expected_second_response = OrderedMessage {
 			number: 1,
 			message: ServerResponse::Chat {
 				message: "second".into(),
