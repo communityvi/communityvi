@@ -1,3 +1,4 @@
+use crate::client::Client;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::state::PlaybackState::{self, *};
 use contrie::ConSet;
@@ -38,10 +39,7 @@ impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
 	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Client {
 		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
-		let client = Client {
-			id,
-			sender: response_sender,
-		};
+		let client = Client::new(id, response_sender);
 		let existing_client = self.clients.insert(client.clone());
 		if existing_client != None {
 			unreachable!("There must never be two clients with the same id!")
@@ -134,36 +132,3 @@ impl Room {
 		}
 	}
 }
-
-#[derive(Clone, Debug)]
-pub struct Client {
-	id: usize,
-	sender: Sender<OrderedMessage<ServerResponse>>,
-}
-
-impl Client {
-	pub fn id(&self) -> usize {
-		self.id
-	}
-
-	async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {
-		let send_result = self.sender.clone().send(message).await;
-		send_result.map_err(|_: SendError| {
-			info!("Client with id {} has gone away.", self.id);
-		})
-	}
-}
-
-impl Hash for Client {
-	fn hash<H: Hasher>(&self, state: &mut H) {
-		self.id.hash(state)
-	}
-}
-
-impl PartialEq for Client {
-	fn eq(&self, other: &Self) -> bool {
-		self.id == other.id
-	}
-}
-
-impl Eq for Client {}

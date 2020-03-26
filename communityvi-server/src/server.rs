@@ -1,5 +1,6 @@
+use crate::client::Client;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMessage};
-use crate::room::{Client, Room};
+use crate::room::Room;
 use futures::future::join;
 use futures::future::join_all;
 use futures::{FutureExt, SinkExt, Stream};
