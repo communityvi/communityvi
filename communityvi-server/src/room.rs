@@ -39,7 +39,7 @@ impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
 	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Client {
 		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
-		let client = Client::new(id, response_sender);
+		let client = Client::new(id.into(), response_sender);
 		let existing_client = self.clients.insert(client.clone());
 		if existing_client != None {
 			unreachable!("There must never be two clients with the same id!")
