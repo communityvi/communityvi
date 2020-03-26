@@ -2,7 +2,6 @@ use crate::message::{OrderedMessage, ServerResponse};
 use futures::channel::mpsc::{SendError, Sender};
 use futures::SinkExt;
 use log::info;
-use serde::export::fmt::Error;
 use serde::export::Formatter;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
@@ -29,20 +28,6 @@ impl Client {
 		})
 	}
 }
-
-impl Hash for Client {
-	fn hash<H: Hasher>(&self, state: &mut H) {
-		self.id.hash(state)
-	}
-}
-
-impl PartialEq for Client {
-	fn eq(&self, other: &Self) -> bool {
-		self.id == other.id
-	}
-}
-
-impl Eq for Client {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ClientId {

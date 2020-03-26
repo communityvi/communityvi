@@ -1,19 +1,14 @@
-use crate::client::Client;
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+use crate::client::{Client, ClientId};
+use crate::message::{OrderedMessage, ServerResponse};
 use crate::state::PlaybackState::{self, *};
-use contrie::ConSet;
-use futures::channel::mpsc::{SendError, Sender};
+use ahash::RandomState;
+use dashmap::mapref::one::Ref;
+use dashmap::DashMap;
+use futures::channel::mpsc::Sender;
 use futures::FutureExt;
-use futures::SinkExt;
-use log::info;
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 use std::time::Instant;
 
@@ -21,7 +16,7 @@ pub struct Room {
 	playback_state: Mutex<PlaybackState>,
 	next_client_id: AtomicUsize,
 	next_sequence_number: AtomicU64,
-	pub clients: Arc<ConSet<Client>>,
+	clients: DashMap<ClientId, Client>,
 }
 
 impl Default for Room {
@@ -30,21 +25,33 @@ impl Default for Room {
 			playback_state: Mutex::default(),
 			next_client_id: AtomicUsize::new(0),
 			next_sequence_number: AtomicU64::new(0),
-			clients: Arc::new(ConSet::new()),
+			clients: DashMap::new(),
 		}
 	}
 }
 
+type ClientHandle<'a> = Ref<'a, ClientId, Client, RandomState>;
+
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Client {
-		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
-		let client = Client::new(id.into(), response_sender);
-		let existing_client = self.clients.insert(client.clone());
-		if existing_client != None {
+	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> ClientId {
+		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst).into();
+		let client = Client::new(id, response_sender);
+
+		let existing_client = self.clients.insert(id, client);
+		if existing_client.is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
-		client
+
+		id
+	}
+
+	pub fn remove_client(&self, client_id: ClientId) {
+		self.clients.remove(&client_id);
+	}
+
+	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientHandle> {
+		self.clients.get(&client_id)
 	}
 
 	pub async fn singlecast(&self, client: &Client, response: ServerResponse) {

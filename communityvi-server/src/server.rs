@@ -1,11 +1,10 @@
-use crate::client::Client;
+use crate::client::{Client, ClientId};
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMessage};
 use crate::room::Room;
 use futures::future::join;
-use futures::future::join_all;
+use futures::StreamExt;
 use futures::{FutureExt, SinkExt, Stream};
-use futures::{StreamExt, TryStreamExt};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::convert::Into;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -31,21 +30,21 @@ pub async fn create_server<ShutdownHandleType>(
 				let (websocket_sink, websocket_stream) = websocket.split();
 				let (message_sender, message_receiver) =
 					futures::channel::mpsc::channel::<OrderedMessage<ServerResponse>>(1);
-				let client = room.add_client(message_sender);
+				let client_id = room.add_client(message_sender);
 				let message_receive_future = message_receiver
 					.map(|message| WebSocketMessage::from(&message))
 					.map(Ok)
 					.forward(websocket_sink.sink_map_err(|_| ()))
 					.map(|_| ());
 
-				let stream_future = receive_messages(websocket_stream, client.clone(), &room);
+				let stream_future = receive_messages(websocket_stream, client_id, &room);
 
 				// type erasure for faster compile times!
 				let handle_messages_and_respond: Pin<Box<dyn Future<Output = ()> + Send>> =
 					Box::pin(join(message_receive_future, stream_future).map(|_| ()));
 				handle_messages_and_respond.await;
 
-				room.clients.remove(&client);
+				room.remove_client(client_id);
 			});
 			Box::pin(async { Ok(Box::new(reply) as Box<dyn Reply>) })
 				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
@@ -59,7 +58,7 @@ pub async fn create_server<ShutdownHandleType>(
 
 async fn receive_messages(
 	mut websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin + Send,
-	client: Client,
+	client_id: ClientId,
 	room: &Room,
 ) {
 	loop {
@@ -80,12 +79,19 @@ async fn receive_messages(
 			}
 		};
 		debug!(
-			"Received {:?} message {} from client {}",
+			"Received {:?} message {} from {}",
 			std::mem::discriminant(&message),
 			number,
-			client.id()
+			client_id
 		);
 
+		let client = match room.get_client_by_id(client_id) {
+			Some(client_handle) => client_handle,
+			None => {
+				warn!("Couldn't find Client: {}", client_id);
+				return;
+			}
+		};
 		handle_message(room, &client, message).await
 	}
 }

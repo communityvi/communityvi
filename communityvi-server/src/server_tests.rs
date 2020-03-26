@@ -7,7 +7,6 @@ use parking_lot::Mutex;
 use std::convert::TryFrom;
 use tokio::runtime;
 use tokio_tungstenite::tungstenite;
-use url::Url;
 
 const URL: &str = "ws://localhost:8000";
 lazy_static! {

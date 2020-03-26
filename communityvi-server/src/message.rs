@@ -1,7 +1,5 @@
-use chrono::{DateTime, Duration, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_derive::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
@@ -97,7 +95,6 @@ impl<MessageType: Message> TryFrom<WebSocketMessage> for OrderedMessage<MessageT
 #[cfg(test)]
 mod test {
 	use super::*;
-	use chrono::TimeZone;
 
 	fn first_message<MessageType: Message>(message: MessageType) -> OrderedMessage<MessageType> {
 		OrderedMessage { number: 0, message }
