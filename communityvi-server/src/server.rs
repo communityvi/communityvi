@@ -26,7 +26,7 @@ pub async fn create_server<ShutdownHandleType>(
 		.and(warp::ws())
 		.and_then(move |ws: Ws| {
 			let room = room.clone();
-			let reply = ws.on_upgrade(move |websocket| {
+			let reply = ws.on_upgrade(move |websocket| async move {
 				let (websocket_sink, websocket_stream) = websocket.split();
 				let (message_sender, message_receiver) =
 					futures::channel::mpsc::channel::<OrderedMessage<ServerResponse>>(1);
@@ -37,10 +37,14 @@ pub async fn create_server<ShutdownHandleType>(
 					.forward(websocket_sink.sink_map_err(|_| ()))
 					.map(|_| ());
 
-				let stream_future = receive_messages(websocket_stream, client, room);
+				let stream_future = receive_messages(websocket_stream, client.clone(), room.clone());
 
-				Box::pin(join(message_receive_future, stream_future).map(|_| ()))
-					as Pin<Box<dyn Future<Output = ()> + Send>> // type erasure for faster compile times!
+				// type erasure for faster compile times!
+				let handle_messages_and_respond: Pin<Box<dyn Future<Output = ()> + Send>> =
+					Box::pin(join(message_receive_future, stream_future).map(|_| ()));
+				handle_messages_and_respond.await;
+
+				room.clients.remove(&client);
 			});
 			Box::pin(async { Ok(Box::new(reply) as Box<dyn Reply>) })
 				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
