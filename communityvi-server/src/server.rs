@@ -37,7 +37,7 @@ pub async fn create_server<ShutdownHandleType>(
 					.forward(websocket_sink.sink_map_err(|_| ()))
 					.map(|_| ());
 
-				let stream_future = receive_messages(websocket_stream, client.clone(), room.clone());
+				let stream_future = receive_messages(websocket_stream, client.clone(), &room);
 
 				// type erasure for faster compile times!
 				let handle_messages_and_respond: Pin<Box<dyn Future<Output = ()> + Send>> =
@@ -59,7 +59,7 @@ pub async fn create_server<ShutdownHandleType>(
 async fn receive_messages(
 	mut websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin + Send,
 	client: Client,
-	room: Arc<Room>,
+	room: &Room,
 ) {
 	loop {
 		let websocket_message = match websocket_stream.next().await {
@@ -85,7 +85,7 @@ async fn receive_messages(
 			client.id()
 		);
 
-		handle_message(room.as_ref(), &client, message).await
+		handle_message(room, &client, message).await
 	}
 }
 
