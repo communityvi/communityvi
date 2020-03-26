@@ -76,10 +76,7 @@ impl Room {
 	}
 
 	async fn send(&self, client: &Client, message: OrderedMessage<ServerResponse>) {
-		let _ = client.send(message).await.map_err(|()| {
-			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
-			self.clients.remove(&client.clone());
-		});
+		let _ = client.send(message).await;
 	}
 
 	pub fn play(&self) {
