@@ -1,16 +1,15 @@
-use crate::message::{Message, OrderedMessage, WebSocketMessage};
+use crate::message::{ClientRequest, Message, ServerResponse, WebSocketMessage};
 use crate::room::{Client, Room};
 use futures::future::join;
 use futures::future::join_all;
-use futures::{FutureExt, Sink, SinkExt, Stream};
+use futures::{FutureExt, SinkExt, Stream};
 use futures::{StreamExt, TryStreamExt};
-use log::error;
+use log::{debug, error};
+use std::convert::Into;
 use std::convert::TryFrom;
-use std::convert::{Infallible, Into};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use warp::filters::ws::Ws;
 use warp::{Filter, Rejection, Reply};
@@ -29,10 +28,10 @@ pub async fn create_server<ShutdownHandleType>(
 			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| {
 				let (websocket_sink, websocket_stream) = websocket.split();
-				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<OrderedMessage>(1);
+				let (message_sender, message_receiver) = futures::channel::mpsc::channel::<Message<ServerResponse>>(1);
 				let client = room.add_client(message_sender.clone());
 				let message_receive_future = message_receiver
-					.map(WebSocketMessage::from)
+					.map(|message| WebSocketMessage::from(&message))
 					.map(Ok)
 					.forward(websocket_sink.sink_map_err(|_| ()))
 					.map(|_| ());
@@ -53,7 +52,7 @@ pub async fn create_server<ShutdownHandleType>(
 }
 
 async fn receive_messages(
-	mut websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin,
+	mut websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin + Send,
 	client: Client,
 	room: Arc<Room>,
 ) {
@@ -67,22 +66,28 @@ async fn receive_messages(
 			None => return, // websocket has been closed
 		};
 
-		let message = match Message::try_from(websocket_message) {
+		let Message { number, message } = match Message::<ClientRequest>::try_from(websocket_message) {
 			Ok(message) => message,
 			Err(error) => {
 				error!("Error converting messages: {}", error);
 				continue; // single message wasn't deserializable, continue with next one
 			}
 		};
+		debug!(
+			"Received {:?} message {} from client {}",
+			std::mem::discriminant(&message),
+			number,
+			client.id()
+		);
 
 		handle_message(room.as_ref(), &client, message).await
 	}
 }
 
-async fn handle_message(room: &Room, client: &Client, message: Message) {
-	match message {
-		Message::Ping(text_message) => room.singlecast(&client, Message::Pong(text_message)).await,
-		Message::Chat(text_message) => room.broadcast(Message::Chat(text_message)).await,
+async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
+	match request {
+		ClientRequest::Ping => room.singlecast(&client, ServerResponse::Pong).await,
+		ClientRequest::Chat { message } => room.broadcast(ServerResponse::Chat { message }).await,
 		_ => unimplemented!(),
 	}
 }

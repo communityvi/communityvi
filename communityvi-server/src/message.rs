@@ -1,98 +1,95 @@
 use chrono::{DateTime, Duration, Utc};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct OrderedMessage {
+pub struct Message<MessageType>
+where
+	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
+{
 	pub number: u64,
+	#[serde(bound(deserialize = "MessageType: DeserializeOwned"))]
 	#[serde(flatten)]
-	pub message: Message,
+	pub message: MessageType,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-pub enum Message {
-	Ping(TextMessage),
-	Pong(TextMessage),
-	Chat(TextMessage),
+pub enum ClientRequest {
+	Ping,
+	Pong,
+	Chat { message: String },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct TextMessage {
-	pub text: String,
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+pub enum ServerResponse {
+	Ping,
+	Pong,
+	Chat { message: String },
 }
 
 pub type WebSocketMessage = warp::filters::ws::Message;
 
-impl From<Message> for WebSocketMessage {
-	fn from(message: Message) -> Self {
-		let json = serde_json::to_string(&message).expect("Failed to serialize Message to JSON.");
-		WebSocketMessage::text(json)
-	}
-}
-
-impl From<OrderedMessage> for WebSocketMessage {
-	fn from(broadcast_message: OrderedMessage) -> Self {
-		let json = serde_json::to_string(&broadcast_message).expect("Failed to serialize BroadcastMessage to JSON.");
+impl<MessageType> From<&Message<MessageType>> for WebSocketMessage
+where
+	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
+{
+	fn from(message: &Message<MessageType>) -> Self {
+		let json = serde_json::to_string(message).expect("Failed to serialize message to JSON.");
 		WebSocketMessage::text(json)
 	}
 }
 
 #[derive(Debug)]
 pub enum MessageError {
-	/// (error_message, message_content)
-	DeserializationFailed(String, String),
+	DeserializationFailed { error: String, json: String },
 	WrongMessageType(WebSocketMessage),
 }
 
 impl Display for MessageError {
 	fn fmt(&self, formatter: &mut Formatter) -> Result<(), std::fmt::Error> {
 		match self {
-			MessageError::DeserializationFailed(error_message, message) => {
-				write!(formatter, "Invalid message: {}; {}", error_message, message)
-			}
-			MessageError::WrongMessageType(message) => {
-				write!(formatter, "Wrong message type. Expected text, got: {:?}", message)
-			}
+			MessageError::DeserializationFailed { error, json } => write!(
+				formatter,
+				"Failed to deserialize message with error: '{}'; Message was '{}'",
+				error, json
+			),
+			MessageError::WrongMessageType(message) => write!(
+				formatter,
+				"Wrong websocket message type. Expected text, got: {:?}",
+				message
+			),
 		}
 	}
 }
 
 impl Error for MessageError {}
 
-impl TryFrom<&str> for Message {
+impl<MessageType> TryFrom<&str> for Message<MessageType>
+where
+	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
+{
 	type Error = MessageError;
 
 	fn try_from(json: &str) -> Result<Self, Self::Error> {
-		serde_json::from_str(&json)
-			.map_err(|error| MessageError::DeserializationFailed(error.to_string(), json.to_string()))
+		serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
+			error: error.to_string(),
+			json: json.to_string(),
+		})
 	}
 }
 
-impl TryFrom<&str> for OrderedMessage {
-	type Error = MessageError;
-
-	fn try_from(json: &str) -> Result<Self, Self::Error> {
-		serde_json::from_str(&json)
-			.map_err(|error| MessageError::DeserializationFailed(error.to_string(), json.to_string()))
-	}
-}
-
-impl TryFrom<WebSocketMessage> for Message {
-	type Error = MessageError;
-
-	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
-		let json = websocket_message
-			.to_str()
-			.map_err(|()| MessageError::WrongMessageType(websocket_message.clone()))?;
-		json.try_into()
-	}
-}
-
-impl TryFrom<WebSocketMessage> for OrderedMessage {
+impl<MessageType> TryFrom<WebSocketMessage> for Message<MessageType>
+where
+	MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
+{
 	type Error = MessageError;
 
 	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
@@ -108,52 +105,45 @@ mod test {
 	use super::*;
 	use chrono::TimeZone;
 
+	fn first_message<MessageType>(message: MessageType) -> Message<MessageType>
+	where
+		MessageType: Clone + Debug + DeserializeOwned + Serialize + PartialEq,
+	{
+		Message { number: 0, message }
+	}
+
 	#[test]
 	fn ping_message_should_serialize_and_deserialize() {
-		let ping_message = Message::Ping(TextMessage { text: "hello".into() });
+		let ping_message = first_message(ClientRequest::Ping);
 		let json = serde_json::to_string(&ping_message).expect("Failed to serialize PingMessage to JSON");
-		assert_eq!(json, r#"{"type":"ping","text":"hello"}"#);
+		assert_eq!(json, r#"{"number":0,"type":"ping"}"#);
 
-		let deserialized_ping_message: Message =
+		let deserialized_ping_message: Message<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize PingMessage from JSON");
 		assert_eq!(deserialized_ping_message, ping_message);
 	}
 
 	#[test]
 	fn pong_message_should_serialize_and_deserialize() {
-		let pong_message = Message::Pong(TextMessage { text: "hello".into() });
+		let pong_message = first_message(ClientRequest::Pong);
 		let json = serde_json::to_string(&pong_message).expect("Failed to serialize PongMessage to JSON");
-		assert_eq!(json, r#"{"type":"pong","text":"hello"}"#);
+		assert_eq!(json, r#"{"number":0,"type":"pong"}"#);
 
-		let deserialized_pong_message: Message =
+		let deserialized_pong_message: Message<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize PongMessage from JSON");
 		assert_eq!(deserialized_pong_message, pong_message);
 	}
 
 	#[test]
 	fn chat_message_should_serialize_and_deserialize() {
-		let chat_message = Message::Chat(TextMessage { text: "hello".into() });
+		let chat_message = first_message(ClientRequest::Chat {
+			message: "hello".into(),
+		});
 		let json = serde_json::to_string(&chat_message).expect("Failed to serialize ChatMessage to JSON");
-		assert_eq!(json, r#"{"type":"chat","text":"hello"}"#);
+		assert_eq!(json, r#"{"number":0,"type":"chat","message":"hello"}"#);
 
-		let deserialized_chat_message: Message =
+		let deserialized_chat_message: Message<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize ChatMessage from JSON");
 		assert_eq!(deserialized_chat_message, chat_message);
-	}
-
-	#[test]
-	fn ordered_message_should_serialize_and_deserialize() {
-		let ordered_message = OrderedMessage {
-			number: 12,
-			message: Message::Chat(TextMessage {
-				text: "announcement".to_string(),
-			}),
-		};
-		let json = serde_json::to_string(&ordered_message).expect("Failed to serialize OrderedMessage to JSON");
-		assert_eq!(json, r#"{"number":12,"type":"chat","text":"announcement"}"#);
-
-		let deserialized_ordered_message: OrderedMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize BroadcastMessage from JSON");
-		assert_eq!(deserialized_ordered_message, ordered_message);
 	}
 }

@@ -1,4 +1,4 @@
-use crate::message::{Message, OrderedMessage};
+use crate::message::{ClientRequest, Message, ServerResponse};
 use crate::state::PlaybackState::{self, *};
 use contrie::ConSet;
 use futures::channel::mpsc::{SendError, Sender};
@@ -6,8 +6,9 @@ use futures::FutureExt;
 use futures::SinkExt;
 use log::info;
 use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering};
@@ -35,9 +36,12 @@ impl Default for Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, sender: Sender<OrderedMessage>) -> Client {
+	pub fn add_client(&self, response_sender: Sender<Message<ServerResponse>>) -> Client {
 		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst);
-		let client = Client { id, sender };
+		let client = Client {
+			id,
+			sender: response_sender,
+		};
 		let existing_client = self.clients.insert(client.clone());
 		if existing_client != None {
 			unreachable!("There must never be two clients with the same id!")
@@ -45,35 +49,38 @@ impl Room {
 		client
 	}
 
-	pub async fn singlecast(&self, client: &Client, message: Message) {
+	pub async fn singlecast(&self, client: &Client, response: ServerResponse) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
-		let ordered_message = OrderedMessage { number, message };
-		let _ = client.send(ordered_message).await.map_err(|error| {
-			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
-			self.clients.remove(&error.client);
-			info!("Client with id {} has gone away.", error.client.id());
-		});
+		let message = Message {
+			number,
+			message: response,
+		};
+		self.send(client, message).await
 	}
 
-	pub async fn broadcast(&self, message: Message) {
+	pub async fn broadcast(&self, response: ServerResponse) {
 		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
-		let ordered_message = OrderedMessage { number, message };
+		let message = Message {
+			number,
+			message: response,
+		};
 		let futures: Vec<_> = self
 			.clients
 			.iter()
-			.map(|client| {
-				let ordered_message = ordered_message.clone();
-				async move {
-					let clients = self.clients.clone();
-					let _ = client.send(ordered_message).await.map_err(|error| {
-						// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
-						clients.remove(&error.client);
-						info!("Client with id {} has gone away.", error.client.id());
-					});
-				}
+			.map(move |client| {
+				let message = message.clone();
+				async move { self.send(&client, message).await }
 			})
 			.collect();
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
+	}
+
+	async fn send(&self, client: &Client, message: Message<ServerResponse>) {
+		let _ = client.send(message).await.map_err(|error| {
+			// Send errors happen when clients go away, so remove it from the list of clients and ignore the error
+			self.clients.remove(&client.clone());
+			info!("Client with id {} has gone away.", client.id());
+		});
 	}
 
 	pub fn play(&self) {
@@ -135,7 +142,7 @@ impl Room {
 #[derive(Clone, Debug)]
 pub struct Client {
 	id: usize,
-	sender: Sender<OrderedMessage>,
+	sender: Sender<Message<ServerResponse>>,
 }
 
 #[derive(Debug)]
@@ -158,14 +165,13 @@ impl From<Client> for ClientSendError {
 impl Error for ClientSendError {}
 
 impl Client {
-	pub(self) fn id(&self) -> usize {
+	pub fn id(&self) -> usize {
 		self.id
 	}
 
-	async fn send(&self, message: OrderedMessage) -> Result<(), ClientSendError> {
-		let client = self.clone();
+	async fn send(&self, message: Message<ServerResponse>) -> Result<(), ClientSendError> {
 		let send_result = self.sender.clone().send(message).await;
-		send_result.map_err(|_: SendError| client.into())
+		send_result.map_err(|_: SendError| self.clone().into())
 	}
 }
 

@@ -1,4 +1,4 @@
-use crate::message::{Message, OrderedMessage, TextMessage};
+use crate::message::{ClientRequest, Message, ServerResponse};
 use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
 use http::Request;
@@ -15,8 +15,8 @@ lazy_static! {
 }
 
 async fn websocket_connection() -> (
-	impl futures::Sink<Message, Error = ()>,
-	impl futures::Stream<Item = OrderedMessage>,
+	impl futures::Sink<Message<ClientRequest>, Error = ()>,
+	impl futures::Stream<Item = Message<ServerResponse>>,
 ) {
 	let request = Request::builder()
 		.uri(format!("{}/ws", URL))
@@ -30,7 +30,7 @@ async fn websocket_connection() -> (
 	let stream = stream.map(|result| {
 		let websocket_message = result.expect("Stream error.");
 		let json = websocket_message.to_text().expect("No text message received.");
-		OrderedMessage::try_from(json).expect("Failed to parse JSON response")
+		Message::<ServerResponse>::try_from(json).expect("Failed to parse JSON response")
 	});
 	let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message| {
 		let websocket_message =
@@ -44,9 +44,10 @@ async fn websocket_connection() -> (
 fn should_respond_to_websocket_messages() {
 	let future = async {
 		let (mut sink, stream) = websocket_connection().await;
-		let message = Message::Ping(TextMessage {
-			text: "Hello World!".into(),
-		});
+		let message = Message {
+			number: 42,
+			message: ClientRequest::Ping,
+		};
 		sink.send(message).await.expect("Failed to sink message.");
 		stream.take(1).collect().await
 	};
@@ -54,76 +55,86 @@ fn should_respond_to_websocket_messages() {
 	assert_eq!(messages.len(), 1);
 	assert_eq!(
 		messages[0],
-		OrderedMessage {
+		Message {
 			number: 0,
-			message: Message::Pong(TextMessage {
-				text: "Hello World!".into()
-			})
+			message: ServerResponse::Pong,
 		}
 	);
 }
 
 #[test]
 fn should_broadcast_messages() {
-	let message = Message::Chat(TextMessage {
-		text: r#"Hello everyone \o/"#.into(),
-	});
-	let ordered_message = OrderedMessage {
-		number: 0,
-		message: message.clone(),
-	};
-	let message_for_future = message.clone();
 	let future = async move {
-		let (mut sink1, stream1) = websocket_connection().await;
-		let (_sink2, stream2) = websocket_connection().await;
+		let message = r#"Hello everyone \o/"#;
+		let request = Message {
+			number: 1337,
+			message: ClientRequest::Chat {
+				message: message.to_string(),
+			},
+		};
+		let (mut sink1, mut stream1) = websocket_connection().await;
+		let (_sink2, mut stream2) = websocket_connection().await;
 
-		sink1
-			.send(message_for_future)
-			.await
-			.expect("Failed to sink broadcast message.");
+		let expected_response = Message {
+			number: 0,
+			message: ServerResponse::Chat {
+				message: message.to_string(),
+			},
+		};
 
-		let received_messages1: Vec<_> = stream1.take(1).collect().await;
-		let received_messages2: Vec<_> = stream2.take(1).collect().await;
-		(received_messages1, received_messages2)
+		sink1.send(request).await.expect("Failed to sink broadcast message.");
+
+		assert_eq!(
+			expected_response,
+			stream1.next().await.expect("Failed to receive response on client 1")
+		);
+		assert_eq!(
+			expected_response,
+			stream2.next().await.expect("Failed to receive response on client 2")
+		);
 	};
-	let (received_messages1, received_messages2) = test_future_with_running_server(future);
-	assert_eq!(received_messages1.len(), 1);
-	assert_eq!(received_messages2.len(), 1);
-	assert_eq!(received_messages1[0], ordered_message);
-	assert_eq!(received_messages2[0], ordered_message);
+	test_future_with_running_server(future);
 }
 
 #[test]
 fn test_messages_should_have_sequence_numbers() {
-	let first_message = Message::Chat(TextMessage { text: "first".into() });
-	let second_message = Message::Chat(TextMessage { text: "second".into() });
-	let first_ordered_message = OrderedMessage {
-		number: 0,
-		message: first_message.clone(),
-	};
-	let second_ordered_message = OrderedMessage {
-		number: 1,
-		message: second_message.clone(),
-	};
-
-	let first_message_for_future = first_message.clone();
-	let second_message_for_future = second_message.clone();
 	let future = async move {
-		let (mut sink, stream) = websocket_connection().await;
+		let first_request = Message {
+			number: 0,
+			message: ClientRequest::Chat {
+				message: "first".into(),
+			},
+		};
+		let second_request = Message {
+			number: 1,
+			message: ClientRequest::Chat {
+				message: "second".into(),
+			},
+		};
 
-		let first_message = first_message_for_future;
-		let second_message = second_message_for_future.clone();
+		let expected_first_response = Message {
+			number: 0,
+			message: ServerResponse::Chat {
+				message: "first".into(),
+			},
+		};
+		let expected_second_response = Message {
+			number: 1,
+			message: ServerResponse::Chat {
+				message: "second".into(),
+			},
+		};
 
-		sink.send(first_message).await.expect("Failed to sink first message.");
-		sink.send(second_message).await.expect("Failed to sink second message.");
+		let (mut sink, mut stream) = websocket_connection().await;
+		sink.send(first_request).await.expect("Failed to sink first message.");
+		sink.send(second_request).await.expect("Failed to sink second message.");
 
-		let received_messages: Vec<_> = stream.take(2).collect().await;
-		received_messages
+		let first_response = stream.next().await.expect("Didn't receive first message");
+		assert_eq!(expected_first_response, first_response);
+		let second_response = stream.next().await.expect("Didn't receive second message");
+		assert_eq!(expected_second_response, second_response);
 	};
-	let received_messages = test_future_with_running_server(future);
-	assert_eq!(received_messages.len(), 2);
-	assert_eq!(received_messages[0], first_ordered_message);
-	assert_eq!(received_messages[1], second_ordered_message);
+	test_future_with_running_server(future);
 }
 
 fn test_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
