@@ -5,6 +5,8 @@ use http::Request;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
+use std::net::SocketAddr;
+use std::str::FromStr;
 use tokio::runtime;
 use tokio_tungstenite::tungstenite;
 
@@ -149,7 +151,7 @@ where
 		.expect("Failed to create runtime");
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(([127, 0, 0, 1], 8000), receiver);
+	let server = create_server(SocketAddr::from_str("127.0.0.1:8000").unwrap(), receiver);
 	let server_handle = runtime.spawn(server);
 
 	let output = runtime.block_on(future_to_test);

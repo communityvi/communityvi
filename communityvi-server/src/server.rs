@@ -5,7 +5,6 @@ use futures::future::join;
 use futures::StreamExt;
 use futures::{FutureExt, SinkExt, Stream};
 use log::{debug, error, info, warn};
-use std::convert::Into;
 use std::convert::TryFrom;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -14,10 +13,8 @@ use std::sync::Arc;
 use warp::filters::ws::Ws;
 use warp::{Filter, Rejection, Reply};
 
-pub async fn create_server<ShutdownHandleType>(
-	address: impl Into<SocketAddr> + 'static,
-	shutdown_handle: ShutdownHandleType,
-) where
+pub async fn create_server<ShutdownHandleType>(address: SocketAddr, shutdown_handle: ShutdownHandleType)
+where
 	ShutdownHandleType: std::future::Future<Output = ()> + Send + 'static,
 {
 	let room = Arc::new(Room::default());
