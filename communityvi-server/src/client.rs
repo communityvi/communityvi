@@ -4,7 +4,7 @@ use futures::SinkExt;
 use log::info;
 use serde::export::Formatter;
 use std::fmt::Display;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 #[derive(Clone, Debug)]
 pub struct Client {

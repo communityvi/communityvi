@@ -7,7 +7,6 @@ mod room;
 mod server;
 #[cfg(test)]
 mod server_tests;
-mod state;
 
 #[tokio::main]
 async fn main() {
