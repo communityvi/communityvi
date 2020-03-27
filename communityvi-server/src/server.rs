@@ -49,7 +49,8 @@ where
 
 	let server = warp::serve(websocket_filter);
 
-	let (_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
+	let (bound_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
+	info!("Listening on {}", bound_address);
 	future.await
 }
 
