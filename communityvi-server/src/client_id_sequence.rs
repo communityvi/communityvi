@@ -1,6 +1,7 @@
 use crate::atomic_sequence::AtomicSequence;
 use crate::client::ClientId;
 
+#[derive(Default)]
 pub struct ClientIdSequence {
 	sequence: AtomicSequence,
 }

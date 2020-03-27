@@ -1,16 +1,17 @@
+use crate::atomic_sequence::AtomicSequence;
 use crate::client::{Client, ClientId};
+use crate::client_id_sequence::ClientIdSequence;
 use crate::message::{OrderedMessage, ServerResponse};
 use ahash::RandomState;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::channel::mpsc::Sender;
 use futures::FutureExt;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Default)]
 pub struct Room {
-	next_client_id: AtomicU64,
-	next_sequence_number: AtomicU64,
+	client_id_sequence: ClientIdSequence,
+	message_number_sequence: AtomicSequence,
 	clients: DashMap<ClientId, Client>,
 }
 
@@ -19,15 +20,15 @@ type ClientHandle<'a> = Ref<'a, ClientId, Client, RandomState>;
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
 	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> ClientId {
-		let id = self.next_client_id.fetch_add(1, Ordering::SeqCst).into();
-		let client = Client::new(id, response_sender);
+		let client_id = self.client_id_sequence.next();
+		let client = Client::new(client_id, response_sender);
 
-		let existing_client = self.clients.insert(id, client);
+		let existing_client = self.clients.insert(client_id, client);
 		if existing_client.is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
-		id
+		client_id
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {
@@ -39,7 +40,7 @@ impl Room {
 	}
 
 	pub async fn singlecast(&self, client: &Client, response: ServerResponse) {
-		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
+		let number = self.message_number_sequence.next();
 		let message = OrderedMessage {
 			number,
 			message: response,
@@ -48,7 +49,7 @@ impl Room {
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
-		let number = self.next_sequence_number.fetch_add(1, Ordering::SeqCst);
+		let number = self.message_number_sequence.next();
 		let message = OrderedMessage {
 			number,
 			message: response,
