@@ -5,11 +5,11 @@ use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::channel::mpsc::Sender;
 use futures::FutureExt;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Default)]
 pub struct Room {
-	next_client_id: AtomicUsize,
+	next_client_id: AtomicU64,
 	next_sequence_number: AtomicU64,
 	clients: DashMap<ClientId, Client>,
 }

@@ -31,17 +31,17 @@ impl Client {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ClientId {
-	id: usize,
+	id: u64,
 }
 
-impl From<usize> for ClientId {
-	fn from(id: usize) -> Self {
+impl From<u64> for ClientId {
+	fn from(id: u64) -> Self {
 		ClientId { id }
 	}
 }
 
-impl Into<usize> for ClientId {
-	fn into(self) -> usize {
+impl Into<u64> for ClientId {
+	fn into(self) -> u64 {
 		self.id
 	}
 }
