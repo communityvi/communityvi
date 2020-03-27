@@ -19,8 +19,9 @@ where
 {
 	let room = Arc::new(Room::default());
 	let websocket_filter = warp::path("ws")
-		.and(warp::path::end())
-		.and(warp::ws())
+		.boxed()
+		.and(warp::path::end().boxed())
+		.and(warp::ws().boxed())
 		.and_then(move |ws: Ws| {
 			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| async move {
@@ -47,7 +48,7 @@ where
 				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
 		});
 
-	let server = warp::serve(websocket_filter);
+	let server = warp::serve(websocket_filter.boxed());
 
 	let (bound_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
 	info!("Listening on {}", bound_address);
