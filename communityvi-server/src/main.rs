@@ -1,6 +1,7 @@
 use crate::server::create_server;
 use futures::FutureExt;
 
+mod atomic_sequence;
 mod client;
 mod message;
 mod room;
