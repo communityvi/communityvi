@@ -3,6 +3,7 @@ use futures::FutureExt;
 
 mod atomic_sequence;
 mod client;
+mod client_id_sequence;
 mod message;
 mod room;
 mod server;
