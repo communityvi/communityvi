@@ -19,7 +19,9 @@ async fn main() -> Result<(), CommunityviError> {
 	const CONFIGURATION_FILE_PATH: &str = "configuration.toml";
 	let configuration = Configuration::from_file(CONFIGURATION_FILE_PATH)?;
 
-	env_logger::init();
+	env_logger::Builder::new()
+		.parse_filters(&configuration.log_filters)
+		.init();
 
 	let (_shutdown_sender, shutdown_receiver) = futures::channel::oneshot::channel::<()>();
 	let shutdown_handle = shutdown_receiver.then(|_| futures::future::ready(()));
