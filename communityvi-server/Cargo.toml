@@ -6,20 +6,20 @@ edition = "2018"
 
 [dependencies]
 ahash = "0.3"
-dashmap = "3.7"
-log = "0.4"
-env_logger = "0.7"
-warp = "0.2"
-futures = "0.3"
-tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "parking_lot", "macros"] }
-http = "0.2"
 chrono = {version = "0.4", features = ["serde"]}
+dashmap = "3.7"
+env_logger = "0.7"
+futures = "0.3"
+http = "0.2"
+log = "0.4"
+parking_lot = "0.10"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
-parking_lot = "0.10"
+tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "parking_lot", "macros"] }
+warp = "0.2"
 
 [dev-dependencies]
+lazy_static = "1.4"
 reqwest = {version = "0.10", features = ["json"]}
 tokio-tungstenite = "0.10"
 url = "2.1"
-lazy_static = "1.4"
