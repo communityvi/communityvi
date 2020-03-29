@@ -13,8 +13,13 @@ use std::sync::Arc;
 use warp::filters::ws::Ws;
 use warp::{Filter, Rejection, Reply};
 
-pub async fn create_server<ShutdownHandleType>(address: SocketAddr, shutdown_handle: ShutdownHandleType)
-where
+const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
+
+pub async fn create_server<ShutdownHandleType>(
+	address: SocketAddr,
+	shutdown_handle: ShutdownHandleType,
+	enable_reference_client: bool,
+) where
 	ShutdownHandleType: std::future::Future<Output = ()> + Send + 'static,
 {
 	let room = Arc::new(Room::default());
@@ -46,11 +51,24 @@ where
 			});
 			Box::pin(async { Ok(Box::new(reply) as Box<dyn Reply>) })
 				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
-		});
+		})
+		.boxed();
 
-	let server = warp::serve(websocket_filter.boxed());
+	let reference_client_filter = warp::get()
+		.and(warp::path("reference"))
+		.and(warp::path::end())
+		.map(|| REFERENCE_CLIENT_HTML);
 
-	let (bound_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
+	let (bound_address, future) = if enable_reference_client {
+		let complete_filter = websocket_filter.or(reference_client_filter);
+		let server = warp::serve(complete_filter);
+		let (bound_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
+		(bound_address, future.boxed())
+	} else {
+		let server = warp::serve(websocket_filter);
+		let (bound_address, future) = server.bind_with_graceful_shutdown(address, shutdown_handle);
+		(bound_address, future.boxed())
+	};
 	info!("Listening on {}", bound_address);
 	future.await
 }

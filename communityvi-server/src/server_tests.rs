@@ -3,6 +3,7 @@ use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
+use reqwest::StatusCode;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -10,7 +11,7 @@ use tokio::runtime;
 use tokio_tungstenite::tungstenite;
 use url::Url;
 
-const BASE_URL: &str = "ws://localhost:8000";
+const HOSTNAME_AND_PORT: &str = "localhost:8000";
 lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
@@ -19,7 +20,7 @@ async fn websocket_connection() -> (
 	impl futures::Sink<OrderedMessage<ClientRequest>, Error = ()>,
 	impl futures::Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
-	let url = Url::parse(&format!("{}/ws", BASE_URL)).expect("Failed to build websocket URL");
+	let url = Url::parse(&format!("ws://{}/ws", HOSTNAME_AND_PORT)).expect("Failed to build websocket URL");
 	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
@@ -135,6 +136,18 @@ fn test_messages_should_have_sequence_numbers() {
 	test_future_with_running_server(future);
 }
 
+#[test]
+fn test_server_should_serve_reference_client() {
+	let future = async {
+		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
+		let response = reqwest::get(url).await.expect("Failed to request reference client.");
+		assert_eq!(StatusCode::OK, response.status());
+		let response_text = response.text().await.expect("Incorrect response.");
+		assert!(response_text.contains("html"));
+	};
+	test_future_with_running_server(future);
+}
+
 fn test_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
 where
 	OutputType: Send + 'static,
@@ -148,7 +161,7 @@ where
 		.expect("Failed to create runtime");
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(SocketAddr::from_str("127.0.0.1:8000").unwrap(), receiver);
+	let server = create_server(SocketAddr::from_str("127.0.0.1:8000").unwrap(), receiver, true);
 	let server_handle = runtime.spawn(server);
 
 	let output = runtime.block_on(future_to_test);

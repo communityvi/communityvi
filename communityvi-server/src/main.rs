@@ -25,7 +25,7 @@ async fn main() -> Result<(), CommunityviError> {
 
 	let (_shutdown_sender, shutdown_receiver) = futures::channel::oneshot::channel::<()>();
 	let shutdown_handle = shutdown_receiver.then(|_| futures::future::ready(()));
-	let server = create_server(configuration.address, shutdown_handle);
+	let server = create_server(configuration.address, shutdown_handle, true);
 
 	server.await;
 	Ok(())
