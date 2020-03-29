@@ -127,27 +127,35 @@ fn should_broadcast_messages() {
 				message: message.to_string(),
 			},
 		};
-		let (client1_id, mut sink1, mut stream1) = connect_and_register("Alice".to_string()).await;
-		assert_eq!(ClientId::from(0), client1_id);
-		let (client2_id, _sink2, mut stream2) = connect_and_register("Bob".to_string()).await;
-		assert_eq!(ClientId::from(1), client2_id);
+		let (alice_client_id, mut alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
+		assert_eq!(ClientId::from(0), alice_client_id);
+		let (bob_client_id, _bob_sink, mut bob_stream) = connect_and_register("Bob".to_string()).await;
+		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let expected_response = OrderedMessage {
 			number: 2,
 			message: ServerResponse::Chat {
+				sender_id: alice_client_id,
+				sender_name: "Alice".to_string(),
 				message: message.to_string(),
 			},
 		};
 
-		sink1.send(request).await.expect("Failed to sink broadcast message.");
+		alice_sink
+			.send(request)
+			.await
+			.expect("Failed to sink broadcast message.");
 
 		assert_eq!(
 			expected_response,
-			stream1.next().await.expect("Failed to receive response on client 1")
+			alice_stream
+				.next()
+				.await
+				.expect("Failed to receive response on client 1")
 		);
 		assert_eq!(
 			expected_response,
-			stream2.next().await.expect("Failed to receive response on client 2")
+			bob_stream.next().await.expect("Failed to receive response on client 2")
 		);
 	};
 	test_future_with_running_server(future, false);
@@ -169,28 +177,35 @@ fn test_messages_should_have_sequence_numbers() {
 			},
 		};
 
-		let expected_first_response = OrderedMessage {
-			number: 1,
-			message: ServerResponse::Chat {
-				message: "first".into(),
-			},
-		};
-		let expected_second_response = OrderedMessage {
-			number: 2,
-			message: ServerResponse::Chat {
-				message: "second".into(),
-			},
-		};
-
 		let (client_id, mut sink, mut stream) = connect_and_register("Charlie".to_string()).await;
 		assert_eq!(ClientId::from(0), client_id);
 		sink.send(first_request).await.expect("Failed to sink first message.");
 		sink.send(second_request).await.expect("Failed to sink second message.");
 
 		let first_response = stream.next().await.expect("Didn't receive first message");
-		assert_eq!(expected_first_response, first_response);
+		assert_eq!(
+			OrderedMessage {
+				number: 1,
+				message: ServerResponse::Chat {
+					sender_id: client_id,
+					sender_name: "Charlie".to_string(),
+					message: "first".into(),
+				},
+			},
+			first_response
+		);
 		let second_response = stream.next().await.expect("Didn't receive second message");
-		assert_eq!(expected_second_response, second_response);
+		assert_eq!(
+			OrderedMessage {
+				number: 2,
+				message: ServerResponse::Chat {
+					sender_id: client_id,
+					sender_name: "Charlie".to_string(),
+					message: "second".into(),
+				},
+			},
+			second_response
+		);
 	};
 	test_future_with_running_server(future, false);
 }

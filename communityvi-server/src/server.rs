@@ -173,7 +173,14 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 		ClientRequest::Ping => {
 			let _ = room.singlecast(&client, ServerResponse::Pong).await;
 		}
-		ClientRequest::Chat { message } => room.broadcast(ServerResponse::Chat { message }).await,
+		ClientRequest::Chat { message } => {
+			room.broadcast(ServerResponse::Chat {
+				sender_id: client.id(),
+				sender_name: client.name().to_string(),
+				message,
+			})
+			.await
+		}
 		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
 		ClientRequest::Register { .. } => unreachable!("Register messages are handled in 'register_client'."),
 		ClientRequest::Invalid { .. } => unimplemented!(),

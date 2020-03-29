@@ -35,8 +35,14 @@ impl Message for ClientRequest {}
 pub enum ServerResponse {
 	Ping,
 	Pong,
-	Chat { message: String },
-	Hello { id: ClientId },
+	Chat {
+		sender_id: ClientId,
+		sender_name: String,
+		message: String,
+	},
+	Hello {
+		id: ClientId,
+	},
 }
 
 impl Message for ServerResponse {}
@@ -196,10 +202,15 @@ mod test {
 	#[test]
 	fn chat_response_should_serialize_and_deserialize() {
 		let chat_response = first_message(ServerResponse::Chat {
+			sender_id: ClientId::from(42),
+			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
 		});
 		let json = serde_json::to_string(&chat_response).expect("Failed to serialize Chat response to JSON");
-		assert_eq!(r#"{"number":0,"type":"chat","message":"hello"}"#, json);
+		assert_eq!(
+			r#"{"number":0,"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello"}"#,
+			json
+		);
 
 		let deserialized_chat_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Chat response from JSON");

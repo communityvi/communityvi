@@ -23,7 +23,6 @@ impl Client {
 		self.id
 	}
 
-	#[allow(unused)]
 	pub fn name(&self) -> &str {
 		&self.name
 	}
