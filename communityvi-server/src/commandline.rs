@@ -2,6 +2,7 @@ use crate::configuration::Configuration;
 use crate::error::CommunityviError;
 use crate::server::create_server;
 use futures::FutureExt;
+use log::info;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -41,8 +42,20 @@ impl Commandline {
 
 		let base_command = self.command.unwrap_or_default();
 		match base_command {
-			BaseCommand::Run => create_server(configuration.address, shutdown_handle, false).await,
-			BaseCommand::Demo => create_server(configuration.address, shutdown_handle, true).await,
+			BaseCommand::Run => {
+				info!(
+					"Starting server. Start websocket connections at 'ws://{}/ws'.",
+					configuration.address
+				);
+				create_server(configuration.address, shutdown_handle, false).await
+			}
+			BaseCommand::Demo => {
+				info!(
+					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
+					configuration.address
+				);
+				create_server(configuration.address, shutdown_handle, true).await
+			}
 			BaseCommand::Configuration => println!("{:?}", configuration),
 		}
 		Ok(())
