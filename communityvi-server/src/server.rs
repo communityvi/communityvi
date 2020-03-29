@@ -116,7 +116,12 @@ async fn register_client(
 		unimplemented!("Should fail here.");
 	}
 
-	room.add_client(name, response_sender).await
+	let client_handle = room.add_client(name, response_sender);
+	let hello_response = ServerResponse::Hello { id: client_handle.id() };
+	room.singlecast(&client_handle, hello_response)
+		.await
+		.ok()
+		.map(|()| client_handle.id())
 }
 
 fn websocket_stream_to_client_requests(
@@ -165,7 +170,9 @@ async fn receive_messages(
 
 async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 	match request {
-		ClientRequest::Ping => room.singlecast(&client, ServerResponse::Pong).await,
+		ClientRequest::Ping => {
+			let _ = room.singlecast(&client, ServerResponse::Pong).await;
+		}
 		ClientRequest::Chat { message } => room.broadcast(ServerResponse::Chat { message }).await,
 		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
 		ClientRequest::Register { .. } => unreachable!("Register messages are handled in 'register_client'."),

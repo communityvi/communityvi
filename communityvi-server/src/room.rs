@@ -1,8 +1,9 @@
 use crate::atomic_sequence::AtomicSequence;
 use crate::client::{Client, ClientId};
+use crate::client_handle::ClientHandle;
 use crate::client_id_sequence::ClientIdSequence;
 use crate::message::{OrderedMessage, ServerResponse};
-use dashmap::mapref::one::Ref;
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::channel::mpsc::Sender;
 use futures::FutureExt;
@@ -14,33 +15,17 @@ pub struct Room {
 	clients: DashMap<ClientId, Client>,
 }
 
-type ClientHandle<'a> = Ref<'a, ClientId, Client>;
-
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub async fn add_client(
-		&self,
-		name: String,
-		response_sender: Sender<OrderedMessage<ServerResponse>>,
-	) -> Option<ClientId> {
+	pub fn add_client(&self, name: String, response_sender: Sender<OrderedMessage<ServerResponse>>) -> ClientHandle {
 		let client_id = self.client_id_sequence.next();
 		let client = Client::new(client_id, name, response_sender);
 
-		let hello_message = OrderedMessage {
-			number: self.message_number_sequence.next(),
-			message: ServerResponse::Hello { id: client_id },
-		};
-		match client.send(hello_message).await {
-			Ok(()) => (),
-			Err(()) => return None,
-		}
-
-		let existing_client = self.clients.insert(client_id, client);
-		if existing_client.is_some() {
+		let client_entry = self.clients.entry(client_id);
+		if let Entry::Occupied(_) = &client_entry {
 			unreachable!("There must never be two clients with the same id!")
 		}
-
-		Some(client_id)
+		client_entry.or_insert(client).into()
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {
@@ -48,16 +33,16 @@ impl Room {
 	}
 
 	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientHandle> {
-		self.clients.get(&client_id)
+		self.clients.get(&client_id).map(ClientHandle::from)
 	}
 
-	pub async fn singlecast(&self, client: &Client, response: ServerResponse) {
+	pub async fn singlecast(&self, client: &Client, response: ServerResponse) -> Result<(), ()> {
 		let number = self.message_number_sequence.next();
 		let message = OrderedMessage {
 			number,
 			message: response,
 		};
-		self.send(client, message).await
+		client.send(message).await
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
@@ -71,13 +56,11 @@ impl Room {
 			.iter()
 			.map(move |client| {
 				let message = message.clone();
-				async move { self.send(&client, message).await }
+				async move {
+					let _ = client.send(message).await;
+				}
 			})
 			.collect();
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
-	}
-
-	async fn send(&self, client: &Client, message: OrderedMessage<ServerResponse>) {
-		let _ = client.send(message).await;
 	}
 }

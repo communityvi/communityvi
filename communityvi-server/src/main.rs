@@ -4,6 +4,7 @@ use structopt::StructOpt;
 
 mod atomic_sequence;
 mod client;
+mod client_handle;
 mod client_id_sequence;
 mod commandline;
 mod configuration;
