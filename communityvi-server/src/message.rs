@@ -22,9 +22,17 @@ pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
 pub enum ClientRequest {
 	Ping,
 	Pong,
-	Chat { message: String },
-	Register { name: String },
-	Invalid { error: String, content: Vec<u8> },
+	Chat {
+		message: String,
+	},
+	Register {
+		name: String,
+	},
+	#[serde(skip)]
+	Invalid {
+		error: String,
+		content: Vec<u8>,
+	},
 }
 
 impl Message for ClientRequest {}
