@@ -10,7 +10,6 @@ chrono = {version = "0.4", features = ["serde"]}
 dashmap = "3.7"
 env_logger = "0.7"
 futures = "0.3"
-http = "0.2"
 log = "0.4"
 parking_lot = "0.10"
 serde = {version = "1.0", features = ["derive"]}

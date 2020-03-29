@@ -1,7 +1,6 @@
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::server::create_server;
 use futures::{FutureExt, SinkExt, StreamExt};
-use http::Request;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
@@ -9,8 +8,9 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::runtime;
 use tokio_tungstenite::tungstenite;
+use url::Url;
 
-const URL: &str = "ws://localhost:8000";
+const BASE_URL: &str = "ws://localhost:8000";
 lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
@@ -19,11 +19,8 @@ async fn websocket_connection() -> (
 	impl futures::Sink<OrderedMessage<ClientRequest>, Error = ()>,
 	impl futures::Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
-	let request = Request::builder()
-		.uri(format!("{}/ws", URL))
-		.body(())
-		.expect("Failed to build handshake request.");
-	let (websocket_stream, _response) = tokio_tungstenite::connect_async(request)
+	let url = Url::parse(&format!("{}/ws", BASE_URL)).expect("Failed to build websocket URL");
+	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
 		.unwrap();

@@ -156,7 +156,6 @@ dependencies = [
  "dashmap",
  "env_logger",
  "futures",
- "http",
  "lazy_static",
  "log 0.4.8",
  "parking_lot",
