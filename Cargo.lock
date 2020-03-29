@@ -175,7 +175,6 @@ dependencies = [
 name = "communityvi-server"
 version = "0.1.0"
 dependencies = [
- "ahash",
  "chrono",
  "dashmap",
  "env_logger",

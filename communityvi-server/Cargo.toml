@@ -5,7 +5,6 @@ authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.
 edition = "2018"
 
 [dependencies]
-ahash = "0.3"
 chrono = {version = "0.4", features = ["serde"]}
 dashmap = "3.7"
 env_logger = "0.7"

@@ -2,7 +2,6 @@ use crate::atomic_sequence::AtomicSequence;
 use crate::client::{Client, ClientId};
 use crate::client_id_sequence::ClientIdSequence;
 use crate::message::{OrderedMessage, ServerResponse};
-use ahash::RandomState;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::channel::mpsc::Sender;
@@ -15,7 +14,7 @@ pub struct Room {
 	clients: DashMap<ClientId, Client>,
 }
 
-type ClientHandle<'a> = Ref<'a, ClientId, Client, RandomState>;
+type ClientHandle<'a> = Ref<'a, ClientId, Client>;
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
