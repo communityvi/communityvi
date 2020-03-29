@@ -37,13 +37,7 @@ pub async fn create_server<ShutdownHandleType>(
 
 					let mut client_request_stream = websocket_stream_to_client_requests(websocket_stream);
 
-					let client_id = if let Some(client_id) =
-						register_client(&room, &mut client_request_stream, message_sender).await
-					{
-						client_id
-					} else {
-						return;
-					};
+					let client_id = register_client(&room, &mut client_request_stream, message_sender).await;
 
 					// convert server responses into websocket messages and send them
 					let message_receive_future = message_receiver
@@ -52,14 +46,18 @@ pub async fn create_server<ShutdownHandleType>(
 						.forward(websocket_sink.sink_map_err(|_| ()))
 						.map(|_| ());
 
-					let stream_future = receive_messages(client_request_stream, client_id, &room);
+					let stream_future = if let Some(client_id) = client_id {
+						receive_messages(client_request_stream, client_id, &room).boxed()
+					} else {
+						async {}.boxed()
+					};
 
 					// type erasure for faster compile times!
 					let handle_messages_and_respond: Pin<Box<dyn Future<Output = ()> + Send>> =
 						Box::pin(join(message_receive_future, stream_future).map(|_| ()));
 					handle_messages_and_respond.await;
 
-					room.remove_client(client_id);
+					client_id.map(|client_id| room.remove_client(client_id));
 				}
 				.boxed()
 			});
@@ -90,7 +88,7 @@ pub async fn create_server<ShutdownHandleType>(
 async fn register_client(
 	room: &Room,
 	request_stream: &mut (impl Stream<Item = OrderedMessage<ClientRequest>> + Send + Unpin),
-	response_sender: mpsc::Sender<OrderedMessage<ServerResponse>>,
+	mut response_sender: mpsc::Sender<OrderedMessage<ServerResponse>>,
 ) -> Option<ClientId> {
 	let request = match request_stream.next().await {
 		None => {
@@ -108,12 +106,26 @@ async fn register_client(
 		(number, name)
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
-		//FIXME: Send error message to client
+
+		let invalid_message_response = OrderedMessage {
+			number: 0,
+			message: ServerResponse::InvalidMessage,
+		};
+		let _ = response_sender.send(invalid_message_response).await;
 		return None;
 	};
 
 	if number != 0 {
-		unimplemented!("Should fail here.");
+		error!(
+			"Client registration failed. Invalid message number: {}, should be 0.",
+			number
+		);
+		let invalid_message_response = OrderedMessage {
+			number: 0,
+			message: ServerResponse::InvalidMessage,
+		};
+		let _ = response_sender.send(invalid_message_response).await;
+		return None;
 	}
 
 	let client_handle = room.add_client(name, response_sender);
@@ -182,7 +194,15 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			.await
 		}
 		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
-		ClientRequest::Register { .. } => unreachable!("Register messages are handled in 'register_client'."),
-		ClientRequest::Invalid { .. } => unimplemented!(),
+		ClientRequest::Register { .. } => {
+			error!(
+				"Client: {} tried to register even though it is already registered.",
+				client.id()
+			);
+			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
+		}
+		ClientRequest::Invalid { .. } => {
+			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
+		}
 	}
 }

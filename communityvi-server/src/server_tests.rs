@@ -18,16 +18,11 @@ lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-async fn websocket_connection() -> (
+async fn typed_websocket_connection() -> (
 	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
 	impl Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
-	let url = Url::parse(&format!("ws://{}/ws", HOSTNAME_AND_PORT)).expect("Failed to build websocket URL");
-	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
-		.await
-		.map_err(|error| panic!("Websocket connection failed: {}", error))
-		.unwrap();
-	let (sink, stream) = websocket_stream.split();
+	let (sink, stream) = websocket_connection().await;
 	let stream = stream.map(|result| {
 		let websocket_message = result.expect("Stream error.");
 		let json = websocket_message.to_text().expect("No text message received.");
@@ -39,6 +34,18 @@ async fn websocket_connection() -> (
 		futures::future::ok(websocket_message)
 	});
 	(sink, stream)
+}
+
+async fn websocket_connection() -> (
+	impl Sink<tungstenite::Message, Error = tungstenite::Error>,
+	impl Stream<Item = Result<tungstenite::Message, tungstenite::Error>>,
+) {
+	let url = Url::parse(&format!("ws://{}/ws", HOSTNAME_AND_PORT)).expect("Failed to build websocket URL");
+	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
+		.await
+		.map_err(|error| panic!("Websocket connection failed: {}", error))
+		.unwrap();
+	websocket_stream.split()
 }
 
 async fn register_client(
@@ -79,7 +86,7 @@ async fn connect_and_register(
 	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
 	impl Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
-	let (mut request_sink, mut response_stream) = websocket_connection().await;
+	let (mut request_sink, mut response_stream) = typed_websocket_connection().await;
 	let client_id = register_client(name, &mut request_sink, &mut response_stream).await;
 	(client_id, request_sink, response_stream)
 }
@@ -87,9 +94,107 @@ async fn connect_and_register(
 #[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
+		let (mut sink, mut stream) = typed_websocket_connection().await;
 		let client_id = register_client("Ferris".to_string(), &mut sink, &mut stream).await;
 		assert_eq!(ClientId::from(0), client_id);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
+fn should_not_allow_registering_client_twice() {
+	let future = async {
+		let (_client_id, mut sink, mut stream) = connect_and_register("Anorak".to_string()).await;
+		let register_message = OrderedMessage {
+			number: 1,
+			message: ClientRequest::Register {
+				name: "Parcival".to_string(),
+			},
+		};
+		sink.send(register_message)
+			.await
+			.expect("Failed to send second register method.");
+		let response = stream.next().await.expect("No response to double register.");
+		assert_eq!(
+			OrderedMessage {
+				number: 1,
+				message: ServerResponse::InvalidMessage
+			},
+			response
+		);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
+fn should_not_allow_invalid_messages_during_registration() {
+	let future = async {
+		let (mut sink, mut stream) = websocket_connection().await;
+		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+		sink.send(invalid_message)
+			.await
+			.expect("Failed to send invalid message.");
+		let response = stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Invalid websocket response received");
+		let expected_response = tungstenite::Message::Text(r#"{"number":0,"type":"invalid_message"}"#.to_string());
+		assert_eq!(expected_response, response);
+	};
+	test_future_with_running_server(future, false);
+}
+
+fn register_message_with_number(number: usize) -> String {
+	format!(r#"{{"number":{},"type":"register","name":"Ferris"}}"#, number)
+}
+
+#[test]
+fn should_not_allow_zero_message_numbers_during_registration() {
+	let future = async {
+		let (mut sink, mut stream) = websocket_connection().await;
+		let invalid_message = tungstenite::Message::Text(register_message_with_number(1));
+		sink.send(invalid_message)
+			.await
+			.expect("Failed to send register message with invalid number.");
+		let response = stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Invalid websocket response received");
+		let expected_response = tungstenite::Message::Text(r#"{"number":0,"type":"invalid_message"}"#.to_string());
+		assert_eq!(expected_response, response);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
+fn should_not_allow_invalid_messages_after_successful_registration() {
+	let future = async {
+		let (mut sink, mut stream) = websocket_connection().await;
+		let registration_message = tungstenite::Message::Text(register_message_with_number(0));
+		sink.send(registration_message)
+			.await
+			.expect("Failed to send register message.");
+		let hello_response = stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Invalid websocket response received");
+		let expected_hello_response = tungstenite::Message::Text(r#"{"number":0,"type":"hello","id":0}"#.to_string());
+		assert_eq!(expected_hello_response, hello_response);
+
+		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+		sink.send(invalid_message)
+			.await
+			.expect("Failed to send invalid message.");
+		let response = stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Invalid websocket response received");
+		let expected_response = tungstenite::Message::Text(r#"{"number":1,"type":"invalid_message"}"#.to_string());
+		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
 }

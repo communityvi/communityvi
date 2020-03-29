@@ -43,6 +43,7 @@ pub enum ServerResponse {
 	Hello {
 		id: ClientId,
 	},
+	InvalidMessage,
 }
 
 impl Message for ServerResponse {}
@@ -226,5 +227,17 @@ mod test {
 		let deserialized_hello_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
 		assert_eq!(hello_response, deserialized_hello_response);
+	}
+
+	#[test]
+	fn invalid_message_response_should_serialize_and_deserialize() {
+		let invalid_message_response = first_message(ServerResponse::InvalidMessage);
+		let json = serde_json::to_string(&invalid_message_response)
+			.expect("Failed to serialize InvalidMessage response to JSON");
+		assert_eq!(r#"{"number":0,"type":"invalid_message"}"#, json);
+
+		let deserialized_invalid_message_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize InvalidMessage response from JSON");
+		assert_eq!(invalid_message_response, deserialized_invalid_message_response);
 	}
 }
