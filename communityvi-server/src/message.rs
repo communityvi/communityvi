@@ -21,6 +21,7 @@ pub enum ClientRequest {
 	Ping,
 	Pong,
 	Chat { message: String },
+	Register { name: String },
 }
 
 impl Message for ClientRequest {}
@@ -101,37 +102,50 @@ mod test {
 	}
 
 	#[test]
-	fn ping_message_should_serialize_and_deserialize() {
-		let ping_message = first_message(ClientRequest::Ping);
-		let json = serde_json::to_string(&ping_message).expect("Failed to serialize PingMessage to JSON");
+	fn ping_request_should_serialize_and_deserialize() {
+		let ping_request = first_message(ClientRequest::Ping);
+		let json = serde_json::to_string(&ping_request).expect("Failed to serialize Ping request to JSON");
 		assert_eq!(json, r#"{"number":0,"type":"ping"}"#);
 
-		let deserialized_ping_message: OrderedMessage<ClientRequest> =
-			serde_json::from_str(&json).expect("Failed to deserialize PingMessage from JSON");
-		assert_eq!(deserialized_ping_message, ping_message);
+		let deserialized_ping_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Ping request from JSON");
+		assert_eq!(ping_request, deserialized_ping_request);
 	}
 
 	#[test]
-	fn pong_message_should_serialize_and_deserialize() {
-		let pong_message = first_message(ClientRequest::Pong);
-		let json = serde_json::to_string(&pong_message).expect("Failed to serialize PongMessage to JSON");
+	fn pong_request_should_serialize_and_deserialize() {
+		let pong_request = first_message(ClientRequest::Pong);
+		let json = serde_json::to_string(&pong_request).expect("Failed to serialize Pong request to JSON");
 		assert_eq!(json, r#"{"number":0,"type":"pong"}"#);
 
-		let deserialized_pong_message: OrderedMessage<ClientRequest> =
-			serde_json::from_str(&json).expect("Failed to deserialize PongMessage from JSON");
-		assert_eq!(deserialized_pong_message, pong_message);
+		let deserialized_pong_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Pong request from JSON");
+		assert_eq!(pong_request, deserialized_pong_request);
 	}
 
 	#[test]
-	fn chat_message_should_serialize_and_deserialize() {
-		let chat_message = first_message(ClientRequest::Chat {
+	fn chat_request_should_serialize_and_deserialize() {
+		let chat_request = first_message(ClientRequest::Chat {
 			message: "hello".into(),
 		});
-		let json = serde_json::to_string(&chat_message).expect("Failed to serialize ChatMessage to JSON");
-		assert_eq!(json, r#"{"number":0,"type":"chat","message":"hello"}"#);
+		let json = serde_json::to_string(&chat_request).expect("Failed to serialize Chat request to JSON");
+		assert_eq!(json, r#"{"number":0,"type":"chat","request":"hello"}"#);
 
-		let deserialized_chat_message: OrderedMessage<ClientRequest> =
-			serde_json::from_str(&json).expect("Failed to deserialize ChatMessage from JSON");
-		assert_eq!(deserialized_chat_message, chat_message);
+		let deserialized_chat_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Chat request from JSON");
+		assert_eq!(chat_request, deserialized_chat_request);
+	}
+
+	#[test]
+	fn register_request_should_serialize_and_deserialize() {
+		let register_request = first_message(ClientRequest::Register {
+			name: "Ferris".to_string(),
+		});
+		let json = serde_json::to_string(&register_request).expect("Failed to serialize Register request to JSON");
+		assert_eq!(json, r#"{"number":0,"type":"register","name":"Ferris"}"#);
+
+		let deserialized_register_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Register request from JSON");
+		assert_eq!(register_request, deserialized_register_request);
 	}
 }
