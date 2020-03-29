@@ -1,5 +1,5 @@
 use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::Relaxed;
 
 #[derive(Default)]
 pub struct AtomicSequence {
@@ -8,7 +8,10 @@ pub struct AtomicSequence {
 
 impl AtomicSequence {
 	pub fn next(&self) -> u64 {
-		self.next_number.fetch_add(1, SeqCst)
+		// Using Relaxed memory ordering is ok because we only care about
+		// the ordering of the value in the atomic and not any surrounding
+		// loads or stores.
+		self.next_number.fetch_add(1, Relaxed)
 	}
 }
 
