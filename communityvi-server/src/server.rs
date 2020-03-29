@@ -130,10 +130,10 @@ async fn register_client(
 
 	let client_handle = room.add_client(name, response_sender);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
-	room.singlecast(&client_handle, hello_response)
-		.await
-		.ok()
-		.map(|()| client_handle.id())
+	room.singlecast(&client_handle, hello_response).await.ok().map(|()| {
+		info!("Registered client: {} {}", client_handle.id(), client_handle.name());
+		client_handle.id()
+	})
 }
 
 fn websocket_stream_to_client_requests(

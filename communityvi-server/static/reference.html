@@ -2,9 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Hello World!</title>
+    <title>Communityvi demo client</title>
 </head>
 <body>
-	<h1>Hello World!</h1>
+	<h1>Communityvi demo client</h1>
+	<div>
+		<input type="text" name="name" id="name">
+		<button id="register" onclick="registerClient()">Register</button>
+		<p><b id="client_id"></b></p>
+	</div>
+	<script type="application/javascript">
+		function registerClient() {
+			const name = document.getElementById('name').value;
+			const idField = document.getElementById('client_id');
+
+			const socket = new WebSocket('ws://127.0.0.1:8000/ws');
+			socket.onopen = function (event) {
+				console.log('Socket open.', event);
+				const registerMessage = {
+					number: 0,
+					type: 'register',
+					name: name,
+				};
+				socket.send(JSON.stringify(registerMessage));
+			};
+
+			socket.onmessage = function (messageEvent) {
+				console.log('Received message.', messageEvent);
+				const messageData = messageEvent.data;
+				const message = JSON.parse(messageData);
+				idField.innerText = message.id;
+			};
+
+			socket.onclose = function (event) {
+				console.log('Socket closed.', event);
+			};
+
+			socket.onerror = function (event) {
+				console.log('Received error.', event);
+			};
+		}
+	</script>
 </body>
 </html>

@@ -7,6 +7,7 @@ use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::channel::mpsc::Sender;
 use futures::FutureExt;
+use log::info;
 
 #[derive(Default)]
 pub struct Room {
@@ -29,7 +30,9 @@ impl Room {
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {
-		self.clients.remove(&client_id);
+		self.clients.remove(&client_id).map(|(_, client)| {
+			info!("Removed client: {} {}", client.id(), client.name());
+		});
 	}
 
 	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientHandle> {
