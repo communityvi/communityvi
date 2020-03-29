@@ -18,16 +18,25 @@ type ClientHandle<'a> = Ref<'a, ClientId, Client>;
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> ClientId {
+	pub async fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Option<ClientId> {
 		let client_id = self.client_id_sequence.next();
 		let client = Client::new(client_id, response_sender);
+
+		let hello_message = OrderedMessage {
+			number: self.message_number_sequence.next(),
+			message: ServerResponse::Hello { id: client_id },
+		};
+		match client.send(hello_message).await {
+			Ok(()) => (),
+			Err(()) => return None,
+		}
 
 		let existing_client = self.clients.insert(client_id, client);
 		if existing_client.is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
-		client_id
+		Some(client_id)
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {

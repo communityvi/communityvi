@@ -1,4 +1,5 @@
 use crate::client::ClientId;
+use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -23,6 +24,7 @@ pub enum ClientRequest {
 	Pong,
 	Chat { message: String },
 	Register { name: String },
+	Invalid { error: String, content: Vec<u8> },
 }
 
 impl Message for ClientRequest {}
@@ -84,10 +86,28 @@ impl<MessageType: Message> TryFrom<&str> for OrderedMessage<MessageType> {
 	}
 }
 
-impl<MessageType: Message> TryFrom<WebSocketMessage> for OrderedMessage<MessageType> {
+impl From<WebSocketMessage> for OrderedMessage<ClientRequest> {
+	fn from(websocket_message: WebSocketMessage) -> Self {
+		match OrderedMessage::try_from(&websocket_message) {
+			Ok(message) => message,
+			Err(error) => {
+				error!("Invalid client request: {}", error);
+				OrderedMessage {
+					number: 0,
+					message: ClientRequest::Invalid {
+						error: error.to_string(),
+						content: websocket_message.into_bytes(),
+					},
+				}
+			}
+		}
+	}
+}
+
+impl<MessageType: Message> TryFrom<&WebSocketMessage> for OrderedMessage<MessageType> {
 	type Error = MessageError;
 
-	fn try_from(websocket_message: WebSocketMessage) -> Result<Self, Self::Error> {
+	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
 		let json = websocket_message
 			.to_str()
 			.map_err(|()| MessageError::WrongMessageType(websocket_message.clone()))?;

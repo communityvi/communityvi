@@ -1,10 +1,12 @@
+use crate::client::ClientId;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::server::create_server;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use reqwest::StatusCode;
 use std::convert::TryFrom;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::runtime;
@@ -17,8 +19,8 @@ lazy_static! {
 }
 
 async fn websocket_connection() -> (
-	impl futures::Sink<OrderedMessage<ClientRequest>, Error = ()>,
-	impl futures::Stream<Item = OrderedMessage<ServerResponse>>,
+	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
+	impl Stream<Item = OrderedMessage<ServerResponse>>,
 ) {
 	let url = Url::parse(&format!("ws://{}/ws", HOSTNAME_AND_PORT)).expect("Failed to build websocket URL");
 	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
@@ -39,26 +41,80 @@ async fn websocket_connection() -> (
 	(sink, stream)
 }
 
+async fn register_client(
+	name: String,
+	request_sink: &mut (impl Sink<OrderedMessage<ClientRequest>, Error = ()> + Unpin),
+	response_stream: &mut (impl Stream<Item = OrderedMessage<ServerResponse>> + Unpin),
+) -> ClientId {
+	let register_request = OrderedMessage {
+		number: 0,
+		message: ClientRequest::Register { name },
+	};
+
+	request_sink
+		.send(register_request)
+		.await
+		.expect("Failed to send register message.");
+
+	let response = response_stream
+		.next()
+		.await
+		.expect("Failed to get response to register request.");
+
+	if let OrderedMessage {
+		number: _,
+		message: ServerResponse::Hello { id },
+	} = response
+	{
+		id
+	} else {
+		panic!("Expected Hello-Response, got '{:?}'", response);
+	}
+}
+
+async fn connect_and_register(
+	name: String,
+) -> (
+	ClientId,
+	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
+	impl Stream<Item = OrderedMessage<ServerResponse>>,
+) {
+	let (mut request_sink, mut response_stream) = websocket_connection().await;
+	let client_id = register_client(name, &mut request_sink, &mut response_stream).await;
+	(client_id, request_sink, response_stream)
+}
+
 #[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
-		let (mut sink, stream) = websocket_connection().await;
+		let (mut sink, mut stream) = websocket_connection().await;
+		let client_id = register_client("Ferris".to_string(), &mut sink, &mut stream).await;
+		assert_eq!(ClientId::from(0), client_id);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
+fn should_receive_pong_in_response_to_ping() {
+	let future = async {
+		let (client_id, mut sink, mut stream) = connect_and_register("Ferris".to_string()).await;
+		assert_eq!(ClientId::from(0), client_id);
 		let message = OrderedMessage {
 			number: 42,
 			message: ClientRequest::Ping,
 		};
 		sink.send(message).await.expect("Failed to sink message.");
-		stream.take(1).collect().await
+		let message = stream.next().await.unwrap();
+		assert_eq!(
+			OrderedMessage {
+				number: 1,
+				message: ServerResponse::Pong,
+			},
+			message
+		);
 	};
-	let messages: Vec<_> = test_future_with_running_server(future, false);
-	assert_eq!(messages.len(), 1);
-	assert_eq!(
-		messages[0],
-		OrderedMessage {
-			number: 0,
-			message: ServerResponse::Pong,
-		}
-	);
+
+	test_future_with_running_server(future, false);
 }
 
 #[test]
@@ -71,11 +127,13 @@ fn should_broadcast_messages() {
 				message: message.to_string(),
 			},
 		};
-		let (mut sink1, mut stream1) = websocket_connection().await;
-		let (_sink2, mut stream2) = websocket_connection().await;
+		let (client1_id, mut sink1, mut stream1) = connect_and_register("Alice".to_string()).await;
+		assert_eq!(ClientId::from(0), client1_id);
+		let (client2_id, _sink2, mut stream2) = connect_and_register("Bob".to_string()).await;
+		assert_eq!(ClientId::from(1), client2_id);
 
 		let expected_response = OrderedMessage {
-			number: 0,
+			number: 2,
 			message: ServerResponse::Chat {
 				message: message.to_string(),
 			},
@@ -112,19 +170,20 @@ fn test_messages_should_have_sequence_numbers() {
 		};
 
 		let expected_first_response = OrderedMessage {
-			number: 0,
+			number: 1,
 			message: ServerResponse::Chat {
 				message: "first".into(),
 			},
 		};
 		let expected_second_response = OrderedMessage {
-			number: 1,
+			number: 2,
 			message: ServerResponse::Chat {
 				message: "second".into(),
 			},
 		};
 
-		let (mut sink, mut stream) = websocket_connection().await;
+		let (client_id, mut sink, mut stream) = connect_and_register("Charlie".to_string()).await;
+		assert_eq!(ClientId::from(0), client_id);
 		sink.send(first_request).await.expect("Failed to sink first message.");
 		sink.send(second_request).await.expect("Failed to sink second message.");
 
@@ -171,7 +230,7 @@ fn test_future_with_running_server<OutputType, FutureType>(
 ) -> OutputType
 where
 	OutputType: Send + 'static,
-	FutureType: std::future::Future<Output = OutputType> + Send + 'static,
+	FutureType: Future<Output = OutputType> + Send + 'static,
 {
 	let _guard = TEST_MUTEX.lock();
 	let mut runtime = runtime::Builder::new()
