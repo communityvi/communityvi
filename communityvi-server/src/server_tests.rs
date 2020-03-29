@@ -142,6 +142,13 @@ fn test_server_should_serve_reference_client() {
 		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
 		let response = reqwest::get(url).await.expect("Failed to request reference client.");
 		assert_eq!(StatusCode::OK, response.status());
+		let content_type = response
+			.headers()
+			.get("content-type")
+			.expect("No content-type header.")
+			.to_str()
+			.expect("Content-Type header is no valid UTF-8");
+		assert_eq!("text/html; charset=utf-8", content_type);
 		let response_text = response.text().await.expect("Incorrect response.");
 		assert!(response_text.contains("html"));
 	};
