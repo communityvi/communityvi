@@ -50,7 +50,7 @@ fn should_respond_to_websocket_messages() {
 		sink.send(message).await.expect("Failed to sink message.");
 		stream.take(1).collect().await
 	};
-	let messages: Vec<_> = test_future_with_running_server(future);
+	let messages: Vec<_> = test_future_with_running_server(future, false);
 	assert_eq!(messages.len(), 1);
 	assert_eq!(
 		messages[0],
@@ -92,7 +92,7 @@ fn should_broadcast_messages() {
 			stream2.next().await.expect("Failed to receive response on client 2")
 		);
 	};
-	test_future_with_running_server(future);
+	test_future_with_running_server(future, false);
 }
 
 #[test]
@@ -133,11 +133,11 @@ fn test_messages_should_have_sequence_numbers() {
 		let second_response = stream.next().await.expect("Didn't receive second message");
 		assert_eq!(expected_second_response, second_response);
 	};
-	test_future_with_running_server(future);
+	test_future_with_running_server(future, false);
 }
 
 #[test]
-fn test_server_should_serve_reference_client() {
+fn test_server_should_serve_reference_client_if_enabled() {
 	let future = async {
 		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
 		let response = reqwest::get(url).await.expect("Failed to request reference client.");
@@ -152,10 +152,23 @@ fn test_server_should_serve_reference_client() {
 		let response_text = response.text().await.expect("Incorrect response.");
 		assert!(response_text.contains("html"));
 	};
-	test_future_with_running_server(future);
+	test_future_with_running_server(future, true);
 }
 
-fn test_future_with_running_server<OutputType, FutureType>(future_to_test: FutureType) -> OutputType
+#[test]
+fn test_server_should_not_serve_reference_client_if_disabled() {
+	let future = async {
+		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
+		let response = reqwest::get(url).await.expect("Failed to request reference client.");
+		assert_eq!(StatusCode::NOT_FOUND, response.status());
+	};
+	test_future_with_running_server(future, false);
+}
+
+fn test_future_with_running_server<OutputType, FutureType>(
+	future_to_test: FutureType,
+	enable_reference_client: bool,
+) -> OutputType
 where
 	OutputType: Send + 'static,
 	FutureType: std::future::Future<Output = OutputType> + Send + 'static,
@@ -168,7 +181,11 @@ where
 		.expect("Failed to create runtime");
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(SocketAddr::from_str("127.0.0.1:8000").unwrap(), receiver, true);
+	let server = create_server(
+		SocketAddr::from_str("127.0.0.1:8000").unwrap(),
+		receiver,
+		enable_reference_client,
+	);
 	let server_handle = runtime.spawn(server);
 
 	let output = runtime.block_on(future_to_test);
