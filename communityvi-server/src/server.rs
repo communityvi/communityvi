@@ -100,7 +100,7 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let (number, _name) = if let OrderedMessage {
+	let (number, name) = if let OrderedMessage {
 		number,
 		message: ClientRequest::Register { name },
 	} = request
@@ -116,8 +116,7 @@ async fn register_client(
 		unimplemented!("Should fail here.");
 	}
 
-	// FIXME: Add name to client
-	room.add_client(response_sender).await
+	room.add_client(name, response_sender).await
 }
 
 fn websocket_stream_to_client_requests(

@@ -10,16 +10,22 @@ use std::hash::Hash;
 #[derive(Clone, Debug)]
 pub struct Client {
 	id: ClientId,
+	name: String,
 	sender: Sender<OrderedMessage<ServerResponse>>,
 }
 
 impl Client {
-	pub fn new(id: ClientId, sender: Sender<OrderedMessage<ServerResponse>>) -> Self {
-		Self { id, sender }
+	pub fn new(id: ClientId, name: String, sender: Sender<OrderedMessage<ServerResponse>>) -> Self {
+		Self { id, name, sender }
 	}
 
 	pub fn id(&self) -> ClientId {
 		self.id
+	}
+
+	#[allow(unused)]
+	pub fn name(&self) -> &str {
+		&self.name
 	}
 
 	pub async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {

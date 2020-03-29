@@ -18,9 +18,13 @@ type ClientHandle<'a> = Ref<'a, ClientId, Client>;
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub async fn add_client(&self, response_sender: Sender<OrderedMessage<ServerResponse>>) -> Option<ClientId> {
+	pub async fn add_client(
+		&self,
+		name: String,
+		response_sender: Sender<OrderedMessage<ServerResponse>>,
+	) -> Option<ClientId> {
 		let client_id = self.client_id_sequence.next();
-		let client = Client::new(client_id, response_sender);
+		let client = Client::new(client_id, name, response_sender);
 
 		let hello_message = OrderedMessage {
 			number: self.message_number_sequence.next(),
