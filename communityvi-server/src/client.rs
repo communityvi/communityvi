@@ -3,6 +3,7 @@ use futures::channel::mpsc::{SendError, Sender};
 use futures::SinkExt;
 use log::info;
 use serde::export::Formatter;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::hash::Hash;
 
@@ -29,7 +30,8 @@ impl Client {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ClientId {
 	id: u64,
 }
