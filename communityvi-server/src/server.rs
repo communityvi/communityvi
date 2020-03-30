@@ -143,41 +143,40 @@ fn websocket_stream_to_client_requests(
 		.inspect_err(|error| {
 			error!("Error streaming websocket message: {}, result.", error);
 		})
-		.take_while(|result| {
-			let is_ok = result.is_ok();
-			futures::future::ready(is_ok)
-		})
+		.take_while(|result| futures::future::ready(result.is_ok()))
 		.map(|result| match result {
-			Ok(message) => OrderedMessage::<ClientRequest>::from(message),
+			Ok(message) => message,
 			Err(_) => unreachable!("Error's can't happen, they have been filtered out."),
 		})
+		.map(OrderedMessage::from)
 }
 
 async fn receive_messages(
-	client_request_stream: impl Stream<Item = OrderedMessage<ClientRequest>> + Send,
+	mut client_request_stream: impl Stream<Item = OrderedMessage<ClientRequest>> + Send + Unpin,
 	client_id: ClientId,
 	room: &Room,
 ) {
-	client_request_stream
-		.for_each(|ordered_message| async {
-			let OrderedMessage { number, message } = ordered_message;
-			debug!(
-				"Received {:?} message {} from {}",
-				std::mem::discriminant(&message),
-				number,
-				client_id
-			);
+	loop {
+		let OrderedMessage { number, message } = match client_request_stream.next().await {
+			Some(message) => message,
+			None => return,
+		};
+		debug!(
+			"Received {:?} message {} from {}",
+			std::mem::discriminant(&message),
+			number,
+			client_id
+		);
 
-			let client = match room.get_client_by_id(client_id) {
-				Some(client_handle) => client_handle,
-				None => {
-					warn!("Couldn't find Client: {}", client_id);
-					return;
-				}
-			};
-			handle_message(room, &client, message).await
-		})
-		.await
+		let client = match room.get_client_by_id(client_id) {
+			Some(client_handle) => client_handle,
+			None => {
+				warn!("Couldn't find Client: {}", client_id);
+				return;
+			}
+		};
+		handle_message(room, &client, message).await;
+	}
 }
 
 async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
@@ -203,6 +202,10 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 		}
 		ClientRequest::Invalid { .. } => {
 			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
+		}
+		ClientRequest::Close => {
+			info!("Close message received for Client: {} {}", client.id(), client.name());
+			let _ = room.singlecast(&client, ServerResponse::Bye).await;
 		}
 	}
 }
