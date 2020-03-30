@@ -53,9 +53,13 @@ pub enum ServerResponse {
 	Hello {
 		id: ClientId,
 	},
-	InvalidMessage,
+	Joined {
+		id: ClientId,
+		name: String,
+	},
 	#[serde(skip)]
 	Bye,
+	InvalidMessage,
 }
 
 impl Message for ServerResponse {}
@@ -253,6 +257,20 @@ mod test {
 		let deserialized_chat_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Chat response from JSON");
 		assert_eq!(chat_response, deserialized_chat_response);
+	}
+
+	#[test]
+	fn joined_response_should_serialize_and_deserialize() {
+		let joined_response = first_message(ServerResponse::Joined {
+			id: ClientId::from(42),
+			name: "Hedwig".to_string(),
+		});
+		let json = serde_json::to_string(&joined_response).expect("Failed to serialize Joined response to JSON");
+		assert_eq!(r#"{"number":0,"type":"joined","id":42,"name":"Hedwig"}"#, json);
+
+		let deserialized_joined_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize Joined response from JSON");
+		assert_eq!(joined_response, deserialized_joined_response);
 	}
 
 	#[test]
