@@ -345,6 +345,15 @@ fn test_server_should_serve_reference_client_if_enabled() {
 			.to_str()
 			.expect("Content-Type header is no valid UTF-8");
 		assert_eq!("text/html; charset=utf-8", content_type);
+
+		let cache_control = response
+			.headers()
+			.get("cache-control")
+			.expect("No cache-control header.")
+			.to_str()
+			.expect("Cache-Control header is no valid UTF-8");
+		assert_eq!("no-cache", cache_control);
+
 		let response_text = response.text().await.expect("Incorrect response.");
 		assert!(response_text.contains("html"));
 	};

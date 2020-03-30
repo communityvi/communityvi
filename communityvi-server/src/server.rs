@@ -11,7 +11,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use warp::filters::ws::Ws;
-use warp::reply::with_header;
 use warp::{Filter, Rejection, Reply};
 
 const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
@@ -66,10 +65,12 @@ pub async fn create_server<ShutdownHandleType>(
 		})
 		.boxed();
 
-	let reference_client_filter = warp::get()
-		.and(warp::path("reference"))
-		.and(warp::path::end())
-		.map(|| with_header(REFERENCE_CLIENT_HTML, "Content-Type", "text/html; charset=utf-8"));
+	let reference_client_filter = warp::get().and(warp::path("reference")).and(warp::path::end()).map(|| {
+		warp::http::Response::builder()
+			.header("Content-Type", "text/html; charset=utf-8")
+			.header("Cache-Control", "no-cache")
+			.body(REFERENCE_CLIENT_HTML)
+	});
 
 	let (bound_address, future) = if enable_reference_client {
 		let complete_filter = websocket_filter.or(reference_client_filter);
