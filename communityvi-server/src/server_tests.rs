@@ -55,7 +55,7 @@ async fn register_client(
 ) -> ClientId {
 	let register_request = OrderedMessage {
 		number: 0,
-		message: ClientRequest::Register { name },
+		message: ClientRequest::Register { name: name.clone() },
 	};
 
 	request_sink
@@ -68,7 +68,7 @@ async fn register_client(
 		.await
 		.expect("Failed to get response to register request.");
 
-	if let OrderedMessage {
+	let id = if let OrderedMessage {
 		number: _,
 		message: ServerResponse::Hello { id },
 	} = response
@@ -76,7 +76,12 @@ async fn register_client(
 		id
 	} else {
 		panic!("Expected Hello-Response, got '{:?}'", response);
-	}
+	};
+
+	let joined_response = response_stream.next().await.expect("Failed to get joined response.");
+	assert!(matches!(joined_response, OrderedMessage {number: _, message: ServerResponse::Joined {id: _, name: _}}));
+
+	id
 }
 
 async fn connect_and_register(
@@ -117,7 +122,7 @@ fn should_not_allow_registering_client_twice() {
 		let response = stream.next().await.expect("No response to double register.");
 		assert_eq!(
 			OrderedMessage {
-				number: 1,
+				number: 2,
 				message: ServerResponse::InvalidMessage
 			},
 			response
@@ -184,6 +189,8 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 		let expected_hello_response = tungstenite::Message::Text(r#"{"number":0,"type":"hello","id":0}"#.to_string());
 		assert_eq!(expected_hello_response, hello_response);
 
+		let _ = stream.next().await.expect("Failed to receive joined response.");
+
 		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 		sink.send(invalid_message)
 			.await
@@ -193,7 +200,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
-		let expected_response = tungstenite::Message::Text(r#"{"number":1,"type":"invalid_message"}"#.to_string());
+		let expected_response = tungstenite::Message::Text(r#"{"number":2,"type":"invalid_message"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -212,7 +219,7 @@ fn should_receive_pong_in_response_to_ping() {
 		let message = stream.next().await.unwrap();
 		assert_eq!(
 			OrderedMessage {
-				number: 1,
+				number: 2,
 				message: ServerResponse::Pong,
 			},
 			message
@@ -237,8 +244,18 @@ fn should_broadcast_messages() {
 		let (bob_client_id, _bob_sink, mut bob_stream) = connect_and_register("Bob".to_string()).await;
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let expected_response = OrderedMessage {
-			number: 2,
+		let expected_bob_joined_response = OrderedMessage {
+			number: 3,
+			message: ServerResponse::Joined {
+				id: bob_client_id,
+				name: "Bob".to_string(),
+			},
+		};
+		let bob_joined_response = alice_stream.next().await.expect("Didn't get join message for Bob.");
+		assert_eq!(expected_bob_joined_response, bob_joined_response);
+
+		let expected_chat_response = OrderedMessage {
+			number: 4,
 			message: ServerResponse::Chat {
 				sender_id: alice_client_id,
 				sender_name: "Alice".to_string(),
@@ -252,14 +269,14 @@ fn should_broadcast_messages() {
 			.expect("Failed to sink broadcast message.");
 
 		assert_eq!(
-			expected_response,
+			expected_chat_response,
 			alice_stream
 				.next()
 				.await
 				.expect("Failed to receive response on client 1")
 		);
 		assert_eq!(
-			expected_response,
+			expected_chat_response,
 			bob_stream.next().await.expect("Failed to receive response on client 2")
 		);
 	};
@@ -290,7 +307,7 @@ fn test_messages_should_have_sequence_numbers() {
 		let first_response = stream.next().await.expect("Didn't receive first message");
 		assert_eq!(
 			OrderedMessage {
-				number: 1,
+				number: 2,
 				message: ServerResponse::Chat {
 					sender_id: client_id,
 					sender_name: "Charlie".to_string(),
@@ -302,7 +319,7 @@ fn test_messages_should_have_sequence_numbers() {
 		let second_response = stream.next().await.expect("Didn't receive second message");
 		assert_eq!(
 			OrderedMessage {
-				number: 2,
+				number: 3,
 				message: ServerResponse::Chat {
 					sender_id: client_id,
 					sender_name: "Charlie".to_string(),

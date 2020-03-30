@@ -33,7 +33,7 @@ pub async fn create_server<ShutdownHandleType>(
 			let reply = ws.on_upgrade(move |websocket| {
 				async move {
 					let (websocket_sink, websocket_stream) = websocket.split();
-					let (message_sender, message_receiver) = mpsc::channel::<OrderedMessage<ServerResponse>>(1);
+					let (message_sender, message_receiver) = mpsc::channel::<OrderedMessage<ServerResponse>>(2);
 
 					let mut client_request_stream = websocket_stream_to_client_requests(websocket_stream);
 
@@ -130,10 +130,21 @@ async fn register_client(
 
 	let client_handle = room.add_client(name, response_sender);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
-	room.singlecast(&client_handle, hello_response).await.ok().map(|()| {
-		info!("Registered client: {} {}", client_handle.id(), client_handle.name());
-		client_handle.id()
-	})
+	if room.singlecast(&client_handle, hello_response).await.is_ok() {
+		let name = client_handle.name().to_string();
+		let id = client_handle.id();
+
+		// Drop the client_handle so that the lock on the concurrent hashmap is released for the broadcast
+		std::mem::drop(client_handle);
+
+		info!("Registered client: {} {}", id, name);
+
+		room.broadcast(ServerResponse::Joined { id, name }).await;
+
+		Some(id)
+	} else {
+		None
+	}
 }
 
 fn websocket_stream_to_client_requests(
