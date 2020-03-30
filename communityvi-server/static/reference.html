@@ -12,36 +12,45 @@
 		<p><b id="client_id"></b></p>
 	</div>
 	<script type="application/javascript">
+		'use strict';
+
+		let webSocket = null;
+
 		function registerClient() {
 			const name = document.getElementById('name').value;
 			const idField = document.getElementById('client_id');
 
-			const socket = new WebSocket('ws://127.0.0.1:8000/ws');
-			socket.onopen = function (event) {
+			if (webSocket !== null) {
+				webSocket.close();
+			}
+
+			webSocket = new WebSocket('ws://127.0.0.1:8000/ws');
+			webSocket.onopen = function (event) {
 				console.log('Socket open.', event);
 				const registerMessage = {
 					number: 0,
 					type: 'register',
 					name: name,
 				};
-				socket.send(JSON.stringify(registerMessage));
+				webSocket.send(JSON.stringify(registerMessage));
 			};
 
-			socket.onmessage = function (messageEvent) {
+			webSocket.onmessage = function (messageEvent) {
 				console.log('Received message.', messageEvent);
 				const messageData = messageEvent.data;
 				const message = JSON.parse(messageData);
 				idField.innerText = message.id;
 			};
 
-			socket.onclose = function (event) {
+			webSocket.onclose = function (event) {
 				console.log('Socket closed.', event);
 			};
 
-			socket.onerror = function (event) {
+			webSocket.onerror = function (event) {
 				console.log('Received error.', event);
 			};
 		}
+
 	</script>
 </body>
 </html>
