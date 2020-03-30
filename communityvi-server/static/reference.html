@@ -7,39 +7,57 @@
 <body>
 	<h1>Communityvi demo client</h1>
 	<div>
-		<input type="text" name="name" id="name">
-		<button id="register" onclick="registerClient()">Register</button>
-		<p><b id="client_id"></b></p>
+		<p>
+			<input type="text" name="name" id="name">
+			<button id="register" onclick="registerClient()">Register</button>
+		</p>
+		<p><b>Client ID: </b><b id="client_id">&lt;unregistered&gt;</b></p>
+		<hr>
+		<table border="1">
+			<thead>
+				<tr>
+					<td><b>ID</b></td>
+					<td><b>Name</b></td>
+					<td><b>Message</b></td>
+				</tr>
+			</thead>
+			<tbody id="chat">
+			</tbody>
+		</table>
+		<p>
+			<input type="text" name="message" id="message">
+			<button id="send_message" onclick="sendChatMessage()">Send</button>
+		</p>
 	</div>
 	<script type="application/javascript">
 		'use strict';
 
 		let webSocket = null;
+		let messageNumber = 0;
 
 		function registerClient() {
 			const name = document.getElementById('name').value;
-			const idField = document.getElementById('client_id');
 
 			if (webSocket !== null) {
 				webSocket.close();
+				messageNumber = 0;
 			}
 
 			webSocket = new WebSocket('ws://127.0.0.1:8000/ws');
 			webSocket.onopen = function (event) {
 				console.log('Socket open.', event);
 				const registerMessage = {
-					number: 0,
 					type: 'register',
 					name: name,
 				};
-				webSocket.send(JSON.stringify(registerMessage));
+				sendMessage(registerMessage);
 			};
 
 			webSocket.onmessage = function (messageEvent) {
 				console.log('Received message.', messageEvent);
 				const messageData = messageEvent.data;
 				const message = JSON.parse(messageData);
-				idField.innerText = message.id;
+				handleMessage(message);
 			};
 
 			webSocket.onclose = function (event) {
@@ -49,6 +67,44 @@
 			webSocket.onerror = function (event) {
 				console.log('Received error.', event);
 			};
+		}
+
+		function handleMessage(message) {
+			const idField = document.getElementById('client_id');
+
+			switch (message.type) {
+				case 'hello':
+					idField.innerText = message.id;
+					break;
+
+				case 'joined':
+					displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
+					break;
+
+				case 'chat':
+					displayChatMessage(message.sender_id, message.sender_name, message.message);
+					break;
+			}
+		}
+
+		function sendChatMessage() {
+			const message = document.getElementById('message').value;
+			const chatMessage = {
+				type: "chat",
+				message: message,
+			};
+			sendMessage(chatMessage);
+		}
+
+		function sendMessage(message) {
+			message.number = messageNumber;
+			messageNumber++;
+			webSocket.send(JSON.stringify(message));
+		}
+
+		function displayChatMessage(id, name, message) {
+			const chat = document.getElementById('chat');
+			chat.innerHTML += `<tr><td>${id}</td><td>${name}</td><td>${message}</td></tr>`; // XSS Galore XD
 		}
 
 	</script>
