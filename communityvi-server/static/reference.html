@@ -34,6 +34,7 @@
 
 		let webSocket = null;
 		let messageNumber = 0;
+		const websocketURL = `ws://${window.location.host}/ws`;
 
 		function registerClient() {
 			const name = document.getElementById('name').value;
@@ -43,7 +44,7 @@
 				messageNumber = 0;
 			}
 
-			webSocket = new WebSocket('ws://127.0.0.1:8000/ws');
+			webSocket = new WebSocket(websocketURL);
 			webSocket.onopen = function (event) {
 				console.log('Socket open.', event);
 				const registerMessage = {
