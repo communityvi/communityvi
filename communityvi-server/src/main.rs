@@ -8,6 +8,7 @@ mod client_handle;
 mod client_id_sequence;
 mod commandline;
 mod configuration;
+mod connection;
 mod error;
 mod message;
 mod room;
