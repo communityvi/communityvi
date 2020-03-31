@@ -1,6 +1,5 @@
+use crate::connection::ClientConnection;
 use crate::message::{OrderedMessage, ServerResponse};
-use futures::channel::mpsc::{SendError, Sender};
-use futures::SinkExt;
 use log::info;
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -11,12 +10,12 @@ use std::hash::Hash;
 pub struct Client {
 	id: ClientId,
 	name: String,
-	sender: Sender<OrderedMessage<ServerResponse>>,
+	connection: ClientConnection,
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, sender: Sender<OrderedMessage<ServerResponse>>) -> Self {
-		Self { id, name, sender }
+	pub fn new(id: ClientId, name: String, connection: ClientConnection) -> Self {
+		Self { id, name, connection }
 	}
 
 	pub fn id(&self) -> ClientId {
@@ -28,8 +27,8 @@ impl Client {
 	}
 
 	pub async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {
-		let send_result = self.sender.clone().send(message).await;
-		send_result.map_err(|_: SendError| {
+		let send_result = self.connection.send(message).await;
+		send_result.map_err(|_: ()| {
 			info!("Client with id {} has gone away.", self.id);
 		})
 	}

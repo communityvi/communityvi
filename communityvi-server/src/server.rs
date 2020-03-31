@@ -1,10 +1,8 @@
 use crate::client::{Client, ClientId};
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::connection::{split_websocket, ClientConnection, ServerConnection};
+use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::room::Room;
-use futures::channel::mpsc;
-use futures::future::join;
-use futures::{FutureExt, SinkExt, Stream};
-use futures::{StreamExt, TryStreamExt};
+use futures::FutureExt;
 use log::{debug, error, info, warn};
 use std::future::Future;
 use std::net::SocketAddr;
@@ -31,32 +29,12 @@ pub async fn create_server<ShutdownHandleType>(
 			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| {
 				async move {
-					let (websocket_sink, websocket_stream) = websocket.split();
-					let (message_sender, message_receiver) = mpsc::channel::<OrderedMessage<ServerResponse>>(2);
+					let (client_connection, mut server_connection) = split_websocket(websocket);
 
-					let mut client_request_stream = websocket_stream_to_client_requests(websocket_stream);
-
-					let client_id = register_client(&room, &mut client_request_stream, message_sender).await;
-
-					// convert server responses into websocket messages and send them
-					let message_receive_future = message_receiver
-						.map(|message| WebSocketMessage::from(&message))
-						.map(Ok)
-						.forward(websocket_sink.sink_map_err(|_| ()))
-						.map(|_| ());
-
-					let stream_future = if let Some(client_id) = client_id {
-						receive_messages(client_request_stream, client_id, &room).boxed()
-					} else {
-						async {}.boxed()
-					};
-
-					// type erasure for faster compile times!
-					let handle_messages_and_respond: Pin<Box<dyn Future<Output = ()> + Send>> =
-						Box::pin(join(message_receive_future, stream_future).map(|_| ()));
-					handle_messages_and_respond.await;
-
-					client_id.map(|client_id| room.remove_client(client_id));
+					if let Some(client_id) = register_client(&room, &mut server_connection, client_connection).await {
+						receive_messages(server_connection, client_id, &room).await;
+						room.remove_client(client_id);
+					}
 				}
 				.boxed()
 			});
@@ -88,10 +66,10 @@ pub async fn create_server<ShutdownHandleType>(
 
 async fn register_client(
 	room: &Room,
-	request_stream: &mut (impl Stream<Item = OrderedMessage<ClientRequest>> + Send + Unpin),
-	mut response_sender: mpsc::Sender<OrderedMessage<ServerResponse>>,
+	server_connection: &mut ServerConnection,
+	client_connection: ClientConnection,
 ) -> Option<ClientId> {
-	let request = match request_stream.next().await {
+	let request = match server_connection.receive().await {
 		None => {
 			error!("Client registration failed. Socket closed prematurely.");
 			return None;
@@ -112,7 +90,7 @@ async fn register_client(
 			number: 0,
 			message: ServerResponse::InvalidMessage,
 		};
-		let _ = response_sender.send(invalid_message_response).await;
+		let _ = client_connection.send(invalid_message_response).await;
 		return None;
 	};
 
@@ -125,11 +103,11 @@ async fn register_client(
 			number: 0,
 			message: ServerResponse::InvalidMessage,
 		};
-		let _ = response_sender.send(invalid_message_response).await;
+		let _ = client_connection.send(invalid_message_response).await;
 		return None;
 	}
 
-	let client_handle = room.add_client(name, response_sender);
+	let client_handle = room.add_client(name, client_connection);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
 	if room.singlecast(&client_handle, hello_response).await.is_ok() {
 		let name = client_handle.name().to_string();
@@ -148,28 +126,9 @@ async fn register_client(
 	}
 }
 
-fn websocket_stream_to_client_requests(
-	websocket_stream: impl Stream<Item = Result<warp::ws::Message, warp::Error>> + Unpin + Send,
-) -> impl Stream<Item = OrderedMessage<ClientRequest>> + Send + Unpin {
-	websocket_stream
-		.inspect_err(|error| {
-			error!("Error streaming websocket message: {}, result.", error);
-		})
-		.take_while(|result| futures::future::ready(result.is_ok()))
-		.map(|result| match result {
-			Ok(message) => message,
-			Err(_) => unreachable!("Error's can't happen, they have been filtered out."),
-		})
-		.map(OrderedMessage::from)
-}
-
-async fn receive_messages(
-	mut client_request_stream: impl Stream<Item = OrderedMessage<ClientRequest>> + Send + Unpin,
-	client_id: ClientId,
-	room: &Room,
-) {
+async fn receive_messages(mut server_connection: ServerConnection, client_id: ClientId, room: &Room) {
 	loop {
-		let OrderedMessage { number, message } = match client_request_stream.next().await {
+		let OrderedMessage { number, message } = match server_connection.receive().await {
 			Some(message) => message,
 			None => return,
 		};
