@@ -1,5 +1,5 @@
 use crate::client::{Client, ClientId};
-use crate::connection::{split_websocket, ClientConnection, ServerConnection};
+use crate::connection::{register_client, ServerConnection};
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::room::Room;
 use futures::FutureExt;
@@ -29,10 +29,8 @@ pub async fn create_server<ShutdownHandleType>(
 			let room = room.clone();
 			let reply = ws.on_upgrade(move |websocket| {
 				async move {
-					let (client_connection, mut server_connection) = split_websocket(websocket);
-
-					if let Some(client_id) = register_client(&room, &mut server_connection, client_connection).await {
-						receive_messages(server_connection, client_id, &room).await;
+					if let Some((client_id, server_connection)) = register_client(&room, websocket).await {
+						handle_messages(server_connection, client_id, &room).await;
 						room.remove_client(client_id);
 					}
 				}
@@ -64,61 +62,7 @@ pub async fn create_server<ShutdownHandleType>(
 	future.await
 }
 
-async fn register_client(
-	room: &Room,
-	server_connection: &mut ServerConnection,
-	client_connection: ClientConnection,
-) -> Option<ClientId> {
-	let request = match server_connection.receive().await {
-		None => {
-			error!("Client registration failed. Socket closed prematurely.");
-			return None;
-		}
-		Some(request) => request,
-	};
-
-	let (number, name) = if let OrderedMessage {
-		number,
-		message: ClientRequest::Register { name },
-	} = request
-	{
-		(number, name)
-	} else {
-		error!("Client registration failed. Invalid request: {:?}", request);
-
-		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
-		return None;
-	};
-
-	if number != 0 {
-		error!(
-			"Client registration failed. Invalid message number: {}, should be 0.",
-			number
-		);
-		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
-		return None;
-	}
-
-	let client_handle = room.add_client(name, client_connection);
-	let hello_response = ServerResponse::Hello { id: client_handle.id() };
-	if room.singlecast(&client_handle, hello_response).await.is_ok() {
-		let name = client_handle.name().to_string();
-		let id = client_handle.id();
-
-		// Drop the client_handle so that the lock on the concurrent hashmap is released for the broadcast
-		std::mem::drop(client_handle);
-
-		info!("Registered client: {} {}", id, name);
-
-		room.broadcast(ServerResponse::Joined { id, name }).await;
-
-		Some(id)
-	} else {
-		None
-	}
-}
-
-async fn receive_messages(mut server_connection: ServerConnection, client_id: ClientId, room: &Room) {
+async fn handle_messages(mut server_connection: ServerConnection, client_id: ClientId, room: &Room) {
 	loop {
 		let OrderedMessage { number, message } = match server_connection.receive().await {
 			Some(message) => message,
