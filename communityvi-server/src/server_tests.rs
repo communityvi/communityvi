@@ -364,6 +364,21 @@ fn test_server_should_serve_reference_client_if_enabled() {
 }
 
 #[test]
+fn server_should_respond_to_websocket_pings() {
+	let future = async {
+		let (mut sink, mut stream) = websocket_connection().await;
+		let ping_content = vec![1u8, 9, 8, 0];
+		sink.send(tungstenite::Message::Ping(ping_content.clone()))
+			.await
+			.expect("Failed to send ping.");
+		let received_pong = stream.next().await.unwrap().expect("Failed to receive pong.");
+		let expected_pong = tungstenite::Message::Pong(ping_content);
+		assert_eq!(expected_pong, received_pong);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
 fn test_server_should_not_serve_reference_client_if_disabled() {
 	let future = async {
 		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
