@@ -8,13 +8,8 @@ use warp::filters::ws::WebSocket;
 
 pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
 	let (websocket_sink, websocket_stream) = websocket.split();
-	let client_connection = ClientConnection {
-		inner: Arc::new(tokio::sync::Mutex::new(ClientConnectionInner {
-			websocket_sink,
-			message_number_sequence: (0..std::u64::MAX),
-		})),
-	};
-	let server_connection = ServerConnection { websocket_stream };
+	let client_connection = ClientConnection::new(websocket_sink);
+	let server_connection = ServerConnection::new(websocket_stream);
 	(client_connection, server_connection)
 }
 
@@ -23,6 +18,10 @@ pub struct ServerConnection {
 }
 
 impl ServerConnection {
+	fn new(websocket_stream: SplitStream<WebSocket>) -> Self {
+		Self { websocket_stream }
+	}
+
 	/// Receive a message from the client or None if the connection has been closed.
 	pub async fn receive(&mut self) -> Option<OrderedMessage<ClientRequest>> {
 		let websocket_message = match self.websocket_stream.next().await {
@@ -49,6 +48,16 @@ struct ClientConnectionInner {
 }
 
 impl ClientConnection {
+	fn new(websocket_sink: SplitSink<WebSocket, WebSocketMessage>) -> Self {
+		let inner = ClientConnectionInner {
+			websocket_sink,
+			message_number_sequence: (0..std::u64::MAX),
+		};
+		Self {
+			inner: Arc::new(inner.into()),
+		}
+	}
+
 	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 
