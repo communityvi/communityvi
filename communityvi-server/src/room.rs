@@ -1,9 +1,8 @@
-use crate::atomic_sequence::AtomicSequence;
 use crate::client::{Client, ClientId};
 use crate::client_handle::ClientHandle;
 use crate::client_id_sequence::ClientIdSequence;
 use crate::connection::ClientConnection;
-use crate::message::{OrderedMessage, ServerResponse};
+use crate::message::ServerResponse;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::FutureExt;
@@ -12,7 +11,6 @@ use log::info;
 #[derive(Default)]
 pub struct Room {
 	client_id_sequence: ClientIdSequence,
-	message_number_sequence: AtomicSequence,
 	clients: DashMap<ClientId, Client>,
 }
 
@@ -40,27 +38,17 @@ impl Room {
 	}
 
 	pub async fn singlecast(&self, client: &Client, response: ServerResponse) -> Result<(), ()> {
-		let number = self.message_number_sequence.next();
-		let message = OrderedMessage {
-			number,
-			message: response,
-		};
-		client.send(message).await
+		client.send(response).await
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
-		let number = self.message_number_sequence.next();
-		let message = OrderedMessage {
-			number,
-			message: response,
-		};
 		let futures: Vec<_> = self
 			.clients
 			.iter()
 			.map(move |client| {
-				let message = message.clone();
+				let response = response.clone();
 				async move {
-					let _ = client.send(message).await;
+					let _ = client.send(response).await;
 				}
 			})
 			.collect();

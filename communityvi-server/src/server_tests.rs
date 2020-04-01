@@ -245,7 +245,7 @@ fn should_broadcast_messages() {
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let expected_bob_joined_response = OrderedMessage {
-			number: 3,
+			number: 2,
 			message: ServerResponse::Joined {
 				id: bob_client_id,
 				name: "Bob".to_string(),
@@ -254,13 +254,10 @@ fn should_broadcast_messages() {
 		let bob_joined_response = alice_stream.next().await.expect("Didn't get join message for Bob.");
 		assert_eq!(expected_bob_joined_response, bob_joined_response);
 
-		let expected_chat_response = OrderedMessage {
-			number: 4,
-			message: ServerResponse::Chat {
-				sender_id: alice_client_id,
-				sender_name: "Alice".to_string(),
-				message: message.to_string(),
-			},
+		let expected_chat_response = ServerResponse::Chat {
+			sender_id: alice_client_id,
+			sender_name: "Alice".to_string(),
+			message: message.to_string(),
 		};
 
 		alice_sink
@@ -269,14 +266,20 @@ fn should_broadcast_messages() {
 			.expect("Failed to sink broadcast message.");
 
 		assert_eq!(
-			expected_chat_response,
+			OrderedMessage {
+				number: 3,
+				message: expected_chat_response.clone()
+			},
 			alice_stream
 				.next()
 				.await
 				.expect("Failed to receive response on client 1")
 		);
 		assert_eq!(
-			expected_chat_response,
+			OrderedMessage {
+				number: 2,
+				message: expected_chat_response
+			},
 			bob_stream.next().await.expect("Failed to receive response on client 2")
 		);
 	};

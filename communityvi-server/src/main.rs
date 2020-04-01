@@ -2,7 +2,6 @@ use crate::commandline::Commandline;
 use crate::error::CommunityviError;
 use structopt::StructOpt;
 
-mod atomic_sequence;
 mod client;
 mod client_handle;
 mod client_id_sequence;

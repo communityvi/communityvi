@@ -2,13 +2,17 @@ use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMes
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::error;
+use std::ops::Range;
 use std::sync::Arc;
 use warp::filters::ws::WebSocket;
 
 pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
 	let (websocket_sink, websocket_stream) = websocket.split();
 	let client_connection = ClientConnection {
-		websocket_sink: Arc::new(tokio::sync::Mutex::new(websocket_sink)),
+		inner: Arc::new(tokio::sync::Mutex::new(ClientConnectionInner {
+			websocket_sink,
+			message_number_sequence: (0..std::u64::MAX),
+		})),
 	};
 	let server_connection = ServerConnection { websocket_stream };
 	(client_connection, server_connection)
@@ -35,13 +39,25 @@ impl ServerConnection {
 
 #[derive(Clone, Debug)]
 pub struct ClientConnection {
-	websocket_sink: Arc<tokio::sync::Mutex<SplitSink<WebSocket, WebSocketMessage>>>,
+	inner: Arc<tokio::sync::Mutex<ClientConnectionInner>>,
+}
+
+#[derive(Debug)]
+struct ClientConnectionInner {
+	websocket_sink: SplitSink<WebSocket, WebSocketMessage>,
+	message_number_sequence: Range<u64>,
 }
 
 impl ClientConnection {
-	pub async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {
-		let mut sink = self.websocket_sink.lock().await;
-		let websocket_message = WebSocketMessage::from(&message);
-		sink.send(websocket_message).await.map_err(|_| ())
+	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
+		let mut inner = self.inner.lock().await;
+
+		let ordered_message = OrderedMessage {
+			number: inner.message_number_sequence.next().expect("Out of message numbers"),
+			message,
+		};
+		let websocket_message = WebSocketMessage::from(&ordered_message);
+
+		inner.websocket_sink.send(websocket_message).await.map_err(|_| ())
 	}
 }

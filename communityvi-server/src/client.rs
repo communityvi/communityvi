@@ -1,5 +1,5 @@
 use crate::connection::ClientConnection;
-use crate::message::{OrderedMessage, ServerResponse};
+use crate::message::ServerResponse;
 use log::info;
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ impl Client {
 		&self.name
 	}
 
-	pub async fn send(&self, message: OrderedMessage<ServerResponse>) -> Result<(), ()> {
+	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let send_result = self.connection.send(message).await;
 		send_result.map_err(|_: ()| {
 			info!("Client with id {} has gone away.", self.id);

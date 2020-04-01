@@ -86,11 +86,7 @@ async fn register_client(
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
 
-		let invalid_message_response = OrderedMessage {
-			number: 0,
-			message: ServerResponse::InvalidMessage,
-		};
-		let _ = client_connection.send(invalid_message_response).await;
+		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
 		return None;
 	};
 
@@ -99,11 +95,7 @@ async fn register_client(
 			"Client registration failed. Invalid message number: {}, should be 0.",
 			number
 		);
-		let invalid_message_response = OrderedMessage {
-			number: 0,
-			message: ServerResponse::InvalidMessage,
-		};
-		let _ = client_connection.send(invalid_message_response).await;
+		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
 		return None;
 	}
 
