@@ -56,6 +56,17 @@ pub enum ServerResponse {
 		name: String,
 	},
 	InvalidMessage,
+	Error {
+		error: ErrorResponse,
+	},
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorResponse {
+	InvalidFormat,
+	InvalidOperation,
+	InternalServerError,
 }
 
 impl Message for ServerResponse {}
@@ -265,5 +276,56 @@ mod test {
 		let deserialized_invalid_message_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InvalidMessage response from JSON");
 		assert_eq!(invalid_message_response, deserialized_invalid_message_response);
+	}
+
+	#[test]
+	fn invalid_format_error_response_should_serialize_and_deserialize() {
+		let invalid_format_error_response = first_message(ServerResponse::Error {
+			error: ErrorResponse::InvalidFormat,
+		});
+		let json = serde_json::to_string(&invalid_format_error_response)
+			.expect("Failed to serialize InvalidFormat error response to JSON");
+		assert_eq!(r#"{"number":0,"type":"error","error":"invalid_format"}"#, json);
+
+		let deserialized_invalid_format_error_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize InvalidFormat error response from JSON");
+		assert_eq!(
+			invalid_format_error_response,
+			deserialized_invalid_format_error_response
+		);
+	}
+
+	#[test]
+	fn invalid_operation_error_response_should_serialize_and_deserialize() {
+		let invalid_operation_error_response = first_message(ServerResponse::Error {
+			error: ErrorResponse::InvalidOperation,
+		});
+		let json = serde_json::to_string(&invalid_operation_error_response)
+			.expect("Failed to serialize InvalidOperation error response to JSON");
+		assert_eq!(r#"{"number":0,"type":"error","error":"invalid_operation"}"#, json);
+
+		let deserialized_invalid_operation_error_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize InvalidOperation error response from JSON");
+		assert_eq!(
+			invalid_operation_error_response,
+			deserialized_invalid_operation_error_response
+		);
+	}
+
+	#[test]
+	fn internal_server_error_response_should_serialize_and_deserialize() {
+		let internal_server_error_error_response = first_message(ServerResponse::Error {
+			error: ErrorResponse::InternalServerError,
+		});
+		let json = serde_json::to_string(&internal_server_error_error_response)
+			.expect("Failed to serialize InternalServerError error response to JSON");
+		assert_eq!(r#"{"number":0,"type":"error","error":"internal_server_error"}"#, json);
+
+		let deserialized_internal_server_error_error_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize InternalServerError error response from JSON");
+		assert_eq!(
+			internal_server_error_error_response,
+			deserialized_internal_server_error_error_response
+		);
 	}
 }
