@@ -9,17 +9,21 @@ use warp::filters::ws::WebSocket;
 pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
 	let (websocket_sink, websocket_stream) = websocket.split();
 	let client_connection = ClientConnection::new(websocket_sink);
-	let server_connection = ServerConnection::new(websocket_stream);
+	let server_connection = ServerConnection::new(websocket_stream, client_connection.clone());
 	(client_connection, server_connection)
 }
 
 pub struct ServerConnection {
 	websocket_stream: SplitStream<WebSocket>,
+	client_connection: ClientConnection,
 }
 
 impl ServerConnection {
-	fn new(websocket_stream: SplitStream<WebSocket>) -> Self {
-		Self { websocket_stream }
+	fn new(websocket_stream: SplitStream<WebSocket>, client_connection: ClientConnection) -> Self {
+		Self {
+			websocket_stream,
+			client_connection,
+		}
 	}
 
 	/// Receive a message from the client or None if the connection has been closed.
@@ -32,6 +36,12 @@ impl ServerConnection {
 			}
 			None => return None,
 		};
+
+		if websocket_message.is_close() {
+			self.client_connection.close().await;
+			return None;
+		}
+
 		Some(OrderedMessage::from(websocket_message))
 	}
 }
@@ -68,5 +78,10 @@ impl ClientConnection {
 		let websocket_message = WebSocketMessage::from(&ordered_message);
 
 		inner.websocket_sink.send(websocket_message).await.map_err(|_| ())
+	}
+
+	async fn close(&self) {
+		let mut inner = self.inner.lock().await;
+		let _ = inner.websocket_sink.send(WebSocketMessage::close()).await;
 	}
 }

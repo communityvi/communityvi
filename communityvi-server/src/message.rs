@@ -33,8 +33,6 @@ pub enum ClientRequest {
 		error: String,
 		content: Vec<u8>,
 	},
-	#[serde(skip)]
-	Close,
 }
 
 impl Message for ClientRequest {}
@@ -57,8 +55,6 @@ pub enum ServerResponse {
 		id: ClientId,
 		name: String,
 	},
-	#[serde(skip)]
-	Bye,
 	InvalidMessage,
 }
 
@@ -66,29 +62,11 @@ impl Message for ServerResponse {}
 
 pub type WebSocketMessage = warp::filters::ws::Message;
 
-impl From<&OrderedMessage<ClientRequest>> for WebSocketMessage {
-	fn from(message: &OrderedMessage<ClientRequest>) -> Self {
-		ordered_message_to_websocket_message(message)
+impl<MessageType: Message> From<&OrderedMessage<MessageType>> for WebSocketMessage {
+	fn from(message: &OrderedMessage<MessageType>) -> Self {
+		let json = serde_json::to_string(message).expect("Failed to serialize message to JSON.");
+		WebSocketMessage::text(json)
 	}
-}
-
-impl From<&OrderedMessage<ServerResponse>> for WebSocketMessage {
-	fn from(message: &OrderedMessage<ServerResponse>) -> Self {
-		match message {
-			OrderedMessage {
-				number: _,
-				message: ServerResponse::Bye,
-			} => WebSocketMessage::close(),
-			message @ _ => ordered_message_to_websocket_message(message),
-		}
-	}
-}
-
-fn ordered_message_to_websocket_message<MessageType: Message>(
-	message: &OrderedMessage<MessageType>,
-) -> WebSocketMessage {
-	let json = serde_json::to_string(message).expect("Failed to serialize message to JSON.");
-	WebSocketMessage::text(json)
 }
 
 #[derive(Debug)]
@@ -129,23 +107,16 @@ impl<MessageType: Message> TryFrom<&str> for OrderedMessage<MessageType> {
 
 impl From<WebSocketMessage> for OrderedMessage<ClientRequest> {
 	fn from(websocket_message: WebSocketMessage) -> Self {
-		if websocket_message.is_close() {
-			OrderedMessage {
-				number: 0,
-				message: ClientRequest::Close,
-			}
-		} else {
-			match OrderedMessage::try_from(&websocket_message) {
-				Ok(message) => message,
-				Err(error) => {
-					error!("Invalid client request: {}", error);
-					OrderedMessage {
-						number: 0,
-						message: ClientRequest::Invalid {
-							error: error.to_string(),
-							content: websocket_message.into_bytes(),
-						},
-					}
+		match OrderedMessage::try_from(&websocket_message) {
+			Ok(message) => message,
+			Err(error) => {
+				error!("Invalid client request: {}", error);
+				OrderedMessage {
+					number: 0,
+					message: ClientRequest::Invalid {
+						error: error.to_string(),
+						content: websocket_message.into_bytes(),
+					},
 				}
 			}
 		}
@@ -294,27 +265,5 @@ mod test {
 		let deserialized_invalid_message_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InvalidMessage response from JSON");
 		assert_eq!(invalid_message_response, deserialized_invalid_message_response);
-	}
-
-	#[test]
-	fn should_deserialize_close_websocket_message() {
-		let close_message = WebSocketMessage::close();
-		let expected_client_request = OrderedMessage {
-			number: 0,
-			message: ClientRequest::Close,
-		};
-		let client_request = OrderedMessage::from(close_message);
-		assert_eq!(expected_client_request, client_request);
-	}
-
-	#[test]
-	fn should_serialize_close_websocket_message() {
-		let bye_response = OrderedMessage {
-			number: 1337,
-			message: ServerResponse::Bye,
-		};
-		let expected_websocket_message = WebSocketMessage::close();
-		let websocket_message = WebSocketMessage::from(&bye_response);
-		assert_eq!(expected_websocket_message, websocket_message);
 	}
 }

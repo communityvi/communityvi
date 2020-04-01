@@ -166,9 +166,5 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 		ClientRequest::Invalid { .. } => {
 			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
 		}
-		ClientRequest::Close => {
-			info!("Close message received for Client: {} {}", client.id(), client.name());
-			let _ = room.singlecast(&client, ServerResponse::Bye).await;
-		}
 	}
 }
