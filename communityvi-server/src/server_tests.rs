@@ -341,7 +341,7 @@ fn test_messages_should_have_sequence_numbers() {
 }
 
 #[test]
-fn test_server_should_serve_reference_client_if_enabled() {
+fn test_server_should_serve_reference_client_html_if_enabled() {
 	let future = async {
 		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
 		let response = reqwest::get(url).await.expect("Failed to request reference client.");
@@ -362,8 +362,49 @@ fn test_server_should_serve_reference_client_if_enabled() {
 			.expect("Cache-Control header is no valid UTF-8");
 		assert_eq!("no-cache", cache_control);
 
+		let content_security_policy = response
+			.headers()
+			.get("content-security-policy")
+			.expect("No cache-control header.")
+			.to_str()
+			.expect("Cache-Control header is no valid UTF-8");
+		assert_eq!(
+			"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
+			content_security_policy
+		);
+
 		let response_text = response.text().await.expect("Incorrect response.");
 		assert!(response_text.contains("html"));
+	};
+	test_future_with_running_server(future, true);
+}
+
+#[test]
+fn test_server_should_serve_reference_client_javascript_if_enabled() {
+	let future = async {
+		let url = Url::parse(&format!("http://{}/reference/reference.js", HOSTNAME_AND_PORT)).unwrap();
+		let response = reqwest::get(url)
+			.await
+			.expect("Failed to request reference client javascript.");
+		assert_eq!(StatusCode::OK, response.status());
+		let content_type = response
+			.headers()
+			.get("content-type")
+			.expect("No content-type header.")
+			.to_str()
+			.expect("Content-Type header is no valid UTF-8");
+		assert_eq!("application/javascript; charset=utf-8", content_type);
+
+		let cache_control = response
+			.headers()
+			.get("cache-control")
+			.expect("No cache-control header.")
+			.to_str()
+			.expect("Cache-Control header is no valid UTF-8");
+		assert_eq!("no-cache", cache_control);
+
+		let response_text = response.text().await.expect("Incorrect response.");
+		assert!(response_text.contains("use strict"));
 	};
 	test_future_with_running_server(future, true);
 }

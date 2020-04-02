@@ -12,6 +12,7 @@ use warp::filters::ws::Ws;
 use warp::{Filter, Rejection, Reply};
 
 const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
+const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
 
 pub async fn create_server<ShutdownHandleType>(
 	address: SocketAddr,
@@ -41,12 +42,35 @@ pub async fn create_server<ShutdownHandleType>(
 		})
 		.boxed();
 
-	let reference_client_filter = warp::get().and(warp::path("reference")).and(warp::path::end()).map(|| {
-		warp::http::Response::builder()
+	let reference_client_html_filter = warp::get()
+		.and(warp::path("reference"))
+		.and(warp::path::end())
+		.map(|| {
+			warp::http::Response::builder()
 			.header("Content-Type", "text/html; charset=utf-8")
 			.header("Cache-Control", "no-cache")
+			// prevent XSS
+			.header(
+				"Content-Security-Policy",
+				"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
+			)
 			.body(REFERENCE_CLIENT_HTML)
-	});
+		})
+		.boxed();
+
+	let reference_client_javascript_filter = warp::get()
+		.and(warp::path("reference"))
+		.and(warp::path("reference.js"))
+		.and(warp::path::end())
+		.map(|| {
+			warp::http::Response::builder()
+				.header("Content-Type", "application/javascript; charset=utf-8")
+				.header("Cache-Control", "no-cache")
+				.body(REFERENCE_CLIENT_JAVASCRIPT)
+		})
+		.boxed();
+
+	let reference_client_filter = reference_client_html_filter.or(reference_client_javascript_filter);
 
 	let (bound_address, future) = if enable_reference_client {
 		let complete_filter = websocket_filter.or(reference_client_filter);

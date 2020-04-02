@@ -7,11 +7,10 @@
 <body>
 	<h1>Communityvi demo client</h1>
 	<div>
-		<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
-		<form onsubmit="registerClient(); return false">
+		<p>
 			<input type="text" name="name" id="name">
-			<button type="submit" id="register">Register</button>
-		</form>
+			<button id="register">Register</button>
+		</p>
 		<p><b>Client ID: </b><b id="client_id">&lt;unregistered&gt;</b></p>
 		<hr>
 		<table border="1">
@@ -25,91 +24,11 @@
 			<tbody id="chat">
 			</tbody>
 		</table>
-		<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
-		<form onsubmit="sendChatMessage(); return false">
+		<p>
 			<input type="text" name="message" id="message">
-			<button type="submit" id="send_message">Send</button>
-		</form>
+			<button id="send_message">Send</button>
+		</p>
 	</div>
-	<script type="application/javascript">
-		'use strict';
-
-		let webSocket = null;
-		let messageNumber = 0;
-		const websocketURL = `ws://${window.location.host}/ws`;
-
-		function registerClient() {
-			const name = document.getElementById('name').value;
-
-			if (webSocket !== null) {
-				webSocket.close();
-				messageNumber = 0;
-			}
-
-			webSocket = new WebSocket(websocketURL);
-			webSocket.onopen = function (event) {
-				console.log('Socket open.', event);
-				const registerMessage = {
-					type: 'register',
-					name: name,
-				};
-				sendMessage(registerMessage);
-			};
-
-			webSocket.onmessage = function (messageEvent) {
-				console.log('Received message.', messageEvent);
-				const messageData = messageEvent.data;
-				const message = JSON.parse(messageData);
-				handleMessage(message);
-			};
-
-			webSocket.onclose = function (event) {
-				console.log('Socket closed.', event);
-			};
-
-			webSocket.onerror = function (event) {
-				console.log('Received error.', event);
-			};
-		}
-
-		function handleMessage(message) {
-			const idField = document.getElementById('client_id');
-
-			switch (message.type) {
-				case 'hello':
-					idField.innerText = message.id;
-					break;
-
-				case 'joined':
-					displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
-					break;
-
-				case 'chat':
-					displayChatMessage(message.sender_id, message.sender_name, message.message);
-					break;
-			}
-		}
-
-		function sendChatMessage() {
-			const message = document.getElementById('message').value;
-			const chatMessage = {
-				type: "chat",
-				message: message,
-			};
-			sendMessage(chatMessage);
-		}
-
-		function sendMessage(message) {
-			message.number = messageNumber;
-			messageNumber++;
-			webSocket.send(JSON.stringify(message));
-		}
-
-		function displayChatMessage(id, name, message) {
-			const chat = document.getElementById('chat');
-			chat.innerHTML += `<tr><td>${id}</td><td>${name}</td><td>${message}</td></tr>`; // XSS Galore XD
-		}
-
-	</script>
+	<script src="reference/reference.js" type="application/javascript"></script>
 </body>
 </html>
