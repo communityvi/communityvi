@@ -8,8 +8,11 @@
 	<h1>Communityvi demo client</h1>
 	<div>
 		<p>
-			<input type="text" name="name" id="name">
-			<button id="register" onclick="registerClient()">Register</button>
+			<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
+			<form onsubmit="registerClient(); return false">
+				<input type="text" name="name" id="name">
+				<button type="submit" id="register">Register</button>
+			</form>
 		</p>
 		<p><b>Client ID: </b><b id="client_id">&lt;unregistered&gt;</b></p>
 		<hr>
@@ -25,8 +28,11 @@
 			</tbody>
 		</table>
 		<p>
-			<input type="text" name="message" id="message">
-			<button id="send_message" onclick="sendChatMessage()">Send</button>
+			<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
+			<form onsubmit="sendChatMessage(); return false">
+				<input type="text" name="message" id="message">
+				<button type="submit" id="send_message">Send</button>
+			</form>
 		</p>
 	</div>
 	<script type="application/javascript">
