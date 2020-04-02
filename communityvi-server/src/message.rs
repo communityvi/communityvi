@@ -45,6 +45,10 @@ pub enum ServerResponse {
 		id: ClientId,
 		name: String,
 	},
+	Left {
+		id: ClientId,
+		name: String,
+	},
 	Error {
 		error: ErrorResponse,
 	},
@@ -224,6 +228,20 @@ mod test {
 		let deserialized_joined_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Joined response from JSON");
 		assert_eq!(joined_response, deserialized_joined_response);
+	}
+
+	#[test]
+	fn left_response_should_serialize_and_deserialize() {
+		let left_response = first_message(ServerResponse::Left {
+			id: ClientId::from(42),
+			name: "Hedwig".to_string(),
+		});
+		let json = serde_json::to_string(&left_response).expect("Failed to serialize Left response to JSON");
+		assert_eq!(r#"{"number":0,"type":"left","id":42,"name":"Hedwig"}"#, json);
+
+		let deserialized_left_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize Left response from JSON");
+		assert_eq!(left_response, deserialized_left_response);
 	}
 
 	#[test]
