@@ -27,10 +27,15 @@ impl Room {
 		client_entry.or_insert(client).into()
 	}
 
-	pub fn remove_client(&self, client_id: ClientId) {
-		self.clients.remove(&client_id).map(|(_, client)| {
+	pub async fn remove_client(&self, client_id: ClientId) {
+		if let Some((_, client)) = self.clients.remove(&client_id) {
 			info!("Removed client: {} {}", client.id(), client.name());
-		});
+			self.broadcast(ServerResponse::Left {
+				id: client.id(),
+				name: client.name().to_string(),
+			})
+			.await;
+		}
 	}
 
 	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientHandle> {

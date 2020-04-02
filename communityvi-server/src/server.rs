@@ -32,7 +32,7 @@ pub async fn create_server<ShutdownHandleType>(
 				async move {
 					if let Some((client_id, server_connection)) = register_client(&room, websocket).await {
 						handle_messages(server_connection, client_id, &room).await;
-						room.remove_client(client_id);
+						room.remove_client(client_id).await;
 					}
 				}
 				.boxed()

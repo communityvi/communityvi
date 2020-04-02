@@ -292,6 +292,29 @@ fn should_broadcast_messages() {
 }
 
 #[test]
+fn should_broadcast_when_client_leaves_the_room() {
+	let future = async {
+		let (_alice_client_id, _alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
+		let (bob_client_id, bob_sink, bob_stream) = connect_and_register("Bob".to_string()).await;
+
+		let _ = alice_stream.next().await; // skip join message for bob
+		std::mem::drop(bob_sink);
+		std::mem::drop(bob_stream);
+
+		let expected_leave_message = OrderedMessage {
+			number: 3,
+			message: ServerResponse::Left {
+				id: bob_client_id,
+				name: "Bob".to_string(),
+			},
+		};
+		let leave_message = alice_stream.next().await.expect("Failed to get Leave message for bob");
+		assert_eq!(expected_leave_message, leave_message);
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
 fn test_messages_should_have_sequence_numbers() {
 	let future = async move {
 		let first_request = OrderedMessage {

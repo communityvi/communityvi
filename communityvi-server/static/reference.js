@@ -84,6 +84,10 @@ function handleMessage(message) {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
 			break;
 
+		case 'left':
+			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} left the room.`);
+			break;
+
 		case 'chat':
 			displayChatMessage(message.sender_id, message.sender_name, message.message);
 			break;
