@@ -7,13 +7,11 @@
 <body>
 	<h1>Communityvi demo client</h1>
 	<div>
-		<p>
-			<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
-			<form onsubmit="registerClient(); return false">
-				<input type="text" name="name" id="name">
-				<button type="submit" id="register">Register</button>
-			</form>
-		</p>
+		<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
+		<form onsubmit="registerClient(); return false">
+			<input type="text" name="name" id="name">
+			<button type="submit" id="register">Register</button>
+		</form>
 		<p><b>Client ID: </b><b id="client_id">&lt;unregistered&gt;</b></p>
 		<hr>
 		<table border="1">
@@ -27,13 +25,11 @@
 			<tbody id="chat">
 			</tbody>
 		</table>
-		<p>
-			<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
-			<form onsubmit="sendChatMessage(); return false">
-				<input type="text" name="message" id="message">
-				<button type="submit" id="send_message">Send</button>
-			</form>
-		</p>
+		<!-- use form for submit on enter and https://stackoverflow.com/questions/3384960/want-html-form-submit-to-do-nothing -->
+		<form onsubmit="sendChatMessage(); return false">
+			<input type="text" name="message" id="message">
+			<button type="submit" id="send_message">Send</button>
+		</form>
 	</div>
 	<script type="application/javascript">
 		'use strict';
