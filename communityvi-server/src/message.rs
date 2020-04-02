@@ -1,5 +1,4 @@
 use crate::client::ClientId;
-use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -22,17 +21,8 @@ pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
 pub enum ClientRequest {
 	Ping,
 	Pong,
-	Chat {
-		message: String,
-	},
-	Register {
-		name: String,
-	},
-	#[serde(skip)]
-	Invalid {
-		error: String,
-		content: Vec<u8>,
-	},
+	Chat { message: String },
+	Register { name: String },
 }
 
 impl Message for ClientRequest {}
@@ -55,7 +45,6 @@ pub enum ServerResponse {
 		id: ClientId,
 		name: String,
 	},
-	InvalidMessage,
 	Error {
 		error: ErrorResponse,
 	},
@@ -113,24 +102,6 @@ impl<MessageType: Message> TryFrom<&str> for OrderedMessage<MessageType> {
 			error: error.to_string(),
 			json: json.to_string(),
 		})
-	}
-}
-
-impl From<WebSocketMessage> for OrderedMessage<ClientRequest> {
-	fn from(websocket_message: WebSocketMessage) -> Self {
-		match OrderedMessage::try_from(&websocket_message) {
-			Ok(message) => message,
-			Err(error) => {
-				error!("Invalid client request: {}", error);
-				OrderedMessage {
-					number: 0,
-					message: ClientRequest::Invalid {
-						error: error.to_string(),
-						content: websocket_message.into_bytes(),
-					},
-				}
-			}
-		}
 	}
 }
 
@@ -264,18 +235,6 @@ mod test {
 		let deserialized_hello_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
 		assert_eq!(hello_response, deserialized_hello_response);
-	}
-
-	#[test]
-	fn invalid_message_response_should_serialize_and_deserialize() {
-		let invalid_message_response = first_message(ServerResponse::InvalidMessage);
-		let json = serde_json::to_string(&invalid_message_response)
-			.expect("Failed to serialize InvalidMessage response to JSON");
-		assert_eq!(r#"{"number":0,"type":"invalid_message"}"#, json);
-
-		let deserialized_invalid_message_response: OrderedMessage<ServerResponse> =
-			serde_json::from_str(&json).expect("Failed to deserialize InvalidMessage response from JSON");
-		assert_eq!(invalid_message_response, deserialized_invalid_message_response);
 	}
 
 	#[test]

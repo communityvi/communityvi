@@ -1,9 +1,10 @@
 use crate::client::ClientId;
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
 use crate::room::Room;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{error, info};
+use std::convert::TryFrom;
 use std::ops::Range;
 use std::sync::Arc;
 use warp::filters::ws::WebSocket;
@@ -27,7 +28,11 @@ pub async fn register_client(room: &Room, websocket: WebSocket) -> Option<(Clien
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
 
-		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
+		let _ = client_connection
+			.send(ServerResponse::Error {
+				error: ErrorResponse::InvalidOperation,
+			})
+			.await;
 		return None;
 	};
 
@@ -36,7 +41,11 @@ pub async fn register_client(room: &Room, websocket: WebSocket) -> Option<(Clien
 			"Client registration failed. Invalid message number: {}, should be 0.",
 			number
 		);
-		let _ = client_connection.send(ServerResponse::InvalidMessage).await;
+		let _ = client_connection
+			.send(ServerResponse::Error {
+				error: ErrorResponse::InvalidOperation,
+			})
+			.await;
 		return None;
 	}
 
@@ -95,7 +104,29 @@ impl ServerConnection {
 			return None;
 		}
 
-		Some(OrderedMessage::from(websocket_message))
+		match OrderedMessage::try_from(&websocket_message) {
+			Ok(ordered_message) => Some(ordered_message),
+			Err(message_error) => {
+				match message_error {
+					MessageError::DeserializationFailed { error, json } => {
+						error!(
+							"Failed to deserialize client message with error: {}, message was: {}",
+							error, json
+						);
+					}
+					MessageError::WrongMessageType(message) => {
+						error!("Client request has incorrect message type. Message was: {:?}", message);
+					}
+				}
+				let _ = self
+					.client_connection
+					.send(ServerResponse::Error {
+						error: ErrorResponse::InvalidFormat,
+					})
+					.await;
+				None
+			}
+		}
 	}
 }
 

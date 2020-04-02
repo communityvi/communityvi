@@ -1,5 +1,5 @@
 use crate::client::ClientId;
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 use crate::server::create_server;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
@@ -123,7 +123,9 @@ fn should_not_allow_registering_client_twice() {
 		assert_eq!(
 			OrderedMessage {
 				number: 2,
-				message: ServerResponse::InvalidMessage
+				message: ServerResponse::Error {
+					error: ErrorResponse::InvalidOperation
+				}
 			},
 			response
 		);
@@ -144,7 +146,8 @@ fn should_not_allow_invalid_messages_during_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
-		let expected_response = tungstenite::Message::Text(r#"{"number":0,"type":"invalid_message"}"#.to_string());
+		let expected_response =
+			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_format"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -167,7 +170,8 @@ fn should_not_allow_zero_message_numbers_during_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
-		let expected_response = tungstenite::Message::Text(r#"{"number":0,"type":"invalid_message"}"#.to_string());
+		let expected_response =
+			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_operation"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -200,7 +204,8 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
-		let expected_response = tungstenite::Message::Text(r#"{"number":2,"type":"invalid_message"}"#.to_string());
+		let expected_response =
+			tungstenite::Message::Text(r#"{"number":2,"type":"error","error":"invalid_format"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);

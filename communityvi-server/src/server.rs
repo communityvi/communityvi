@@ -1,6 +1,6 @@
 use crate::client::{Client, ClientId};
 use crate::connection::{register_client, ServerConnection};
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 use crate::room::Room;
 use futures::FutureExt;
 use log::{debug, error, info, warn};
@@ -105,10 +105,14 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 				"Client: {} tried to register even though it is already registered.",
 				client.id()
 			);
-			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
-		}
-		ClientRequest::Invalid { .. } => {
-			let _ = room.singlecast(&client, ServerResponse::InvalidMessage).await;
+			let _ = room
+				.singlecast(
+					&client,
+					ServerResponse::Error {
+						error: ErrorResponse::InvalidOperation,
+					},
+				)
+				.await;
 		}
 	}
 }
