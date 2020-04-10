@@ -97,6 +97,44 @@ async fn connect_and_register(
 }
 
 #[test]
+fn should_close_after_10_invalid_messages() {
+	let future = async {
+		let (mut sink, mut stream) = websocket_connection().await;
+		let registration_message = tungstenite::Message::Text(register_message_with_number(0));
+		sink.send(registration_message)
+			.await
+			.expect("Failed to send register message.");
+		let _ = stream.next().await.expect("Failed to receive hello response");
+
+		let _ = stream.next().await.expect("Failed to receive joined response.");
+
+		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+		for _ in 0..10 {
+			sink.send(invalid_message.clone())
+				.await
+				.expect("Failed to send invalid message.");
+			let _ = stream
+				.next()
+				.await
+				.unwrap()
+				.expect("Invalid websocket response received");
+		}
+
+		let too_many_retries_response = stream.next().await.unwrap().unwrap();
+		assert_eq!(
+			tungstenite::Message::Text(
+				r#"{"number":12,"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
+			),
+			too_many_retries_response
+		);
+
+		let close_message = stream.next().await.unwrap().unwrap();
+		assert!(close_message.is_close());
+	};
+	test_future_with_running_server(future, false);
+}
+
+#[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
 		let (mut sink, mut stream) = typed_websocket_connection().await;
@@ -119,16 +157,17 @@ fn should_not_allow_registering_client_twice() {
 		sink.send(register_message)
 			.await
 			.expect("Failed to send second register method.");
-		let response = stream.next().await.expect("No response to double register.");
-		assert_eq!(
+		match stream.next().await.expect("No response to double register.") {
 			OrderedMessage {
-				number: 2,
-				message: ServerResponse::Error {
-					error: ErrorResponse::InvalidOperation
-				}
-			},
-			response
-		);
+				number,
+				message: ServerResponse::Error { error, message },
+			} => {
+				assert_eq!(2, number);
+				assert_eq!(ErrorResponse::InvalidOperation, error);
+				assert!(message.contains("registered"));
+			}
+			_ => panic!("Incorrect message received."),
+		}
 	};
 	test_future_with_running_server(future, false);
 }
@@ -141,13 +180,15 @@ fn should_not_allow_invalid_messages_during_registration() {
 		sink.send(invalid_message)
 			.await
 			.expect("Failed to send invalid message.");
+
 		let response = stream
 			.next()
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
+
 		let expected_response =
-			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_format"}"#.to_string());
+			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -165,13 +206,15 @@ fn should_not_allow_zero_message_numbers_during_registration() {
 		sink.send(invalid_message)
 			.await
 			.expect("Failed to send register message with invalid number.");
+
 		let response = stream
 			.next()
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
+
 		let expected_response =
-			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_operation"}"#.to_string());
+			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_operation","message":"Client registration failed. Invalid message number: 1, should be 0."}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -185,6 +228,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 		sink.send(registration_message)
 			.await
 			.expect("Failed to send register message.");
+
 		let hello_response = stream
 			.next()
 			.await
@@ -204,8 +248,9 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
+
 		let expected_response =
-			tungstenite::Message::Text(r#"{"number":2,"type":"error","error":"invalid_format"}"#.to_string());
+			tungstenite::Message::Text(r#"{"number":2,"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);

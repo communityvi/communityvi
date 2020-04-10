@@ -51,6 +51,7 @@ pub enum ServerResponse {
 	},
 	Error {
 		error: ErrorResponse,
+		message: String,
 	},
 }
 
@@ -259,10 +260,14 @@ mod test {
 	fn invalid_format_error_response_should_serialize_and_deserialize() {
 		let invalid_format_error_response = first_message(ServerResponse::Error {
 			error: ErrorResponse::InvalidFormat,
+			message: "�".to_string(),
 		});
 		let json = serde_json::to_string(&invalid_format_error_response)
 			.expect("Failed to serialize InvalidFormat error response to JSON");
-		assert_eq!(r#"{"number":0,"type":"error","error":"invalid_format"}"#, json);
+		assert_eq!(
+			r#"{"number":0,"type":"error","error":"invalid_format","message":"�"}"#,
+			json
+		);
 
 		let deserialized_invalid_format_error_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InvalidFormat error response from JSON");
@@ -276,10 +281,14 @@ mod test {
 	fn invalid_operation_error_response_should_serialize_and_deserialize() {
 		let invalid_operation_error_response = first_message(ServerResponse::Error {
 			error: ErrorResponse::InvalidOperation,
+			message: "I'm a teapot.".to_string(),
 		});
 		let json = serde_json::to_string(&invalid_operation_error_response)
 			.expect("Failed to serialize InvalidOperation error response to JSON");
-		assert_eq!(r#"{"number":0,"type":"error","error":"invalid_operation"}"#, json);
+		assert_eq!(
+			r#"{"number":0,"type":"error","error":"invalid_operation","message":"I'm a teapot."}"#,
+			json
+		);
 
 		let deserialized_invalid_operation_error_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InvalidOperation error response from JSON");
@@ -293,10 +302,14 @@ mod test {
 	fn internal_server_error_response_should_serialize_and_deserialize() {
 		let internal_server_error_error_response = first_message(ServerResponse::Error {
 			error: ErrorResponse::InternalServerError,
+			message: "I've found a bug crawling around my circuits.".to_string(),
 		});
 		let json = serde_json::to_string(&internal_server_error_error_response)
 			.expect("Failed to serialize InternalServerError error response to JSON");
-		assert_eq!(r#"{"number":0,"type":"error","error":"internal_server_error"}"#, json);
+		assert_eq!(
+			r#"{"number":0,"type":"error","error":"internal_server_error","message":"I've found a bug crawling around my circuits."}"#,
+			json
+		);
 
 		let deserialized_internal_server_error_error_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InternalServerError error response from JSON");

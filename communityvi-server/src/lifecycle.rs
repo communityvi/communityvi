@@ -35,19 +35,22 @@ pub async fn register_client(room: &Room, websocket: WebSocket) -> Option<(Clien
 		let _ = client_connection
 			.send(ServerResponse::Error {
 				error: ErrorResponse::InvalidOperation,
+				message: "Invalid request".to_string(),
 			})
 			.await;
 		return None;
 	};
 
 	if number != 0 {
-		error!(
+		let message = format!(
 			"Client registration failed. Invalid message number: {}, should be 0.",
 			number
 		);
+		error!("{}", message);
 		let _ = client_connection
 			.send(ServerResponse::Error {
 				error: ErrorResponse::InvalidOperation,
+				message,
 			})
 			.await;
 		return None;
@@ -120,6 +123,7 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 					&client,
 					ServerResponse::Error {
 						error: ErrorResponse::InvalidOperation,
+						message: "Already registered".to_string(),
 					},
 				)
 				.await;
