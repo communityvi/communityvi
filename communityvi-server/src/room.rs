@@ -1,7 +1,7 @@
 use crate::client::{Client, ClientId};
 use crate::client_handle::ClientHandle;
 use crate::client_id_sequence::ClientIdSequence;
-use crate::connection::ClientConnection;
+use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;

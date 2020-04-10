@@ -1,4 +1,4 @@
-use crate::connection::ClientConnection;
+use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
 use log::info;
 use serde::export::Formatter;

@@ -1,5 +1,6 @@
 use crate::client::{Client, ClientId};
-use crate::connection::{register_client, ServerConnection};
+use crate::connection::register_client;
+use crate::connection::server::ServerConnection;
 use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 use crate::room::Room;
 use futures::FutureExt;
