@@ -1,4 +1,5 @@
 use crate::client::{Client, ClientId};
+use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
 use crate::connection::split_websocket;
 use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
@@ -7,14 +8,18 @@ use log::{debug, error, info, warn};
 use warp::filters::ws::WebSocket;
 
 pub async fn run_client(room: &Room, websocket: WebSocket) {
-	if let Some((client_id, server_connection)) = register_client(&room, websocket).await {
+	let (client_connection, server_connection) = split_websocket(websocket);
+	if let Some((client_id, server_connection)) = register_client(&room, client_connection, server_connection).await {
 		handle_messages(server_connection, client_id, &room).await;
 		room.remove_client(client_id).await;
 	}
 }
 
-pub async fn register_client(room: &Room, websocket: WebSocket) -> Option<(ClientId, ServerConnection)> {
-	let (client_connection, mut server_connection) = split_websocket(websocket);
+async fn register_client(
+	room: &Room,
+	client_connection: ClientConnection,
+	mut server_connection: ServerConnection,
+) -> Option<(ClientId, ServerConnection)> {
 	let request = match server_connection.receive().await {
 		None => {
 			error!("Client registration failed. Socket closed prematurely.");
