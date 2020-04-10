@@ -23,6 +23,7 @@ pub enum ClientRequest {
 	Pong,
 	Chat { message: String },
 	Register { name: String },
+	GetReferenceTime,
 }
 
 impl Message for ClientRequest {}
@@ -44,6 +45,9 @@ pub enum ServerResponse {
 	Joined {
 		id: ClientId,
 		name: String,
+	},
+	ReferenceTime {
+		milliseconds: u64,
 	},
 	Left {
 		id: ClientId,
@@ -178,6 +182,18 @@ mod test {
 	}
 
 	#[test]
+	fn get_reference_time_request_should_serialize_and_deserialize() {
+		let get_reference_time_request = first_message(ClientRequest::GetReferenceTime);
+		let json = serde_json::to_string(&get_reference_time_request)
+			.expect("Failed to serialize GetReferenceTime request to JSON");
+		assert_eq!(r#"{"number":0,"type":"get_reference_time"}"#, json);
+
+		let deserialized_get_reference_time_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize GetReferenceTime request from JSON");
+		assert_eq!(get_reference_time_request, deserialized_get_reference_time_request);
+	}
+
+	#[test]
 	fn ping_response_should_serialize_and_deserialize() {
 		let ping_response = first_message(ServerResponse::Ping);
 		let json = serde_json::to_string(&ping_response).expect("Failed to serialize Ping response to JSON");
@@ -254,6 +270,18 @@ mod test {
 		let deserialized_hello_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
 		assert_eq!(hello_response, deserialized_hello_response);
+	}
+
+	#[test]
+	fn reference_time_response_should_serialize_and_deserialize() {
+		let reference_time_response = first_message(ServerResponse::ReferenceTime { milliseconds: 1337 });
+		let json = serde_json::to_string(&reference_time_response)
+			.expect("Failed to serialize ReferenceTime response to JSON");
+		assert_eq!(r#"{"number":0,"type":"reference_time","milliseconds":1337}"#, json);
+
+		let deserialized_reference_time_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize ReferenceTime response from JSON");
+		assert_eq!(reference_time_response, deserialized_reference_time_response);
 	}
 
 	#[test]

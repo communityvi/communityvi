@@ -133,5 +133,54 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 				)
 				.await;
 		}
+		ClientRequest::GetReferenceTime => {
+			let reference_time = room.current_reference_time();
+			let message = ServerResponse::ReferenceTime {
+				milliseconds: reference_time.as_millis() as u64,
+			};
+			let _ = client.send(message).await;
+		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::connection::test::test_client_connection;
+	use crate::lifecycle::handle_message;
+	use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+	use crate::room::Room;
+	use futures::StreamExt;
+	use std::time::Duration;
+	use tokio::time::delay_for;
+
+	#[tokio::test]
+	async fn the_client_should_get_access_to_the_server_reference_time() {
+		const TEST_DELAY: Duration = Duration::from_millis(2);
+
+		let (client_connection, mut server_response_stream, _dont_drop_me) = test_client_connection();
+		let room = Room::default();
+		let client_handle = room.add_client("Alice".to_string(), client_connection);
+
+		delay_for(TEST_DELAY).await; // ensure that some time has passed
+		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
+
+		match server_response_stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Invalid ordered message")
+		{
+			OrderedMessage {
+				number: _,
+				message: ServerResponse::ReferenceTime { milliseconds },
+			} => {
+				assert!(
+					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
+					"milliseconds = {}",
+					milliseconds
+				);
+			}
+			_ => panic!("Invalid response"),
+		};
 	}
 }

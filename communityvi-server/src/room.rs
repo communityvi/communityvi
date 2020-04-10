@@ -3,15 +3,20 @@ use crate::client_handle::ClientHandle;
 use crate::client_id_sequence::ClientIdSequence;
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
+use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::FutureExt;
 use log::info;
+use std::time::Duration;
+
+mod state;
 
 #[derive(Default)]
 pub struct Room {
 	client_id_sequence: ClientIdSequence,
 	clients: DashMap<ClientId, Client>,
+	state: State,
 }
 
 impl Room {
@@ -58,5 +63,9 @@ impl Room {
 			})
 			.collect();
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
+	}
+
+	pub fn current_reference_time(&self) -> Duration {
+		self.state.current_reference_time()
 	}
 }
