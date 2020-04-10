@@ -1,4 +1,5 @@
 use crate::connection::client::ClientConnection;
+use crate::infallible_stream::InfallibleStream;
 use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
 use futures::stream::{SplitSink, SplitStream};
 use futures::{Sink, Stream, StreamExt};
@@ -7,7 +8,7 @@ use std::convert::TryFrom;
 use warp::ws::WebSocket;
 
 pub struct ServerConnection<
-	RequestStream = SplitStream<WebSocket>,
+	RequestStream = InfallibleStream<SplitStream<WebSocket>>,
 	ResponseSink = SplitSink<WebSocket, WebSocketMessage>,
 > {
 	request_stream: RequestStream,
@@ -16,7 +17,7 @@ pub struct ServerConnection<
 
 impl<RequestStream, ResponseSink> ServerConnection<RequestStream, ResponseSink>
 where
-	RequestStream: Stream<Item = Result<WebSocketMessage, warp::Error>> + Unpin,
+	RequestStream: Stream<Item = WebSocketMessage> + Unpin,
 	ResponseSink: Sink<WebSocketMessage> + Unpin,
 {
 	pub fn new(request_stream: RequestStream, client_connection: ClientConnection<ResponseSink>) -> Self {
@@ -32,11 +33,7 @@ where
 
 		for _ in 0..MAXIMUM_RETRIES {
 			let websocket_message = match self.request_stream.next().await {
-				Some(Ok(websocket_message)) => websocket_message,
-				Some(Err(error)) => {
-					error!("Error streaming websocket message: {}, result.", error);
-					return None;
-				}
+				Some(websocket_message) => websocket_message,
 				None => return None,
 			};
 
