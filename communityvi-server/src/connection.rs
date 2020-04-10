@@ -1,4 +1,4 @@
-use crate::connection::client::ClientConnection;
+use crate::connection::client::{ClientConnection, WebSocketClientConnection};
 use crate::connection::server::ServerConnection;
 use crate::infallible_stream::InfallibleStream;
 use futures::StreamExt;
@@ -9,7 +9,10 @@ pub mod server;
 
 pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
 	let (websocket_sink, websocket_stream) = websocket.split();
-	let client_connection = ClientConnection::new(websocket_sink);
-	let server_connection = ServerConnection::new(InfallibleStream::from(websocket_stream), client_connection.clone());
-	(client_connection, server_connection)
+	let websocket_client_connection = WebSocketClientConnection::new(websocket_sink);
+	let server_connection = ServerConnection::new(
+		InfallibleStream::from(websocket_stream),
+		websocket_client_connection.clone().into(),
+	);
+	(websocket_client_connection.into(), server_connection)
 }

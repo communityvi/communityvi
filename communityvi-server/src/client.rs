@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::hash::Hash;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Client {
 	id: ClientId,
 	name: String,

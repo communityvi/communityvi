@@ -1,46 +1,49 @@
 use crate::message::{OrderedMessage, ServerResponse, WebSocketMessage};
+use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::Sink;
 use futures::SinkExt;
 use std::fmt::Debug;
 use std::ops::Range;
+use std::pin::Pin;
 use std::sync::Arc;
 use warp::ws::WebSocket;
 
-#[derive(Debug)]
-pub struct ClientConnection<ResponseSink = SplitSink<WebSocket, WebSocketMessage>> {
-	inner: Arc<tokio::sync::Mutex<ClientConnectionInner<ResponseSink>>>,
+pub type ClientConnection = Pin<Box<dyn ClientConnectionTrait + Send + Sync>>;
+
+#[async_trait]
+pub trait ClientConnectionTrait: Debug {
+	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
+	async fn close(&self);
 }
 
-impl<T> Clone for ClientConnection<T> {
+pub type WebSocketClientConnection = SinkClientConnection<SplitSink<WebSocket, WebSocketMessage>>;
+
+#[derive(Debug)]
+pub struct SinkClientConnection<ResponseSink> {
+	inner: Arc<tokio::sync::Mutex<SinkClientConnectionInner<ResponseSink>>>,
+}
+
+impl<T> Clone for SinkClientConnection<T> {
 	fn clone(&self) -> Self {
-		ClientConnection {
+		SinkClientConnection {
 			inner: self.inner.clone(),
 		}
 	}
 }
 
 #[derive(Debug)]
-struct ClientConnectionInner<ResponseSink> {
+struct SinkClientConnectionInner<ResponseSink> {
 	response_sink: ResponseSink,
 	message_number_sequence: Range<u64>,
 }
 
-impl<ResponseSink> ClientConnection<ResponseSink>
+#[async_trait]
+impl<ResponseSink> ClientConnectionTrait for SinkClientConnection<ResponseSink>
 where
-	ResponseSink: Sink<WebSocketMessage> + Unpin,
+	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + Debug + 'static,
 {
-	pub fn new(response_sink: ResponseSink) -> Self {
-		let inner = ClientConnectionInner {
-			response_sink,
-			message_number_sequence: (0..std::u64::MAX),
-		};
-		Self {
-			inner: Arc::new(inner.into()),
-		}
-	}
-
-	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
+	async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 
 		let ordered_message = OrderedMessage {
@@ -52,8 +55,33 @@ where
 		inner.response_sink.send(websocket_message).await.map_err(|_| ())
 	}
 
-	pub async fn close(&self) {
+	async fn close(&self) {
 		let mut inner = self.inner.lock().await;
 		let _ = inner.response_sink.send(WebSocketMessage::close()).await;
+	}
+}
+
+impl<ResponseSink> SinkClientConnection<ResponseSink>
+where
+	ResponseSink: Sink<WebSocketMessage>,
+{
+	pub fn new(response_sink: ResponseSink) -> Self {
+		let inner = SinkClientConnectionInner {
+			response_sink,
+			message_number_sequence: (0..std::u64::MAX),
+		};
+		let connection = Self {
+			inner: Arc::new(inner.into()),
+		};
+		connection
+	}
+}
+
+impl<ResponseSink> From<SinkClientConnection<ResponseSink>> for ClientConnection
+where
+	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + Debug + 'static,
+{
+	fn from(sink_client_connection: SinkClientConnection<ResponseSink>) -> Self {
+		Box::pin(sink_client_connection)
 	}
 }

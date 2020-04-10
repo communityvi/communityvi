@@ -1,26 +1,22 @@
 use crate::connection::client::ClientConnection;
 use crate::infallible_stream::InfallibleStream;
 use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
-use futures::stream::{SplitSink, SplitStream};
-use futures::{Sink, Stream, StreamExt};
+use futures::stream::SplitStream;
+use futures::{Stream, StreamExt};
 use log::error;
 use std::convert::TryFrom;
 use warp::ws::WebSocket;
 
-pub struct ServerConnection<
-	RequestStream = InfallibleStream<SplitStream<WebSocket>>,
-	ResponseSink = SplitSink<WebSocket, WebSocketMessage>,
-> {
+pub struct ServerConnection<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
 	request_stream: RequestStream,
-	client_connection: ClientConnection<ResponseSink>,
+	client_connection: ClientConnection,
 }
 
-impl<RequestStream, ResponseSink> ServerConnection<RequestStream, ResponseSink>
+impl<RequestStream> ServerConnection<RequestStream>
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin,
-	ResponseSink: Sink<WebSocketMessage> + Unpin,
 {
-	pub fn new(request_stream: RequestStream, client_connection: ClientConnection<ResponseSink>) -> Self {
+	pub fn new(request_stream: RequestStream, client_connection: ClientConnection) -> Self {
 		Self {
 			request_stream,
 			client_connection,
