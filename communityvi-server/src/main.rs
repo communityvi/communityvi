@@ -9,6 +9,7 @@ mod commandline;
 mod configuration;
 mod connection;
 mod error;
+mod lifecycle;
 mod message;
 mod room;
 mod server;
