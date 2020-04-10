@@ -38,8 +38,8 @@ pub async fn create_server<ShutdownHandleType>(
 		.map(|| {
 			warp::http::Response::builder()
 			.header("Content-Type", "text/html; charset=utf-8")
-			.header("Cache-Control", "no-cache")
-			// prevent XSS
+			.header("Cache-Control", "no-cache") 
+			// prevent XSS - FIXME: Make this work in Safari.
 			.header(
 				"Content-Security-Policy",
 				"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
