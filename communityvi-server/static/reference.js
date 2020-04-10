@@ -18,8 +18,8 @@ pingButton.onclick = function () {
 };
 
 let lastSentGetReferenceTime = null;
-let referenceTimeOffset = 10000;
-let referenceTime = NaN;
+let referenceTimeOffset = null;
+let referenceTime = null;
 const referenceTimeDisplay = document.getElementById('reference_time');
 
 setupButtonPressOnEnter();
@@ -121,7 +121,7 @@ function handleMessage(message, messageEvent) {
 
 		case 'pong': {
 			const elapsed = messageEvent.timeStamp - lastSentPing;
-			pingDisplay.innerText = `${elapsed} ms`;
+			pingDisplay.innerText = `${Math.round(elapsed)} ms`;
 			pingButton.disabled = false;
 			break;
 		}
@@ -130,11 +130,15 @@ function handleMessage(message, messageEvent) {
 			const elapsed = messageEvent.timeStamp - lastSentGetReferenceTime;
 			const serverReferenceTime = message.milliseconds;
 			const now = performance.now();
-			const localReferenceTime = (now - elapsed / 2) + referenceTimeOffset;
-			referenceTimeOffset += serverReferenceTime - localReferenceTime;
+			if (referenceTimeOffset == null) {
+				referenceTimeOffset = serverReferenceTime - (now - elapsed / 2);
+			} else {
+				const localReferenceTime = (now - elapsed / 2) + referenceTimeOffset;
+				referenceTimeOffset += serverReferenceTime - localReferenceTime;
+			}
 			console.log(`offset: ${referenceTimeOffset}`);
 
-			if (Number.isNaN(referenceTime)) {
+			if (referenceTime == null) {
 				referenceTime = now + referenceTimeOffset;
 			}
 
@@ -172,7 +176,7 @@ function displayChatMessage(id, name, message) {
 }
 
 function displayCounter() {
-	if (Number.isNaN(referenceTime)) {
+	if (referenceTime == null) {
 		return;
 	}
 
