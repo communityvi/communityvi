@@ -17,6 +17,11 @@ pingButton.onclick = function () {
 	pingButton.disabled = true;
 };
 
+let lastSentGetReferenceTime = null;
+let referenceTimeOffset = 10000;
+let referenceTime = NaN;
+const referenceTimeDisplay = document.getElementById('reference_time');
+
 setupButtonPressOnEnter();
 
 
@@ -89,27 +94,53 @@ function handleMessage(message, messageEvent) {
 	const idField = document.getElementById('client_id');
 
 	switch (message.type) {
-		case 'hello':
+		case 'hello': {
 			idField.innerText = message.id;
-			break;
 
-		case 'joined':
+			// start counter management
+			setInterval(displayCounter, 16);
+			requestReferenceTime();
+			setInterval(requestReferenceTime, 10000);
+			break;
+		}
+
+		case 'joined': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
 			break;
+		}
 
-		case 'left':
+		case 'left': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} left the room.`);
 			break;
+		}
 
-		case 'chat':
+		case 'chat': {
 			displayChatMessage(message.sender_id, message.sender_name, message.message);
 			break;
+		}
 
-		case 'pong':
+		case 'pong': {
 			const elapsed = messageEvent.timeStamp - lastSentPing;
 			pingDisplay.innerText = `${elapsed} ms`;
 			pingButton.disabled = false;
 			break;
+		}
+
+		case 'reference_time': {
+			const elapsed = messageEvent.timeStamp - lastSentGetReferenceTime;
+			const serverReferenceTime = message.milliseconds;
+			const now = performance.now();
+			const localReferenceTime = (now - elapsed / 2) + referenceTimeOffset;
+			referenceTimeOffset += serverReferenceTime - localReferenceTime;
+			console.log(`offset: ${referenceTimeOffset}`);
+
+			if (Number.isNaN(referenceTime)) {
+				referenceTime = now + referenceTimeOffset;
+			}
+
+			break;
+		}
+
 	}
 }
 
@@ -138,4 +169,22 @@ function displayChatMessage(id, name, message) {
 	row.insertCell().appendChild(document.createTextNode(id));
 	row.insertCell().appendChild(document.createTextNode(name));
 	row.insertCell().appendChild(document.createTextNode(message));
+}
+
+function displayCounter() {
+	if (Number.isNaN(referenceTime)) {
+		return;
+	}
+
+	referenceTime = performance.now() + referenceTimeOffset;
+	referenceTimeDisplay.innerText = `${Math.round(referenceTime)} ms`;
+}
+
+function requestReferenceTime() {
+	if (webSocket == null) {
+		return;
+	}
+
+	lastSentGetReferenceTime = performance.now();
+	sendMessage({type: "get_reference_time"});
 }
