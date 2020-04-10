@@ -1,20 +1,27 @@
 use crate::connection::client::ClientConnection;
-use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse};
-use futures::stream::SplitStream;
-use futures::StreamExt;
+use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+use futures::stream::{SplitSink, SplitStream};
+use futures::{Sink, Stream, StreamExt};
 use log::error;
 use std::convert::TryFrom;
 use warp::ws::WebSocket;
 
-pub struct ServerConnection {
-	websocket_stream: SplitStream<WebSocket>,
-	client_connection: ClientConnection,
+pub struct ServerConnection<
+	RequestStream = SplitStream<WebSocket>,
+	ResponseSink = SplitSink<WebSocket, WebSocketMessage>,
+> {
+	request_stream: RequestStream,
+	client_connection: ClientConnection<ResponseSink>,
 }
 
-impl ServerConnection {
-	pub fn new(websocket_stream: SplitStream<WebSocket>, client_connection: ClientConnection) -> Self {
+impl<RequestStream, ResponseSink> ServerConnection<RequestStream, ResponseSink>
+where
+	RequestStream: Stream<Item = Result<WebSocketMessage, warp::Error>> + Unpin,
+	ResponseSink: Sink<WebSocketMessage> + Unpin,
+{
+	pub fn new(request_stream: RequestStream, client_connection: ClientConnection<ResponseSink>) -> Self {
 		Self {
-			websocket_stream,
+			request_stream,
 			client_connection,
 		}
 	}
@@ -24,7 +31,7 @@ impl ServerConnection {
 		const MAXIMUM_RETRIES: usize = 10;
 
 		for _ in 0..MAXIMUM_RETRIES {
-			let websocket_message = match self.websocket_stream.next().await {
+			let websocket_message = match self.request_stream.next().await {
 				Some(Ok(websocket_message)) => websocket_message,
 				Some(Err(error)) => {
 					error!("Error streaming websocket message: {}, result.", error);
