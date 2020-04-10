@@ -2,7 +2,20 @@
 
 let webSocket = null;
 let messageNumber = 0;
+let lastSentPing = null;
 const websocketURL = `ws://${window.location.host}/ws`;
+
+const pingButton = document.getElementById('ping_button');
+const pingDisplay = document.getElementById('ping_display');
+pingButton.onclick = function () {
+	if (webSocket == null) {
+		return;
+	}
+
+	lastSentPing = performance.now();
+	sendMessage({type: "ping"});
+	pingButton.disabled = true;
+};
 
 setupButtonPressOnEnter();
 
@@ -60,7 +73,7 @@ function registerClient() {
 		console.log('Received message.', messageEvent);
 		const messageData = messageEvent.data;
 		const message = JSON.parse(messageData);
-		handleMessage(message);
+		handleMessage(message, messageEvent);
 	};
 
 	webSocket.onclose = function (event) {
@@ -72,7 +85,7 @@ function registerClient() {
 	};
 }
 
-function handleMessage(message) {
+function handleMessage(message, messageEvent) {
 	const idField = document.getElementById('client_id');
 
 	switch (message.type) {
@@ -90,6 +103,12 @@ function handleMessage(message) {
 
 		case 'chat':
 			displayChatMessage(message.sender_id, message.sender_name, message.message);
+			break;
+
+		case 'pong':
+			const elapsed = messageEvent.timeStamp - lastSentPing;
+			pingDisplay.innerText = `${elapsed} ms`;
+			pingButton.disabled = false;
 			break;
 	}
 }
