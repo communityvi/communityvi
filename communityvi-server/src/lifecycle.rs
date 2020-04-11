@@ -145,8 +145,11 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 
 #[cfg(test)]
 mod test {
-	use crate::connection::test::create_typed_test_connections;
-	use crate::lifecycle::{handle_message, register_client};
+	use crate::client::ClientId;
+	use crate::connection::client::ClientConnection;
+	use crate::connection::server::ServerConnection;
+	use crate::connection::test::{create_typed_test_connections, TypedClientSinkStream};
+	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 	use crate::room::Room;
 	use futures::{SinkExt, StreamExt};
@@ -210,5 +213,100 @@ mod test {
 			},
 		};
 		assert_eq!(expected_response, response);
+	}
+
+	#[tokio::test]
+	async fn should_not_allow_registering_client_twice() {
+		let (client_connection, server_connection, client_sink_stream) = create_typed_test_connections();
+		let room = Room::default();
+
+		let (client_id, server_connection, mut client_sink_stream) = register_test_client(
+			"Anorak",
+			&room,
+			client_connection,
+			server_connection,
+			client_sink_stream,
+		)
+		.await;
+
+		// run server message handler
+		tokio::spawn(async move { handle_messages(server_connection, client_id, &room).await });
+
+		let register_message = OrderedMessage {
+			number: 1,
+			message: ClientRequest::Register {
+				name: "Parcival".to_string(),
+			},
+		};
+
+		client_sink_stream
+			.send(register_message)
+			.await
+			.expect("Failed to send second register method.");
+		match client_sink_stream
+			.next()
+			.await
+			.unwrap()
+			.expect("No response to double register.")
+		{
+			OrderedMessage {
+				number,
+				message: ServerResponse::Error { error, message },
+			} => {
+				assert_eq!(2, number);
+				assert_eq!(ErrorResponse::InvalidOperation, error);
+				assert!(message.contains("registered"));
+			}
+			_ => panic!("Incorrect message received."),
+		}
+	}
+
+	async fn register_test_client(
+		name: &'static str,
+		room: &Room,
+		client_connection: ClientConnection,
+		server_connection: ServerConnection,
+		mut client_sink_stream: TypedClientSinkStream,
+	) -> (ClientId, ServerConnection, TypedClientSinkStream) {
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register { name: name.into() },
+		};
+
+		client_sink_stream
+			.send(register_request)
+			.await
+			.expect("Failed to send register message.");
+
+		// run server code required for client registration
+		let (_client_id, server_connection) = register_client(room, client_connection, server_connection)
+			.await
+			.unwrap();
+
+		let response = client_sink_stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Failed to get response to register request.");
+
+		let id = if let OrderedMessage {
+			number: _,
+			message: ServerResponse::Hello { id },
+		} = response
+		{
+			id
+		} else {
+			panic!("Expected Hello-Response, got '{:?}'", response);
+		};
+
+		let joined_response = client_sink_stream
+			.next()
+			.await
+			.unwrap()
+			.expect("Failed to get joined response.");
+		assert!(
+			matches!(joined_response, OrderedMessage {number: _, message: ServerResponse::Joined {id: _, name: _}})
+		);
+		(id, server_connection, client_sink_stream)
 	}
 }

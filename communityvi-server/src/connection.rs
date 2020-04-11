@@ -26,15 +26,18 @@ pub mod test {
 	use crate::utils::sink_stream::SinkStream;
 	use futures::{Sink, SinkExt, Stream};
 	use std::convert::TryFrom;
+	use std::pin::Pin;
 
-	pub fn create_typed_test_connections() -> (
-		ClientConnection,
-		ServerConnection,
-		SinkStream<
-			impl Sink<OrderedMessage<ClientRequest>, Error = futures::channel::mpsc::SendError>,
-			impl Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>,
-		>,
-	) {
+	pub type RawClientSinkStream = SinkStream<
+		Pin<Box<dyn Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>>>,
+		Pin<Box<dyn Stream<Item = WebSocketMessage>>>,
+	>;
+	pub type TypedClientSinkStream = SinkStream<
+		Pin<Box<dyn Sink<OrderedMessage<ClientRequest>, Error = futures::channel::mpsc::SendError>>>,
+		Pin<Box<dyn Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>>>,
+	>;
+
+	pub fn create_typed_test_connections() -> (ClientConnection, ServerConnection, TypedClientSinkStream) {
 		let (
 			client_connection,
 			server_connection,
@@ -53,18 +56,11 @@ pub mod test {
 		(
 			client_connection,
 			server_connection,
-			SinkStream::new(client_sender, client_receiver),
+			SinkStream::new(Box::pin(client_sender), Box::pin(client_receiver)),
 		)
 	}
 
-	pub fn create_raw_test_connections() -> (
-		ClientConnection,
-		ServerConnection,
-		SinkStream<
-			impl Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>,
-			impl Stream<Item = WebSocketMessage>,
-		>,
-	) {
+	pub fn create_raw_test_connections() -> (ClientConnection, ServerConnection, RawClientSinkStream) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 
@@ -78,7 +74,7 @@ pub mod test {
 		(
 			client_connection,
 			server_connection,
-			SinkStream::new(client_sender, client_receiver),
+			SinkStream::new(Box::pin(client_sender), Box::pin(client_receiver)),
 		)
 	}
 }

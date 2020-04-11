@@ -1,5 +1,5 @@
 use crate::client::ClientId;
-use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
+use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::server::create_server;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
@@ -140,34 +140,6 @@ fn should_respond_to_websocket_messages() {
 		let (mut sink, mut stream) = typed_websocket_connection().await;
 		let client_id = register_client("Ferris".to_string(), &mut sink, &mut stream).await;
 		assert_eq!(ClientId::from(0), client_id);
-	};
-	test_future_with_running_server(future, false);
-}
-
-#[test]
-fn should_not_allow_registering_client_twice() {
-	let future = async {
-		let (_client_id, mut sink, mut stream) = connect_and_register("Anorak".to_string()).await;
-		let register_message = OrderedMessage {
-			number: 1,
-			message: ClientRequest::Register {
-				name: "Parcival".to_string(),
-			},
-		};
-		sink.send(register_message)
-			.await
-			.expect("Failed to send second register method.");
-		match stream.next().await.expect("No response to double register.") {
-			OrderedMessage {
-				number,
-				message: ServerResponse::Error { error, message },
-			} => {
-				assert_eq!(2, number);
-				assert_eq!(ErrorResponse::InvalidOperation, error);
-				assert!(message.contains("registered"));
-			}
-			_ => panic!("Incorrect message received."),
-		}
 	};
 	test_future_with_running_server(future, false);
 }
