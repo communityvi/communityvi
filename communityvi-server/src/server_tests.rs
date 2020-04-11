@@ -199,28 +199,6 @@ fn register_message_with_number(number: usize) -> String {
 }
 
 #[test]
-fn should_not_allow_zero_message_numbers_during_registration() {
-	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
-		let invalid_message = tungstenite::Message::Text(register_message_with_number(1));
-		sink.send(invalid_message)
-			.await
-			.expect("Failed to send register message with invalid number.");
-
-		let response = stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Invalid websocket response received");
-
-		let expected_response =
-			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_operation","message":"Client registration failed. Invalid message number: 1, should be 0."}"#.to_string());
-		assert_eq!(expected_response, response);
-	};
-	test_future_with_running_server(future, false);
-}
-
-#[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
 	let future = async {
 		let (mut sink, mut stream) = websocket_connection().await;

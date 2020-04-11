@@ -146,10 +146,10 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 #[cfg(test)]
 mod test {
 	use crate::connection::test::create_typed_test_connections;
-	use crate::lifecycle::handle_message;
-	use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+	use crate::lifecycle::{handle_message, register_client};
+	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 	use crate::room::Room;
-	use futures::StreamExt;
+	use futures::{SinkExt, StreamExt};
 	use std::time::Duration;
 	use tokio::time::delay_for;
 
@@ -182,5 +182,33 @@ mod test {
 			}
 			_ => panic!("Invalid response"),
 		};
+	}
+
+	#[tokio::test]
+	async fn should_enforce_zero_message_numbers_during_registration() {
+		let (client_connection, server_connection, mut client_sink_stream) = create_typed_test_connections();
+		let room = Room::default();
+
+		let register_message = OrderedMessage {
+			number: 1,
+			message: ClientRequest::Register {
+				name: "Ferris".to_string(),
+			},
+		};
+		client_sink_stream.send(register_message).await.unwrap();
+
+		let option = register_client(&room, client_connection, server_connection).await;
+		assert!(option.is_none());
+
+		let response = client_sink_stream.next().await.unwrap().unwrap();
+
+		let expected_response = OrderedMessage {
+			number: 0,
+			message: ServerResponse::Error {
+				error: ErrorResponse::InvalidOperation,
+				message: "Client registration failed. Invalid message number: 1, should be 0.".into(),
+			},
+		};
+		assert_eq!(expected_response, response);
 	}
 }
