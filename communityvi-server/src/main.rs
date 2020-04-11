@@ -9,13 +9,13 @@ mod commandline;
 mod configuration;
 mod connection;
 mod error;
-mod infallible_stream;
 mod lifecycle;
 mod message;
 mod room;
 mod server;
 #[cfg(test)]
 mod server_tests;
+mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), CommunityviError> {

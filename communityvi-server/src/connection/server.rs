@@ -1,6 +1,6 @@
 use crate::connection::client::ClientConnection;
-use crate::infallible_stream::InfallibleStream;
 use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;
 use futures::stream::SplitStream;
 use futures::{Stream, StreamExt};
