@@ -23,13 +23,47 @@ pub mod test {
 	use crate::connection::client::SinkClientConnection;
 	use crate::connection::server::StreamServerConnection;
 	use crate::message::{ClientRequest, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+	use crate::utils::sink_stream::SinkStream;
 	use futures::{Sink, SinkExt, Stream};
 	use std::convert::TryFrom;
 
-	pub fn test_client_connection() -> (
+	pub fn create_typed_test_connections() -> (
 		ClientConnection,
-		impl Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>,
-		impl Sink<OrderedMessage<ClientRequest>>,
+		ServerConnection,
+		SinkStream<
+			impl Sink<OrderedMessage<ClientRequest>, Error = futures::channel::mpsc::SendError>,
+			impl Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>,
+		>,
+	) {
+		let (
+			client_connection,
+			server_connection,
+			SinkStream {
+				sink: client_sender,
+				stream: client_receiver,
+			},
+		) = create_raw_test_connections();
+
+		let client_sender = client_sender.with(|ordered_message| {
+			futures::future::ok::<_, futures::channel::mpsc::SendError>(WebSocketMessage::from(&ordered_message))
+		});
+		let client_receiver =
+			client_receiver.map(|websocket_message| OrderedMessage::<ServerResponse>::try_from(&websocket_message));
+
+		(
+			client_connection,
+			server_connection,
+			SinkStream::new(client_sender, client_receiver),
+		)
+	}
+
+	pub fn create_raw_test_connections() -> (
+		ClientConnection,
+		ServerConnection,
+		SinkStream<
+			impl Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>,
+			impl Stream<Item = WebSocketMessage>,
+		>,
 	) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
@@ -38,21 +72,13 @@ pub mod test {
 		let stream_server_connection =
 			StreamServerConnection::new(server_receiver, sink_client_connection.clone().into());
 
-		let server_response_stream = client_receiver.map(move |websocket_message: WebSocketMessage| {
-			// Crazy Hack to Move the ownership into the server_response_stream so that it can
-			// escape this function otherwise it would get dropped and the connection would break
-			let _keep_server_connection_alive = &stream_server_connection;
-
-			OrderedMessage::<ServerResponse>::try_from(&websocket_message)
-		});
-		let client_request_sink = client_sender.with(|ordered_message| {
-			futures::future::ok::<_, futures::channel::mpsc::SendError>(WebSocketMessage::from(&ordered_message))
-		});
+		let client_connection = ClientConnection::from(sink_client_connection);
+		let server_connection = ServerConnection::from(stream_server_connection);
 
 		(
-			sink_client_connection.into(),
-			server_response_stream,
-			client_request_sink,
+			client_connection,
+			server_connection,
+			SinkStream::new(client_sender, client_receiver),
 		)
 	}
 }

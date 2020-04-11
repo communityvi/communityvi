@@ -145,7 +145,7 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 
 #[cfg(test)]
 mod test {
-	use crate::connection::test::test_client_connection;
+	use crate::connection::test::create_typed_test_connections;
 	use crate::lifecycle::handle_message;
 	use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 	use crate::room::Room;
@@ -157,14 +157,14 @@ mod test {
 	async fn the_client_should_get_access_to_the_server_reference_time() {
 		const TEST_DELAY: Duration = Duration::from_millis(2);
 
-		let (client_connection, mut server_response_stream, _dont_drop_me) = test_client_connection();
+		let (client_connection, _server_connection, mut client_sink_stream) = create_typed_test_connections();
 		let room = Room::default();
 		let client_handle = room.add_client("Alice".to_string(), client_connection);
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
 
-		match server_response_stream
+		match client_sink_stream
 			.next()
 			.await
 			.unwrap()
