@@ -97,44 +97,6 @@ async fn connect_and_register(
 }
 
 #[test]
-fn should_close_after_10_invalid_messages() {
-	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
-		let registration_message = tungstenite::Message::Text(register_message_with_number(0));
-		sink.send(registration_message)
-			.await
-			.expect("Failed to send register message.");
-		let _ = stream.next().await.expect("Failed to receive hello response");
-
-		let _ = stream.next().await.expect("Failed to receive joined response.");
-
-		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-		for _ in 0..10 {
-			sink.send(invalid_message.clone())
-				.await
-				.expect("Failed to send invalid message.");
-			let _ = stream
-				.next()
-				.await
-				.unwrap()
-				.expect("Invalid websocket response received");
-		}
-
-		let too_many_retries_response = stream.next().await.unwrap().unwrap();
-		assert_eq!(
-			tungstenite::Message::Text(
-				r#"{"number":12,"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
-			),
-			too_many_retries_response
-		);
-
-		let close_message = stream.next().await.unwrap().unwrap();
-		assert!(close_message.is_close());
-	};
-	test_future_with_running_server(future, false);
-}
-
-#[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
 		let (mut sink, mut stream) = typed_websocket_connection().await;

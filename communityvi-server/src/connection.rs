@@ -77,4 +77,40 @@ pub mod test {
 			SinkStream::new(Box::pin(client_sender), Box::pin(client_receiver)),
 		)
 	}
+
+	#[tokio::test]
+	async fn should_close_after_10_invalid_messages() {
+		let (_client_connection, mut server_connection, mut client_sink_stream) = create_raw_test_connections();
+
+		// send 10 invalid messages
+		let invalid_message = WebSocketMessage::binary(vec![1u8, 2u8, 3u8, 4u8]);
+		for _ in 0usize..10 {
+			client_sink_stream
+				.send(invalid_message.clone())
+				.await
+				.expect("Failed to send invalid message.");
+		}
+
+		// try to receive them on the server
+		assert!(server_connection.receive().await.is_none());
+
+		// receive 10 responses from the server
+		for _ in 0usize..10 {
+			client_sink_stream
+				.next()
+				.await
+				.expect("Invalid websocket response received");
+		}
+
+		let too_many_retries_response = client_sink_stream.next().await.unwrap();
+		assert_eq!(
+			WebSocketMessage::text(
+				r#"{"number":10,"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
+			),
+			too_many_retries_response
+		);
+
+		let close_message = client_sink_stream.next().await.unwrap();
+		assert!(close_message.is_close());
+	}
 }
