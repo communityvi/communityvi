@@ -1,14 +1,11 @@
 use crate::client::{Client, ClientId};
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
-use crate::connection::split_websocket;
 use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 use crate::room::Room;
 use log::{debug, error, info, warn};
-use warp::filters::ws::WebSocket;
 
-pub async fn run_client(room: &Room, websocket: WebSocket) {
-	let (client_connection, server_connection) = split_websocket(websocket);
+pub async fn run_client(room: &Room, client_connection: ClientConnection, server_connection: ServerConnection) {
 	if let Some((client_id, server_connection)) = register_client(&room, client_connection, server_connection).await {
 		handle_messages(server_connection, client_id, &room).await;
 		room.remove_client(client_id).await;

@@ -1,3 +1,4 @@
+use crate::connection::split_websocket;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use futures::FutureExt;
@@ -26,7 +27,13 @@ pub async fn create_server<ShutdownHandleType>(
 		.and(warp::ws().boxed())
 		.and_then(move |ws: Ws| {
 			let room = room.clone();
-			let reply = ws.on_upgrade(move |websocket| async move { run_client(&room, websocket).await }.boxed());
+			let reply = ws.on_upgrade(move |websocket| {
+				async move {
+					let (client_connection, server_connection) = split_websocket(websocket);
+					run_client(&room, client_connection, server_connection).await
+				}
+				.boxed()
+			});
 			Box::pin(async { Ok(Box::new(reply) as Box<dyn Reply>) })
 				as Pin<Box<dyn Future<Output = Result<Box<dyn Reply>, Rejection>> + Send>> // type erasure for faster compile times!
 		})
@@ -38,7 +45,7 @@ pub async fn create_server<ShutdownHandleType>(
 		.map(|| {
 			warp::http::Response::builder()
 			.header("Content-Type", "text/html; charset=utf-8")
-			.header("Cache-Control", "no-cache") 
+			.header("Cache-Control", "no-cache")
 			// prevent XSS - FIXME: Make this work in Safari.
 			.header(
 				"Content-Security-Policy",
