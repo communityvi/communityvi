@@ -64,6 +64,7 @@ pub enum ServerResponse {
 pub enum ErrorResponse {
 	InvalidFormat,
 	InvalidOperation,
+	InvalidMessageNumber,
 	InternalServerError,
 }
 

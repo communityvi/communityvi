@@ -275,13 +275,13 @@ fn should_broadcast_when_client_leaves_the_room() {
 fn test_messages_should_have_sequence_numbers() {
 	let future = async move {
 		let first_request = OrderedMessage {
-			number: 0,
+			number: 1,
 			message: ClientRequest::Chat {
 				message: "first".into(),
 			},
 		};
 		let second_request = OrderedMessage {
-			number: 1,
+			number: 2,
 			message: ClientRequest::Chat {
 				message: "second".into(),
 			},

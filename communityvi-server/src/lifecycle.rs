@@ -25,12 +25,12 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let (number, name) = if let OrderedMessage {
-		number,
+	let name = if let OrderedMessage {
 		message: ClientRequest::Register { name },
+		..
 	} = request
 	{
-		(number, name)
+		name
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
 
@@ -42,21 +42,6 @@ async fn register_client(
 			.await;
 		return None;
 	};
-
-	if number != 0 {
-		let message = format!(
-			"Client registration failed. Invalid message number: {}, should be 0.",
-			number
-		);
-		error!("{}", message);
-		let _ = client_connection
-			.send(ServerResponse::Error {
-				error: ErrorResponse::InvalidOperation,
-				message,
-			})
-			.await;
-		return None;
-	}
 
 	let client_handle = room.add_client(name, client_connection);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
@@ -182,34 +167,6 @@ mod test {
 			}
 			_ => panic!("Invalid response"),
 		};
-	}
-
-	#[tokio::test]
-	async fn should_enforce_zero_message_numbers_during_registration() {
-		let (client_connection, server_connection, mut client_sink_stream) = create_typed_test_connections();
-		let room = Room::default();
-
-		let register_message = OrderedMessage {
-			number: 1,
-			message: ClientRequest::Register {
-				name: "Ferris".to_string(),
-			},
-		};
-		client_sink_stream.send(register_message).await.unwrap();
-
-		let option = register_client(&room, client_connection, server_connection).await;
-		assert!(option.is_none());
-
-		let response = client_sink_stream.next().await.unwrap().unwrap();
-
-		let expected_response = OrderedMessage {
-			number: 0,
-			message: ServerResponse::Error {
-				error: ErrorResponse::InvalidOperation,
-				message: "Client registration failed. Invalid message number: 1, should be 0.".into(),
-			},
-		};
-		assert_eq!(expected_response, response);
 	}
 
 	#[tokio::test]
