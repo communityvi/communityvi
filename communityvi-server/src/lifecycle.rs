@@ -1,7 +1,7 @@
 use crate::client::{Client, ClientId};
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
-use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
+use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
 use crate::room::Room;
 use log::{debug, error, info, warn};
 
@@ -25,11 +25,7 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let name = if let OrderedMessage {
-		message: ClientRequest::Register { name },
-		..
-	} = request
-	{
+	let name = if let ClientRequest::Register { name } = request {
 		name
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
@@ -64,14 +60,13 @@ async fn register_client(
 
 async fn handle_messages(mut server_connection: ServerConnection, client_id: ClientId, room: &Room) {
 	loop {
-		let OrderedMessage { number, message } = match server_connection.receive().await {
+		let message = match server_connection.receive().await {
 			Some(message) => message,
 			None => return,
 		};
 		debug!(
-			"Received {:?} message {} from {}",
+			"Received {:?} message from {}",
 			std::mem::discriminant(&message),
-			number,
 			client_id
 		);
 

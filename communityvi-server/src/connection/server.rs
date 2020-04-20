@@ -15,7 +15,7 @@ pub type WebSocketServerConnection = StreamServerConnection<InfallibleStream<Spl
 #[async_trait]
 pub trait ServerConnectionTrait {
 	/// Receive a message from the client or None if the connection has been closed.
-	async fn receive(&mut self) -> Option<OrderedMessage<ClientRequest>>;
+	async fn receive(&mut self) -> Option<ClientRequest>;
 }
 
 pub struct StreamServerConnection<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
@@ -29,7 +29,7 @@ impl<RequestStream> ServerConnectionTrait for StreamServerConnection<RequestStre
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send,
 {
-	async fn receive(&mut self) -> Option<OrderedMessage<ClientRequest>> {
+	async fn receive(&mut self) -> Option<ClientRequest> {
 		const MAXIMUM_RETRIES: usize = 10;
 
 		for _ in 0..MAXIMUM_RETRIES {
@@ -103,7 +103,7 @@ where
 				_ => self.highest_message_number = Some(ordered_message.number),
 			}
 
-			return Some(ordered_message);
+			return Some(ordered_message.message);
 		}
 
 		let _ = self
