@@ -39,6 +39,19 @@ async fn register_client(
 		return None;
 	};
 
+	if name.trim().is_empty() {
+		error!("Client registration failed. Tried to register with no or empty name.");
+
+		let _ = client_connection
+			.send(ServerResponse::Error {
+				error: ErrorResponse::InvalidFormat,
+				message: "Name was empty or whitespace-only.".to_string(),
+			})
+			.await;
+
+		return None;
+	}
+
 	let client_handle = room.add_client(name, client_connection);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
 	if room.singlecast(&client_handle, hello_response).await.is_ok() {
@@ -188,6 +201,56 @@ mod test {
 			}
 			_ => panic!("Incorrect message received."),
 		}
+	}
+
+	#[tokio::test]
+	async fn should_not_register_clients_with_empty_name() {
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+		let room = Room::default();
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register { name: "".to_string() },
+		};
+
+		test_client.send(register_request).await;
+		register_client(&room, client_connection, server_connection).await;
+		let response = test_client.receive().await.expect("Did not receive response!");
+
+		assert_eq!(
+			OrderedMessage {
+				number: 0,
+				message: ServerResponse::Error {
+					error: ErrorResponse::InvalidFormat,
+					message: "Name was empty or whitespace-only.".to_string()
+				}
+			},
+			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_not_register_clients_with_blank_name() {
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+		let room = Room::default();
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register { name: "	 ".to_string() },
+		};
+
+		test_client.send(register_request).await;
+		register_client(&room, client_connection, server_connection).await;
+		let response = test_client.receive().await.expect("Did not receive response!");
+
+		assert_eq!(
+			OrderedMessage {
+				number: 0,
+				message: ServerResponse::Error {
+					error: ErrorResponse::InvalidFormat,
+					message: "Name was empty or whitespace-only.".to_string()
+				}
+			},
+			response
+		);
 	}
 
 	async fn register_test_client(
