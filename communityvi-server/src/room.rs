@@ -23,13 +23,9 @@ pub struct Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(
-		&self,
-		name: String,
-		connection: ClientConnection,
-	) -> Result<ClientHandle, (RoomError, ClientConnection)> {
+	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
 		if name.trim().is_empty() {
-			return Err((RoomError::EmptyClientName, connection));
+			return Err(RoomError::EmptyClientName);
 		}
 
 		let client_id = self.client_id_sequence.next();
