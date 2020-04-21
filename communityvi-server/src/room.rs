@@ -3,6 +3,7 @@ use crate::client_handle::ClientHandle;
 use crate::client_id_sequence::ClientIdSequence;
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
+use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
@@ -10,6 +11,7 @@ use futures::FutureExt;
 use log::info;
 use std::time::Duration;
 
+pub mod error;
 mod state;
 
 #[derive(Default)]
@@ -21,7 +23,15 @@ pub struct Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, connection: ClientConnection) -> ClientHandle {
+	pub fn add_client(
+		&self,
+		name: String,
+		connection: ClientConnection,
+	) -> Result<ClientHandle, (RoomError, ClientConnection)> {
+		if name.trim().is_empty() {
+			return Err((RoomError::EmptyClientName, connection));
+		}
+
 		let client_id = self.client_id_sequence.next();
 		let client = Client::new(client_id, name, connection);
 
@@ -29,7 +39,8 @@ impl Room {
 		if let Entry::Occupied(_) = &client_entry {
 			unreachable!("There must never be two clients with the same id!")
 		}
-		client_entry.or_insert(client).into()
+
+		Ok(client_entry.or_insert(client).into())
 	}
 
 	pub async fn remove_client(&self, client_id: ClientId) {

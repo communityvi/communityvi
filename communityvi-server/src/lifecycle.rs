@@ -2,6 +2,7 @@ use crate::client::{Client, ClientId};
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
 use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
+use crate::room::error::RoomError;
 use crate::room::Room;
 use log::{debug, error, info, warn};
 
@@ -39,20 +40,23 @@ async fn register_client(
 		return None;
 	};
 
-	if name.trim().is_empty() {
-		error!("Client registration failed. Tried to register with no or empty name.");
+	let client_handle = match room.add_client(name, client_connection) {
+		Ok(client_handle) => client_handle,
+		Err((error @ RoomError::EmptyClientName, client_connection))
+		| Err((error @ RoomError::ClientNameAlreadyInUse, client_connection)) => {
+			error!("Client registration failed. Tried to register with invalid name.");
 
-		let _ = client_connection
-			.send(ServerResponse::Error {
-				error: ErrorResponse::InvalidFormat,
-				message: "Name was empty or whitespace-only.".to_string(),
-			})
-			.await;
+			let _ = client_connection
+				.send(ServerResponse::Error {
+					error: ErrorResponse::InvalidFormat,
+					message: error.to_string(),
+				})
+				.await;
 
-		return None;
-	}
+			return None;
+		}
+	};
 
-	let client_handle = room.add_client(name, client_connection);
 	let hello_response = ServerResponse::Hello { id: client_handle.id() };
 	if room.singlecast(&client_handle, hello_response).await.is_ok() {
 		let name = client_handle.name().to_string();
@@ -151,7 +155,9 @@ mod test {
 
 		let (client_connection, _server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::default();
-		let client_handle = room.add_client("Alice".to_string(), client_connection);
+		let client_handle = room
+			.add_client("Alice".to_string(), client_connection)
+			.expect("Did not get client handle!");
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
