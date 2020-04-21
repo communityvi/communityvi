@@ -145,6 +145,7 @@ mod test {
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 	use crate::room::Room;
+	use crate::utils::fake_connection::FakeClientConnection;
 	use std::time::Duration;
 	use tokio::time::delay_for;
 
@@ -209,12 +210,12 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn should_not_register_clients_with_empty_name() {
+	async fn should_not_register_clients_with_blank_name() {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::default();
 		let register_request = OrderedMessage {
 			number: 0,
-			message: ClientRequest::Register { name: "".to_string() },
+			message: ClientRequest::Register { name: "	 ".to_string() },
 		};
 
 		test_client.send(register_request).await;
@@ -234,24 +235,34 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn should_not_register_clients_with_blank_name() {
-		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+	async fn should_not_register_clients_with_already_registered_name() {
 		let room = Room::default();
+
+		// "Ferris" is already a registered client
+		let fake_client_connection = FakeClientConnection::default().into();
+		room.add_client("Ferris".to_string(), fake_client_connection)
+			.expect("Could not register 'Ferris'!");
+
+		// And I register another client with the same name
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let register_request = OrderedMessage {
 			number: 0,
-			message: ClientRequest::Register { name: "	 ".to_string() },
+			message: ClientRequest::Register {
+				name: "Ferris".to_string(),
+			},
 		};
 
 		test_client.send(register_request).await;
 		register_client(&room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
+		// Then I expect an error
 		assert_eq!(
 			OrderedMessage {
 				number: 0,
 				message: ServerResponse::Error {
 					error: ErrorResponse::InvalidFormat,
-					message: "Name was empty or whitespace-only.".to_string()
+					message: "Client name is already in use.".to_string()
 				}
 			},
 			response

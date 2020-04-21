@@ -6,7 +6,7 @@ use crate::message::ServerResponse;
 use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
 use log::info;
 use std::time::Duration;
@@ -17,6 +17,7 @@ mod state;
 #[derive(Default)]
 pub struct Room {
 	client_id_sequence: ClientIdSequence,
+	client_names: DashSet<String>,
 	clients: DashMap<ClientId, Client>,
 	state: State,
 }
@@ -26,6 +27,10 @@ impl Room {
 	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
+		}
+
+		if !self.client_names.insert(name.trim().to_string()) {
+			return Err(RoomError::ClientNameAlreadyInUse);
 		}
 
 		let client_id = self.client_id_sequence.next();
@@ -74,5 +79,43 @@ impl Room {
 
 	pub fn current_reference_time(&self) -> Duration {
 		self.state.current_reference_time()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::utils::fake_connection::FakeClientConnection;
+
+	#[test]
+	fn should_not_add_client_with_empty_name() {
+		let room = Room::default();
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+		let result = room.add_client("".to_string(), client_connection.clone());
+
+		matches!(result, Err(RoomError::EmptyClientName));
+	}
+
+	#[test]
+	fn should_not_add_client_with_blank_name() {
+		let room = Room::default();
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+		let result = room.add_client("  	 ".to_string(), client_connection.clone());
+
+		matches!(result, Err(RoomError::EmptyClientName));
+	}
+
+	#[test]
+	fn should_not_add_two_clients_with_the_same_name() {
+		let room = Room::default();
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+		room.add_client("Anorak  ".to_string(), client_connection.clone())
+			.expect("First add did not succeed!");
+		let result = room.add_client("   Anorak".to_string(), client_connection.clone());
+
+		matches!(result, Err(RoomError::ClientNameAlreadyInUse));
 	}
 }

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RoomError {
 	EmptyClientName,
 	ClientNameAlreadyInUse,
