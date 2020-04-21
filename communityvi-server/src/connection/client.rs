@@ -15,6 +15,7 @@ pub type ClientConnection = Pin<Box<dyn ClientConnectionTrait + Send + Sync>>;
 pub trait ClientConnectionTrait: Debug {
 	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
 	async fn close(&self);
+	fn clone(&self) -> ClientConnection;
 }
 
 pub type WebSocketClientConnection = SinkClientConnection<SplitSink<WebSocket, WebSocketMessage>>;
@@ -58,6 +59,10 @@ where
 	async fn close(&self) {
 		let mut inner = self.inner.lock().await;
 		let _ = inner.response_sink.send(WebSocketMessage::close()).await;
+	}
+
+	fn clone(&self) -> ClientConnection {
+		Clone::clone(self).into()
 	}
 }
 
