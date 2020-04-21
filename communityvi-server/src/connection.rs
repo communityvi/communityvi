@@ -23,44 +23,38 @@ pub mod test {
 	use crate::connection::client::SinkClientConnection;
 	use crate::connection::server::StreamServerConnection;
 	use crate::message::{ClientRequest, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
-	use crate::utils::sink_stream::SinkStream;
-	use futures::{Sink, SinkExt, Stream};
+	use crate::utils::test_client::TestClient;
+	use futures::{Sink, SinkExt, Stream, StreamExt};
 	use std::convert::TryFrom;
 	use std::pin::Pin;
 
-	pub type RawClientSinkStream = SinkStream<
-		Pin<Box<dyn Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>>>,
-		Pin<Box<dyn Stream<Item = WebSocketMessage>>>,
-	>;
-	pub type TypedClientSinkStream = SinkStream<
+	pub type TypedTestClient = TestClient<
 		Pin<Box<dyn Sink<OrderedMessage<ClientRequest>, Error = futures::channel::mpsc::SendError>>>,
 		Pin<Box<dyn Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>>>,
 	>;
+	pub type RawTestClient = TestClient<
+		Pin<Box<dyn Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>>>,
+		Pin<Box<dyn Stream<Item = WebSocketMessage>>>,
+	>;
 
-	pub fn create_typed_test_connections() -> (ClientConnection, ServerConnection, TypedClientSinkStream) {
-		let (
-			client_connection,
-			server_connection,
-			SinkStream {
-				sink: client_sender,
-				stream: client_receiver,
-			},
-		) = create_raw_test_connections();
+	pub fn create_typed_test_connections() -> (ClientConnection, ServerConnection, TypedTestClient) {
+		let (client_connection, server_connection, raw_test_client) = create_raw_test_connections();
+		let (raw_client_sender, raw_client_receiver) = raw_test_client.split();
 
-		let client_sender = client_sender.with(|ordered_message| {
+		let client_sender = raw_client_sender.with(|ordered_message| {
 			futures::future::ok::<_, futures::channel::mpsc::SendError>(WebSocketMessage::from(&ordered_message))
 		});
 		let client_receiver =
-			client_receiver.map(|websocket_message| OrderedMessage::<ServerResponse>::try_from(&websocket_message));
+			raw_client_receiver.map(|websocket_message| OrderedMessage::<ServerResponse>::try_from(&websocket_message));
 
 		(
 			client_connection,
 			server_connection,
-			SinkStream::new(Box::pin(client_sender), Box::pin(client_receiver)),
+			TestClient::new(Box::pin(client_sender), Box::pin(client_receiver)),
 		)
 	}
 
-	pub fn create_raw_test_connections() -> (ClientConnection, ServerConnection, RawClientSinkStream) {
+	pub fn create_raw_test_connections() -> (ClientConnection, ServerConnection, RawTestClient) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 
@@ -74,21 +68,18 @@ pub mod test {
 		(
 			client_connection,
 			server_connection,
-			SinkStream::new(Box::pin(client_sender), Box::pin(client_receiver)),
+			TestClient::new(Box::pin(client_sender), Box::pin(client_receiver)),
 		)
 	}
 
 	#[tokio::test]
 	async fn should_close_after_10_invalid_messages() {
-		let (_client_connection, mut server_connection, mut client_sink_stream) = create_raw_test_connections();
+		let (_client_connection, mut server_connection, mut test_client) = create_raw_test_connections();
 
 		// send 10 invalid messages
 		let invalid_message = WebSocketMessage::binary(vec![1u8, 2u8, 3u8, 4u8]);
 		for _ in 0usize..10 {
-			client_sink_stream
-				.send(invalid_message.clone())
-				.await
-				.expect("Failed to send invalid message.");
+			test_client.send(invalid_message.clone()).await;
 		}
 
 		// try to receive them on the server
@@ -96,13 +87,10 @@ pub mod test {
 
 		// receive 10 responses from the server
 		for _ in 0usize..10 {
-			client_sink_stream
-				.next()
-				.await
-				.expect("Invalid websocket response received");
+			test_client.receive().await;
 		}
 
-		let too_many_retries_response = client_sink_stream.next().await.unwrap();
+		let too_many_retries_response = test_client.receive().await;
 		assert_eq!(
 			WebSocketMessage::text(
 				r#"{"number":10,"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
@@ -110,7 +98,7 @@ pub mod test {
 			too_many_retries_response
 		);
 
-		let close_message = client_sink_stream.next().await.unwrap();
+		let close_message = test_client.receive().await;
 		assert!(close_message.is_close());
 	}
 }

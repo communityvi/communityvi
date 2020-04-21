@@ -125,11 +125,10 @@ mod test {
 	use crate::client::ClientId;
 	use crate::connection::client::ClientConnection;
 	use crate::connection::server::ServerConnection;
-	use crate::connection::test::{create_typed_test_connections, TypedClientSinkStream};
+	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
 	use crate::room::Room;
-	use futures::{SinkExt, StreamExt};
 	use std::time::Duration;
 	use tokio::time::delay_for;
 
@@ -137,19 +136,14 @@ mod test {
 	async fn the_client_should_get_access_to_the_server_reference_time() {
 		const TEST_DELAY: Duration = Duration::from_millis(2);
 
-		let (client_connection, _server_connection, mut client_sink_stream) = create_typed_test_connections();
+		let (client_connection, _server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::default();
 		let client_handle = room.add_client("Alice".to_string(), client_connection);
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
 
-		match client_sink_stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Invalid ordered message")
-		{
+		match test_client.receive().await.expect("Invalid ordered message") {
 			OrderedMessage {
 				number: _,
 				message: ServerResponse::ReferenceTime { milliseconds },
@@ -166,17 +160,11 @@ mod test {
 
 	#[tokio::test]
 	async fn should_not_allow_registering_client_twice() {
-		let (client_connection, server_connection, client_sink_stream) = create_typed_test_connections();
+		let (client_connection, server_connection, test_client) = create_typed_test_connections();
 		let room = Room::default();
 
-		let (client_id, server_connection, mut client_sink_stream) = register_test_client(
-			"Anorak",
-			&room,
-			client_connection,
-			server_connection,
-			client_sink_stream,
-		)
-		.await;
+		let (client_id, server_connection, mut test_client) =
+			register_test_client("Anorak", &room, client_connection, server_connection, test_client).await;
 
 		// run server message handler
 		tokio::spawn(async move { handle_messages(server_connection, client_id, &room).await });
@@ -188,16 +176,8 @@ mod test {
 			},
 		};
 
-		client_sink_stream
-			.send(register_message)
-			.await
-			.expect("Failed to send second register method.");
-		match client_sink_stream
-			.next()
-			.await
-			.unwrap()
-			.expect("No response to double register.")
-		{
+		test_client.send(register_message).await;
+		match test_client.receive().await.expect("No response to double register.") {
 			OrderedMessage {
 				number,
 				message: ServerResponse::Error { error, message },
@@ -215,27 +195,23 @@ mod test {
 		room: &Room,
 		client_connection: ClientConnection,
 		server_connection: ServerConnection,
-		mut client_sink_stream: TypedClientSinkStream,
-	) -> (ClientId, ServerConnection, TypedClientSinkStream) {
+		mut test_client: TypedTestClient,
+	) -> (ClientId, ServerConnection, TypedTestClient) {
 		let register_request = OrderedMessage {
 			number: 0,
 			message: ClientRequest::Register { name: name.into() },
 		};
 
-		client_sink_stream
-			.send(register_request)
-			.await
-			.expect("Failed to send register message.");
+		test_client.send(register_request).await;
 
 		// run server code required for client registration
 		let (_client_id, server_connection) = register_client(room, client_connection, server_connection)
 			.await
 			.unwrap();
 
-		let response = client_sink_stream
-			.next()
+		let response = test_client
+			.receive()
 			.await
-			.unwrap()
 			.expect("Failed to get response to register request.");
 
 		let id = if let OrderedMessage {
@@ -248,14 +224,10 @@ mod test {
 			panic!("Expected Hello-Response, got '{:?}'", response);
 		};
 
-		let joined_response = client_sink_stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Failed to get joined response.");
+		let joined_response = test_client.receive().await.expect("Failed to get joined response.");
 		assert!(
 			matches!(joined_response, OrderedMessage {number: _, message: ServerResponse::Joined {id: _, name: _}})
 		);
-		(id, server_connection, client_sink_stream)
+		(id, server_connection, test_client)
 	}
 }

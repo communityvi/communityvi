@@ -144,7 +144,6 @@ where
 pub mod test {
 	use super::test_helper::*;
 	use super::*;
-	use futures::SinkExt;
 	use std::time::Duration;
 
 	#[tokio::test]
@@ -154,11 +153,11 @@ pub mod test {
 
 	#[tokio::test]
 	async fn should_reject_nonzero_message_numbers_at_start_of_conversation() {
-		async_test_case_receiving(0, |mut client_sink_stream| async move {
+		async_test_case_receiving(0, |mut test_client| async move {
 			let nonzero_message = some_ordered_message(42);
 
-			client_sink_stream.send(nonzero_message).await.unwrap();
-			let response = client_sink_stream.next().await.unwrap().unwrap();
+			test_client.send(nonzero_message).await;
+			let response = test_client.receive().await.unwrap();
 
 			assert_eq!(
 				OrderedMessage {
@@ -176,15 +175,15 @@ pub mod test {
 
 	#[tokio::test]
 	async fn should_reject_messages_with_message_numbers_lower_than_the_previous() {
-		async_test_case_receiving(2, |mut client_sink_stream| async move {
+		async_test_case_receiving(2, |mut test_client| async move {
 			let first_message = some_ordered_message(0);
 			let second_message = some_ordered_message(1);
 			let message_with_lower_number = some_ordered_message(0);
 
-			client_sink_stream.send(first_message).await.unwrap();
-			client_sink_stream.send(second_message).await.unwrap();
-			client_sink_stream.send(message_with_lower_number).await.unwrap();
-			let response = client_sink_stream.next().await.unwrap().unwrap();
+			test_client.send(first_message).await;
+			test_client.send(second_message).await;
+			test_client.send(message_with_lower_number).await;
+			let response = test_client.receive().await.unwrap();
 
 			assert_eq!(
 				OrderedMessage {
@@ -202,13 +201,13 @@ pub mod test {
 
 	#[tokio::test]
 	async fn should_reject_messages_with_message_numbers_identical_to_the_previous() {
-		async_test_case_receiving(1, |mut client_sink_stream| async move {
+		async_test_case_receiving(1, |mut test_client| async move {
 			let first_message = some_ordered_message(0);
 			let first_message_sent_again = first_message.clone();
 
-			client_sink_stream.send(first_message).await.unwrap();
-			client_sink_stream.send(first_message_sent_again).await.unwrap();
-			let response = client_sink_stream.next().await.unwrap().unwrap();
+			test_client.send(first_message).await;
+			test_client.send(first_message_sent_again).await;
+			let response = test_client.receive().await.unwrap();
 
 			assert_eq!(
 				OrderedMessage {
@@ -226,29 +225,26 @@ pub mod test {
 
 	#[tokio::test]
 	async fn should_accept_conversations_beginning_with_message_number_zero() {
-		async_test_case_receiving(1, |mut client_sink_stream| async move {
+		async_test_case_receiving(1, |mut test_client| async move {
 			let first_message = some_ordered_message(0);
 
-			client_sink_stream.send(first_message).await.unwrap();
+			test_client.send(first_message).await;
 		})
 		.await;
 	}
 
 	#[tokio::test]
 	async fn should_accept_strictly_increasing_message_numbers() {
-		async_test_case_receiving(4, |mut client_sink_stream| async move {
+		async_test_case_receiving(4, |mut test_client| async move {
 			let first_message = some_ordered_message(0);
 			let second_message = some_ordered_message(1);
 			let tenth_message = some_ordered_message(9);
 			let onethousandthreehundredthirtyeigth_message = some_ordered_message(1337);
 
-			client_sink_stream.send(first_message).await.unwrap();
-			client_sink_stream.send(second_message).await.unwrap();
-			client_sink_stream.send(tenth_message).await.unwrap();
-			client_sink_stream
-				.send(onethousandthreehundredthirtyeigth_message)
-				.await
-				.unwrap();
+			test_client.send(first_message).await;
+			test_client.send(second_message).await;
+			test_client.send(tenth_message).await;
+			test_client.send(onethousandthreehundredthirtyeigth_message).await;
 		})
 		.await;
 	}
@@ -256,7 +252,7 @@ pub mod test {
 
 #[cfg(test)]
 mod test_helper {
-	use crate::connection::test::{create_typed_test_connections, TypedClientSinkStream};
+	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::message::{ClientRequest, OrderedMessage};
 	use std::future::Future;
 
@@ -264,10 +260,10 @@ mod test_helper {
 		expected_valid_message_count: usize,
 		test_case: TestCaseClosure,
 	) where
-		TestCaseClosure: FnOnce(TypedClientSinkStream) -> TestFuture,
+		TestCaseClosure: FnOnce(TypedTestClient) -> TestFuture,
 		TestFuture: Future<Output = ()>,
 	{
-		let (_, mut server_connection, client_sink_stream) = create_typed_test_connections();
+		let (_, mut server_connection, test_client) = create_typed_test_connections();
 		let join_handle = tokio::spawn(async move {
 			for current_count in 1..=expected_valid_message_count {
 				if server_connection.receive().await.is_none() {
@@ -284,7 +280,7 @@ mod test_helper {
 				expected_valid_message_count
 			);
 		});
-		test_case(client_sink_stream).await;
+		test_case(test_client).await;
 		join_handle.await.expect("Failed to finish server.");
 	}
 
