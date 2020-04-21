@@ -10,6 +10,7 @@ use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
 use log::info;
 use std::time::Duration;
+use unicode_skeleton::UnicodeSkeleton;
 
 pub mod error;
 mod state;
@@ -29,7 +30,7 @@ impl Room {
 			return Err(RoomError::EmptyClientName);
 		}
 
-		if !self.client_names.insert(name.trim().to_string()) {
+		if !self.client_names.insert(normalized_name(name.as_str())) {
 			return Err(RoomError::ClientNameAlreadyInUse);
 		}
 
@@ -82,6 +83,14 @@ impl Room {
 	}
 }
 
+/// This function makes sure that unicode characters get correctly decomposed,
+/// normalized and some homograph attacks are hindered, disregarding whitespace.
+fn normalized_name(name: &str) -> String {
+	name.split_whitespace()
+		.flat_map(UnicodeSkeleton::skeleton_chars)
+		.collect()
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -105,6 +114,38 @@ mod test {
 		let result = room.add_client("  	 ".to_string(), client_connection.clone());
 
 		matches!(result, Err(RoomError::EmptyClientName));
+	}
+
+	#[test]
+	fn should_normalize_unicode_strings() {
+		assert_eq!(normalized_name("C\u{327}"), "C\u{326}");
+		assert_eq!(normalized_name("é"), "e\u{301}");
+		assert_eq!(normalized_name("\u{0C5}"), "A\u{30A}");
+		assert_eq!(normalized_name("\u{212B}"), "A\u{30A}");
+		assert_eq!(normalized_name("\u{391}"), "A");
+		assert_eq!(normalized_name("\u{410}"), "A");
+		assert_eq!(normalized_name("𝔭𝒶ỿ𝕡𝕒ℓ"), "paypal");
+		assert_eq!(normalized_name("𝒶𝒷𝒸"), "abc");
+		assert_eq!(normalized_name("ℝ𝓊𝓈𝓉"), "Rust");
+		assert_eq!(normalized_name("аррӏе.com"), "appie.corn");
+		assert_eq!(normalized_name("𝔭𝒶   ỿ𝕡𝕒		ℓ"), "paypal");
+		assert_eq!(normalized_name("𝒶𝒷\r\n𝒸"), "abc");
+		assert_eq!(normalized_name("ℝ		𝓊𝓈 𝓉"), "Rust");
+		assert_eq!(normalized_name("арр    ӏе.	com"), "appie.corn");
+	}
+
+	#[test]
+	#[ignore]
+	fn should_prevent_whole_script_homographs() {
+		/*
+		 * "Our IDN threat model specifically excludes whole-script homographs, because they can't
+		 *  be detected programmatically and our "TLD whitelist" approach didn't scale in the face
+		 *  of a large number of new TLDs. If you are buying a domain in a registry which does not
+		 *  have proper anti-spoofing protections (like .com), it is sadly the responsibility of
+		 *  domain owners to check for whole-script homographs and register them."
+		 *  - https://bugzilla.mozilla.org/show_bug.cgi?id=1332714#c5 by Gervase Markham, 2017-01-25
+		 */
+		assert_eq!(normalized_name("аррӏе.com"), "apple.com");
 	}
 
 	#[test]

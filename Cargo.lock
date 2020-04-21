@@ -185,6 +185,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "unicode_skeleton",
  "url",
  "warp",
 ]
@@ -1450,6 +1451,15 @@ name = "unicode-xid"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
+
+[[package]]
+name = "unicode_skeleton"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66bd74db2c088d393d1fbf83db2cd5663137640f072d128287dd53c882a0f412"
+dependencies = [
+ "unicode-normalization",
+]
 
 [[package]]
 name = "url"
