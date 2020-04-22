@@ -432,7 +432,7 @@ where
 	let receiver = receiver.then(|_| futures::future::ready(()));
 	let server = create_server(
 		SocketAddr::from_str("127.0.0.1:8000").unwrap(),
-		receiver,
+		Box::pin(receiver),
 		enable_reference_client,
 	);
 	let server_handle = runtime.spawn(server);

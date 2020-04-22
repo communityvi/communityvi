@@ -47,14 +47,14 @@ impl Commandline {
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
 					configuration.address
 				);
-				create_server(configuration.address, shutdown_handle, false).await
+				create_server(configuration.address, Box::pin(shutdown_handle), false).await
 			}
 			BaseCommand::Demo => {
 				info!(
 					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
 					configuration.address
 				);
-				create_server(configuration.address, shutdown_handle, true).await
+				create_server(configuration.address, Box::pin(shutdown_handle), true).await
 			}
 			BaseCommand::Configuration => println!("{:?}", configuration),
 		}

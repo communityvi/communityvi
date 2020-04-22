@@ -13,13 +13,11 @@ use warp::{Filter, Rejection, Reply};
 const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
 const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
 
-pub async fn create_server<ShutdownHandleType>(
+pub async fn create_server(
 	address: SocketAddr,
-	shutdown_handle: ShutdownHandleType,
+	shutdown_handle: Pin<Box<dyn Future<Output = ()> + Send>>,
 	enable_reference_client: bool,
-) where
-	ShutdownHandleType: std::future::Future<Output = ()> + Send + 'static,
-{
+) {
 	let room = Arc::new(Room::default());
 	let websocket_filter = warp::path("ws")
 		.boxed()
