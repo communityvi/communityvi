@@ -11,6 +11,7 @@ use warp::filters::ws::Ws;
 use warp::{Filter, Rejection, Reply};
 
 mod unwind_safe_gotham_handler;
+mod websocket_upgrade;
 
 const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
 const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
