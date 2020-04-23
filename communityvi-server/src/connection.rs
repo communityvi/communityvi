@@ -1,8 +1,8 @@
 use crate::connection::client::{ClientConnection, WebSocketClientConnection};
 use crate::connection::server::{ServerConnection, WebSocketServerConnection};
+use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use futures::StreamExt;
-use warp::filters::ws::WebSocket;
 
 pub mod client;
 pub mod server;

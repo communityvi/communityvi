@@ -70,7 +70,7 @@ pub enum ErrorResponse {
 
 impl Message for ServerResponse {}
 
-pub type WebSocketMessage = warp::filters::ws::Message;
+pub type WebSocketMessage = tokio_tungstenite::tungstenite::Message;
 
 impl<MessageType: Message> From<&OrderedMessage<MessageType>> for WebSocketMessage {
 	fn from(message: &OrderedMessage<MessageType>) -> Self {
@@ -119,10 +119,10 @@ impl<MessageType: Message> TryFrom<&WebSocketMessage> for OrderedMessage<Message
 	type Error = MessageError;
 
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
-		let json = websocket_message
-			.to_str()
-			.map_err(|()| MessageError::WrongMessageType(websocket_message.clone()))?;
-		json.try_into()
+		match websocket_message {
+			WebSocketMessage::Text(json) => json.as_str().try_into(),
+			_ => Err(MessageError::WrongMessageType(websocket_message.clone())),
+		}
 	}
 }
 

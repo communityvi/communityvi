@@ -1,5 +1,6 @@
 use crate::connection::client::ClientConnection;
 use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;
 use futures::stream::SplitStream;
@@ -7,7 +8,6 @@ use futures::{Stream, StreamExt};
 use log::error;
 use std::convert::TryFrom;
 use std::pin::Pin;
-use warp::ws::WebSocket;
 
 pub type ServerConnection = Pin<Box<dyn ServerConnectionTrait + Unpin + Send>>;
 pub type WebSocketServerConnection = StreamServerConnection<InfallibleStream<SplitStream<WebSocket>>>;

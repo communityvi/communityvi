@@ -1,4 +1,5 @@
 use crate::message::{OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::server::WebSocket;
 use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::Sink;
@@ -6,7 +7,6 @@ use futures::SinkExt;
 use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
-use warp::ws::WebSocket;
 
 pub type ClientConnection = Pin<Box<dyn ClientConnectionTrait + Send + Sync>>;
 
@@ -55,7 +55,7 @@ where
 
 	async fn close(&self) {
 		let mut inner = self.inner.lock().await;
-		let _ = inner.response_sink.send(WebSocketMessage::close()).await;
+		let _ = inner.response_sink.send(WebSocketMessage::Close(None)).await;
 	}
 
 	fn clone(&self) -> ClientConnection {
