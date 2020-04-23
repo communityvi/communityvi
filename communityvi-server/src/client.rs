@@ -1,15 +1,17 @@
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
+use debug_stub_derive::DebugStub;
 use log::info;
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::hash::Hash;
 
-#[derive(Debug)]
+#[derive(DebugStub)]
 pub struct Client {
 	id: ClientId,
 	name: String,
+	#[debug_stub = "ClientConnection"]
 	connection: ClientConnection,
 }
 

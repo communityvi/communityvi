@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::Sink;
 use futures::SinkExt;
-use std::fmt::Debug;
 use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -12,7 +11,7 @@ use warp::ws::WebSocket;
 pub type ClientConnection = Pin<Box<dyn ClientConnectionTrait + Send + Sync>>;
 
 #[async_trait]
-pub trait ClientConnectionTrait: Debug {
+pub trait ClientConnectionTrait {
 	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
 	async fn close(&self);
 	fn clone(&self) -> ClientConnection;
@@ -20,7 +19,6 @@ pub trait ClientConnectionTrait: Debug {
 
 pub type WebSocketClientConnection = SinkClientConnection<SplitSink<WebSocket, WebSocketMessage>>;
 
-#[derive(Debug)]
 pub struct SinkClientConnection<ResponseSink> {
 	inner: Arc<tokio::sync::Mutex<SinkClientConnectionInner<ResponseSink>>>,
 }
@@ -33,7 +31,6 @@ impl<T> Clone for SinkClientConnection<T> {
 	}
 }
 
-#[derive(Debug)]
 struct SinkClientConnectionInner<ResponseSink> {
 	response_sink: ResponseSink,
 	message_number_sequence: Range<u64>,
@@ -42,7 +39,7 @@ struct SinkClientConnectionInner<ResponseSink> {
 #[async_trait]
 impl<ResponseSink> ClientConnectionTrait for SinkClientConnection<ResponseSink>
 where
-	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + Debug + 'static,
+	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
 	async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
@@ -84,7 +81,7 @@ where
 
 impl<ResponseSink> From<SinkClientConnection<ResponseSink>> for ClientConnection
 where
-	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + Debug + 'static,
+	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
 	fn from(sink_client_connection: SinkClientConnection<ResponseSink>) -> Self {
 		Box::pin(sink_client_connection)
