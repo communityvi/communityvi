@@ -12,7 +12,7 @@ dashmap = "3.11"
 debug_stub_derive = "0.3"
 env_logger = "0.7"
 futures = "0.3"
-gotham = {git = "https://github.com/communityvi/gotham", branch = "feature/fix-websockets"}
+gotham = {git = "https://github.com/communityvi/gotham", branch = "feature/fix-websockets", default-features = false}
 log = "0.4"
 mime = "0.3"
 parking_lot = "0.10"
