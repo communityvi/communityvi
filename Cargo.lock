@@ -178,6 +178,7 @@ dependencies = [
  "lazy_static",
  "log",
  "parking_lot",
+ "pin-project",
  "reqwest",
  "serde",
  "serde_json",
