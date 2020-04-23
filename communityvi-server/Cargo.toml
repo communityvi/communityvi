@@ -25,7 +25,6 @@ tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "parkin
 tokio-tungstenite = "0.10"
 toml = "0.5"
 unicode_skeleton = "0.1"
-warp = {version = "0.2", default_features = false, features = ["websocket"]}
 
 [dev-dependencies]
 lazy_static = "1.4"
