@@ -96,7 +96,7 @@ fn websocket_handler(room: Arc<Room>, mut state: State) -> (State, Response<Body
 fn bad_request() -> Response<Body> {
 	Response::builder()
 		.status(StatusCode::BAD_REQUEST)
-		.body(Body::empty())
+		.body(Body::from("Bad Request"))
 		.expect("Failed to build BAD_REQUEST response.")
 }
 
