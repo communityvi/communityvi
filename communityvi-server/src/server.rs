@@ -20,9 +20,6 @@ mod websocket_upgrade;
 
 pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
-const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
-const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
-
 pub async fn create_server(
 	address: SocketAddr,
 	shutdown_handle: Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -48,6 +45,9 @@ pub async fn create_server(
 }
 
 fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
+	const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
+	const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
+
 	route.get("/").to(|state| {
 		let response = Response::builder()
 			.header(header::CONTENT_TYPE, mime::TEXT_HTML_UTF_8.to_string())
