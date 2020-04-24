@@ -1,2 +1,3 @@
 address = "127.0.0.1:8000"
 log_filters = "info,communityvi_server=debug"
+room_size_limit = 500

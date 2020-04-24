@@ -10,6 +10,7 @@ pub struct Configuration {
 	#[serde(with = "socket_addr_deserializer")]
 	pub address: SocketAddr,
 	pub log_filters: String,
+	pub room_size_limit: usize,
 }
 
 impl Configuration {
@@ -81,9 +82,14 @@ mod test {
 	fn should_deserialize_configuration() {
 		const TEST_FILE_PATH: &str = "test/files/test-configuration.toml";
 
-		let Configuration { address, log_filters } = Configuration::from_file(TEST_FILE_PATH).unwrap();
+		let Configuration {
+			address,
+			log_filters,
+			room_size_limit,
+		} = Configuration::from_file(TEST_FILE_PATH).unwrap();
 
 		assert_eq!(SocketAddr::from_str("127.0.0.1:8000").unwrap(), address);
 		assert_eq!("info", log_filters);
+		assert_eq!(42, room_size_limit);
 	}
 }
