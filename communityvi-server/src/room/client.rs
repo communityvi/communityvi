@@ -49,11 +49,3 @@ impl Client {
 		}
 	}
 }
-
-impl Drop for Inner {
-	fn drop(&mut self) {
-		if !self.room.remove_client(self.id) {
-			unreachable!("Failed to remove client id {} when dropping client handle.", self.id)
-		}
-	}
-}

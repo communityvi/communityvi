@@ -9,7 +9,9 @@ use log::{debug, error, info};
 pub async fn run_client(room: Room, client_connection: ClientConnection, server_connection: ServerConnection) {
 	if let Some((client, server_connection)) = register_client(room.clone(), client_connection, server_connection).await
 	{
+		let client_id = client.id();
 		handle_messages(&room, client, server_connection).await;
+		room.remove_client(client_id);
 	}
 }
 

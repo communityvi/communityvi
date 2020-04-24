@@ -52,8 +52,12 @@ impl Room {
 		Ok(client)
 	}
 
-	pub(self) fn remove_client(&self, client_id: ClientId) -> bool {
-		self.inner.clients.remove(&client_id).is_some()
+	pub fn remove_client(&self, client_id: ClientId) -> bool {
+		self.inner
+			.clients
+			.remove(&client_id)
+			.map(|(_, client)| self.inner.client_names.remove(&normalized_name(client.name())))
+			.is_some()
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
@@ -154,5 +158,23 @@ mod test {
 		let result = room.add_client("   Anorak".to_string(), client_connection.clone());
 
 		matches!(result, Err(RoomError::ClientNameAlreadyInUse));
+	}
+
+	#[test]
+	fn should_allow_adding_client_with_the_same_name_after_first_has_been_removed() {
+		let room = Room::default();
+		let name = "牧瀬 紅莉栖";
+
+		{
+			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			let client = room
+				.add_client(name.to_string(), client_connection.clone())
+				.expect("Failed to add client");
+			room.remove_client(client.id());
+		}
+
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		room.add_client(name.to_string(), client_connection.clone())
+			.expect("Failed to add client with same name after first is gone");
 	}
 }
