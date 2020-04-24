@@ -28,6 +28,10 @@ impl Client {
 		&self.name
 	}
 
+	pub fn connection(&self) -> ClientConnection {
+		self.connection.clone()
+	}
+
 	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let send_result = self.connection.send(message).await;
 		send_result.map_err(|_: ()| {
