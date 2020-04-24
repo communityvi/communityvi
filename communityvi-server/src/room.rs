@@ -1,8 +1,8 @@
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
 use crate::room::client::{Client, ClientId};
-use crate::room::client_handle::ClientHandle;
 use crate::room::client_id_sequence::ClientIdSequence;
+use crate::room::client_reference::ClientReference;
 use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
@@ -13,8 +13,8 @@ use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub mod client;
-mod client_handle;
 mod client_id_sequence;
+mod client_reference;
 pub mod error;
 mod state;
 
@@ -28,7 +28,7 @@ pub struct Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
+	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientReference, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
@@ -59,8 +59,8 @@ impl Room {
 		}
 	}
 
-	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientHandle> {
-		self.clients.get(&client_id).map(ClientHandle::from)
+	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientReference> {
+		self.clients.get(&client_id).map(ClientReference::from)
 	}
 
 	pub async fn singlecast(&self, client: &Client, response: ServerResponse) -> Result<(), ()> {
