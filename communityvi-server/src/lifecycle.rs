@@ -5,18 +5,17 @@ use crate::room::client_handle::ClientHandle;
 use crate::room::error::RoomError;
 use crate::room::Room;
 use log::{debug, error, info};
-use std::sync::Arc;
 
-pub async fn run_client(room: Arc<Room>, client_connection: ClientConnection, server_connection: ServerConnection) {
+pub async fn run_client(room: Room, client_connection: ClientConnection, server_connection: ServerConnection) {
 	if let Some((client_handle, server_connection)) =
 		register_client(room.clone(), client_connection, server_connection).await
 	{
-		handle_messages(room.as_ref(), client_handle, server_connection).await;
+		handle_messages(&room, client_handle, server_connection).await;
 	}
 }
 
 async fn register_client(
-	room: Arc<Room>,
+	room: Room,
 	client_connection: ClientConnection,
 	mut server_connection: ServerConnection,
 ) -> Option<(ClientHandle, ServerConnection)> {
@@ -139,7 +138,6 @@ mod test {
 	use crate::room::client_handle::ClientHandle;
 	use crate::room::Room;
 	use crate::utils::fake_connection::FakeClientConnection;
-	use std::sync::Arc;
 	use std::time::Duration;
 	use tokio::time::delay_for;
 
@@ -148,7 +146,7 @@ mod test {
 		const TEST_DELAY: Duration = Duration::from_millis(2);
 
 		let (client_connection, _server_connection, mut test_client) = create_typed_test_connections();
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 		let client_handle = room
 			.add_client("Alice".to_string(), client_connection)
 			.expect("Did not get client handle!");
@@ -174,7 +172,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_allow_registering_client_twice() {
 		let (client_connection, server_connection, test_client) = create_typed_test_connections();
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 
 		let (client_handle, server_connection, mut test_client) = register_test_client(
 			"Anorak",
@@ -188,7 +186,7 @@ mod test {
 		// run server message handler
 		tokio::spawn({
 			async move {
-				let room = room.as_ref();
+				let room = &room;
 				handle_messages(room, client_handle, server_connection).await
 			}
 		});
@@ -217,7 +215,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_register_clients_with_blank_name() {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 		let register_request = OrderedMessage {
 			number: 0,
 			message: ClientRequest::Register { name: "	 ".to_string() },
@@ -241,7 +239,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_not_register_clients_with_already_registered_name() {
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 
 		// "Ferris" is already a registered client
 		let fake_client_connection = FakeClientConnection::default().into();
@@ -276,7 +274,7 @@ mod test {
 
 	async fn register_test_client(
 		name: &'static str,
-		room: Arc<Room>,
+		room: Room,
 		client_connection: ClientConnection,
 		server_connection: ServerConnection,
 		mut test_client: TypedTestClient,
@@ -289,7 +287,7 @@ mod test {
 		test_client.send(register_request).await;
 
 		// run server code required for client registration
-		let (client_handle, server_connection) = register_client(room, client_connection, server_connection)
+		let (client_handle, server_connection) = register_client(room.clone(), client_connection, server_connection)
 			.await
 			.unwrap();
 

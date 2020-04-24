@@ -13,7 +13,6 @@ use log::error;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::sync::Arc;
 
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
@@ -25,7 +24,7 @@ pub async fn create_server(
 	shutdown_handle: Pin<Box<dyn Future<Output = ()> + Send>>,
 	enable_reference_client: bool,
 ) {
-	let room = Arc::new(Room::default());
+	let room = Room::default();
 	let server = gotham::init_server(
 		address,
 		build_simple_router(move |route| {
@@ -71,7 +70,7 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 	});
 }
 
-fn websocket_handler(room: Arc<Room>, mut state: State) -> (State, Response<Body>) {
+fn websocket_handler(room: Room, mut state: State) -> (State, Response<Body>) {
 	let body = Body::take_from(&mut state);
 	let headers = HeaderMap::take_from(&mut state);
 	let response = if websocket_upgrade::requested(&headers) {
@@ -100,7 +99,7 @@ fn bad_request() -> Response<Body> {
 		.expect("Failed to build BAD_REQUEST response.")
 }
 
-async fn run_client_connection(room: Arc<Room>, websocket: WebSocket) {
+async fn run_client_connection(room: Room, websocket: WebSocket) {
 	let (client_connection, server_connection) = split_websocket(websocket);
 	run_client(room, client_connection, server_connection).await
 }

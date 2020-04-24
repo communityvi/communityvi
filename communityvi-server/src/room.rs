@@ -22,8 +22,13 @@ mod state;
 
 pub(self) type ClientReference<'a> = dashmap::mapref::one::Ref<'a, ClientId, Client>;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Room {
+	inner: Arc<Inner>,
+}
+
+#[derive(Default)]
+struct Inner {
 	client_id_sequence: ClientIdSequence,
 	client_names: DashSet<String>,
 	clients: DashMap<ClientId, Client>,
@@ -32,19 +37,19 @@ pub struct Room {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(self: &Arc<Room>, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
+	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
 
-		if !self.client_names.insert(normalized_name(name.as_str())) {
+		if !self.inner.client_names.insert(normalized_name(name.as_str())) {
 			return Err(RoomError::ClientNameAlreadyInUse);
 		}
 
-		let client_id = self.client_id_sequence.next();
+		let client_id = self.inner.client_id_sequence.next();
 		let client = Client { name, connection };
 
-		if self.clients.insert(client_id, client).is_some() {
+		if self.inner.clients.insert(client_id, client).is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
@@ -54,17 +59,18 @@ impl Room {
 	/// Remove a client.
 	/// IMPORTANT: This is only to be used by `ClientHandle` when being dropped.
 	pub(self) fn remove_client(&self, client_id: ClientId) -> bool {
-		self.clients.remove(&client_id).is_some()
+		self.inner.clients.remove(&client_id).is_some()
 	}
 
 	/// Look up a client by it's ID.
 	/// IMPORTANT: This is only to be used by `ClientHandle` and `MaybeClientHandle`.
 	pub(self) fn client_reference_by_id(&self, client_id: ClientId) -> Option<ClientReference> {
-		self.clients.get(&client_id).map(ClientReference::from)
+		self.inner.clients.get(&client_id).map(ClientReference::from)
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
 		let futures: Vec<_> = self
+			.inner
 			.clients
 			.iter()
 			.map(|entry| (*entry.key(), entry.connection.clone()))
@@ -81,7 +87,7 @@ impl Room {
 	}
 
 	pub fn current_reference_time(&self) -> Duration {
-		self.state.current_reference_time()
+		self.inner.state.current_reference_time()
 	}
 }
 
@@ -100,7 +106,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_client_with_empty_name() {
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		let result = room.add_client("".to_string(), client_connection.clone());
@@ -110,7 +116,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_client_with_blank_name() {
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		let result = room.add_client("  	 ".to_string(), client_connection.clone());
@@ -152,7 +158,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_two_clients_with_the_same_name() {
-		let room = Arc::new(Room::default());
+		let room = Room::default();
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		room.add_client("Anorak  ".to_string(), client_connection.clone())

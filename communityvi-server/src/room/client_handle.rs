@@ -4,7 +4,6 @@ use crate::room::Room;
 
 use log::info;
 use std::ops::Deref;
-use std::sync::Arc;
 
 /// Handle to a client. It is bound to the lifecycle of a client.
 /// It is constructed when adding a `Client` to a `Room` and dropping this
@@ -17,11 +16,11 @@ pub struct ClientHandle {
 /// lifecycle of a client.
 pub struct MaybeClientHandle {
 	client_id: ClientId,
-	room: Arc<Room>,
+	room: Room,
 }
 
 impl MaybeClientHandle {
-	pub fn new(client_id: ClientId, room: Arc<Room>) -> Self {
+	pub fn new(client_id: ClientId, room: Room) -> Self {
 		Self { client_id, room }
 	}
 
@@ -61,7 +60,7 @@ impl MaybeClientHandle {
 impl ClientHandle {
 	/// Construct a new client handle from a `Room` and `ClientId`.
 	/// IMPORTANT: This must only be constructed by a room, when creating a new client.
-	pub(super) fn new(client_id: ClientId, room: Arc<Room>) -> Self {
+	pub(super) fn new(client_id: ClientId, room: Room) -> Self {
 		Self {
 			maybe_handle: MaybeClientHandle::new(client_id, room),
 		}
