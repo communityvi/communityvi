@@ -28,6 +28,7 @@ use gotham::hyper::header::{HeaderValue, CONNECTION, UPGRADE};
 use gotham::hyper::{upgrade::Upgraded, Body, HeaderMap, Response, StatusCode};
 use log::error;
 use sha1::Sha1;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 
 use std::future::Future;
@@ -66,7 +67,13 @@ pub fn accept(
 				return Err(error);
 			}
 		};
-		Ok(WebSocketStream::from_raw_socket(upgraded, Role::Server, None).await)
+
+		const WEBSOCKET_CONFIGURATION: Option<WebSocketConfig> = Some(WebSocketConfig {
+			max_send_queue: Some(1),
+			max_message_size: Some(10 * 1024),
+			max_frame_size: Some(10 * 1024),
+		});
+		Ok(WebSocketStream::from_raw_socket(upgraded, Role::Server, WEBSOCKET_CONFIGURATION).await)
 	};
 
 	Ok((res, ws))
