@@ -38,6 +38,11 @@ impl Room {
 			return Err(RoomError::EmptyClientName);
 		}
 
+		const MAX_NAME_LENGTH: usize = 256;
+		if name.len() > MAX_NAME_LENGTH {
+			return Err(RoomError::ClientNameTooLong);
+		}
+
 		if !self.inner.client_names.insert(normalized_name(name.as_str())) {
 			return Err(RoomError::ClientNameAlreadyInUse);
 		}
@@ -103,7 +108,7 @@ mod test {
 
 		let result = room.add_client("".to_string(), client_connection.clone());
 
-		matches!(result, Err(RoomError::EmptyClientName));
+		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
 
 	#[test]
@@ -113,7 +118,7 @@ mod test {
 
 		let result = room.add_client("  	 ".to_string(), client_connection.clone());
 
-		matches!(result, Err(RoomError::EmptyClientName));
+		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
 
 	#[test]
@@ -157,7 +162,7 @@ mod test {
 			.expect("First add did not succeed!");
 		let result = room.add_client("   Anorak".to_string(), client_connection.clone());
 
-		matches!(result, Err(RoomError::ClientNameAlreadyInUse));
+		assert!(matches!(result, Err(RoomError::ClientNameAlreadyInUse)));
 	}
 
 	#[test]
@@ -176,5 +181,26 @@ mod test {
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 		room.add_client(name.to_string(), client_connection.clone())
 			.expect("Failed to add client with same name after first is gone");
+	}
+
+	#[test]
+	fn should_allow_adding_client_with_name_no_longer_than_256_bytes() {
+		let long_name = String::from_utf8(vec![0x41u8; 256]).unwrap();
+		let room = Room::default();
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+		room.add_client(long_name.to_string(), client_connection.clone())
+			.expect("Failed to add client with name that is not too long");
+	}
+
+	#[test]
+	fn should_not_allow_adding_client_with_name_longer_than_256_bytes() {
+		let long_name = String::from_utf8(vec![0x41u8; 257]).unwrap();
+		let room = Room::default();
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+		let result = room.add_client(long_name.to_string(), client_connection.clone());
+
+		assert!(matches!(result, Err(RoomError::ClientNameTooLong)));
 	}
 }

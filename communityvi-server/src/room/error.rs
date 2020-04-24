@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 pub enum RoomError {
 	EmptyClientName,
 	ClientNameAlreadyInUse,
+	ClientNameTooLong,
 }
 
 impl Display for RoomError {
@@ -12,6 +13,7 @@ impl Display for RoomError {
 		match self {
 			RoomError::EmptyClientName => formatter.write_str("Name was empty or whitespace-only."),
 			RoomError::ClientNameAlreadyInUse => formatter.write_str("Client name is already in use."),
+			RoomError::ClientNameTooLong => formatter.write_str("Client name is too long. (>256 bytes UTF-8)"),
 		}
 	}
 }

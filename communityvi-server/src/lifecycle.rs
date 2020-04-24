@@ -42,9 +42,10 @@ async fn register_client(
 		return None;
 	};
 
+	use RoomError::*;
 	let client = match room.add_client(name, client_connection.clone()) {
 		Ok(client) => client,
-		Err(error @ RoomError::EmptyClientName) | Err(error @ RoomError::ClientNameAlreadyInUse) => {
+		Err(error @ EmptyClientName) | Err(error @ ClientNameAlreadyInUse) | Err(error @ ClientNameTooLong) => {
 			error!("Client registration failed. Tried to register with invalid name.");
 
 			let _ = client_connection
