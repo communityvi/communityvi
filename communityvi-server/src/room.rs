@@ -1,7 +1,6 @@
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
 use crate::room::client::Client;
-use crate::room::client_handle::ClientHandle;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
@@ -13,14 +12,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
-pub(self) mod client;
-pub mod client_handle;
+pub mod client;
 pub mod client_id;
 mod client_id_sequence;
 pub mod error;
 mod state;
-
-pub(self) type ClientReference<'a> = dashmap::mapref::one::Ref<'a, ClientId, Client>;
 
 #[derive(Clone, Default)]
 pub struct Room {
@@ -37,7 +33,7 @@ struct Inner {
 
 impl Room {
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<ClientHandle, RoomError> {
+	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<Client, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
@@ -47,25 +43,17 @@ impl Room {
 		}
 
 		let client_id = self.inner.client_id_sequence.next();
-		let client = Client { name, connection };
+		let client = Client::new(client_id, name, connection, self.clone());
 
-		if self.inner.clients.insert(client_id, client).is_some() {
+		if self.inner.clients.insert(client_id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
-		Ok(ClientHandle::new(client_id, self.clone()))
+		Ok(client)
 	}
 
-	/// Remove a client.
-	/// IMPORTANT: This is only to be used by `ClientHandle` when being dropped.
 	pub(self) fn remove_client(&self, client_id: ClientId) -> bool {
 		self.inner.clients.remove(&client_id).is_some()
-	}
-
-	/// Look up a client by it's ID.
-	/// IMPORTANT: This is only to be used by `ClientHandle` and `MaybeClientHandle`.
-	pub(self) fn client_reference_by_id(&self, client_id: ClientId) -> Option<ClientReference> {
-		self.inner.clients.get(&client_id).map(ClientReference::from)
 	}
 
 	pub async fn broadcast(&self, response: ServerResponse) {
@@ -73,12 +61,12 @@ impl Room {
 			.inner
 			.clients
 			.iter()
-			.map(|entry| (*entry.key(), entry.connection.clone()))
-			.map(move |(id, connection)| {
+			.map(|entry| entry.value().clone())
+			.map(move |client| {
 				let response = response.clone();
 				async move {
-					if connection.send(response).await.is_err() {
-						info!("Client with id {} has gone away during broadcast.", id);
+					if !client.send(response).await {
+						info!("Client with id {} has gone away during broadcast.", client.id());
 					}
 				}
 			})

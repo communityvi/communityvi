@@ -1,16 +1,15 @@
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
 use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
-use crate::room::client_handle::ClientHandle;
+use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::Room;
 use log::{debug, error, info};
 
 pub async fn run_client(room: Room, client_connection: ClientConnection, server_connection: ServerConnection) {
-	if let Some((client_handle, server_connection)) =
-		register_client(room.clone(), client_connection, server_connection).await
+	if let Some((client, server_connection)) = register_client(room.clone(), client_connection, server_connection).await
 	{
-		handle_messages(&room, client_handle, server_connection).await;
+		handle_messages(&room, client, server_connection).await;
 	}
 }
 
@@ -18,7 +17,7 @@ async fn register_client(
 	room: Room,
 	client_connection: ClientConnection,
 	mut server_connection: ServerConnection,
-) -> Option<(ClientHandle, ServerConnection)> {
+) -> Option<(Client, ServerConnection)> {
 	let request = match server_connection.receive().await {
 		None => {
 			error!("Client registration failed. Socket closed prematurely.");
@@ -41,8 +40,8 @@ async fn register_client(
 		return None;
 	};
 
-	let client_handle = match room.add_client(name, client_connection.clone()) {
-		Ok(client_handle) => client_handle,
+	let client = match room.add_client(name, client_connection.clone()) {
+		Ok(client) => client,
 		Err(error @ RoomError::EmptyClientName) | Err(error @ RoomError::ClientNameAlreadyInUse) => {
 			error!("Client registration failed. Tried to register with invalid name.");
 
@@ -57,21 +56,21 @@ async fn register_client(
 		}
 	};
 
-	let hello_response = ServerResponse::Hello { id: client_handle.id() };
-	if client_handle.send(hello_response).await {
-		let id = client_handle.id();
-		let name = client_handle.name();
+	let hello_response = ServerResponse::Hello { id: client.id() };
+	if client.send(hello_response).await {
+		let id = client.id();
+		let name = client.name().to_string();
 
 		info!("Registered client: {} {}", id, name);
 
 		room.broadcast(ServerResponse::Joined { id, name }).await;
-		Some((client_handle, server_connection))
+		Some((client, server_connection))
 	} else {
 		None
 	}
 }
 
-async fn handle_messages(room: &Room, client_handle: ClientHandle, mut server_connection: ServerConnection) {
+async fn handle_messages(room: &Room, client: Client, mut server_connection: ServerConnection) {
 	loop {
 		let message = match server_connection.receive().await {
 			Some(message) => message,
@@ -80,38 +79,38 @@ async fn handle_messages(room: &Room, client_handle: ClientHandle, mut server_co
 		debug!(
 			"Received {:?} message from {}",
 			std::mem::discriminant(&message),
-			client_handle.id(),
+			client.id(),
 		);
 
-		handle_message(room, &client_handle, message).await;
+		handle_message(room, &client, message).await;
 	}
 
-	let id = client_handle.id();
-	let name = client_handle.name();
+	let id = client.id();
+	let name = client.name().to_string();
 	info!("Client '{}' with id {} has left.", name, id);
 	room.broadcast(ServerResponse::Left { id, name }).await;
 }
 
-async fn handle_message(room: &Room, client_handle: &ClientHandle, request: ClientRequest) {
+async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 	match request {
 		ClientRequest::Ping => {
-			client_handle.send(ServerResponse::Pong).await;
+			client.send(ServerResponse::Pong).await;
 		}
 		ClientRequest::Chat { message } => {
 			room.broadcast(ServerResponse::Chat {
-				sender_id: client_handle.id(),
-				sender_name: client_handle.name(),
+				sender_id: client.id(),
+				sender_name: client.name().to_string(),
 				message,
 			})
 			.await
 		}
-		ClientRequest::Pong => info!("Received Pong from client: {}", client_handle.id()),
+		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
 		ClientRequest::Register { .. } => {
 			error!(
 				"Client: {} tried to register even though it is already registered.",
-				client_handle.id()
+				client.id()
 			);
-			client_handle
+			client
 				.send(ServerResponse::Error {
 					error: ErrorResponse::InvalidOperation,
 					message: "Already registered".to_string(),
@@ -123,20 +122,17 @@ async fn handle_message(room: &Room, client_handle: &ClientHandle, request: Clie
 			let message = ServerResponse::ReferenceTime {
 				milliseconds: reference_time.as_millis() as u64,
 			};
-			client_handle.send(message).await;
+			client.send(message).await;
 		}
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use crate::connection::client::ClientConnection;
-	use crate::connection::server::ServerConnection;
+	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
-	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
-	use crate::room::client_handle::ClientHandle;
-	use crate::room::Room;
+	use crate::message::OrderedMessage;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use std::time::Duration;
 	use tokio::time::delay_for;
@@ -278,7 +274,7 @@ mod test {
 		client_connection: ClientConnection,
 		server_connection: ServerConnection,
 		mut test_client: TypedTestClient,
-	) -> (ClientHandle, ServerConnection, TypedTestClient) {
+	) -> (Client, ServerConnection, TypedTestClient) {
 		let register_request = OrderedMessage {
 			number: 0,
 			message: ClientRequest::Register { name: name.into() },
