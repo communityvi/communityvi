@@ -1,7 +1,5 @@
 use crate::connection::client::ClientConnection;
-use crate::message::ServerResponse;
 use debug_stub_derive::DebugStub;
-use log::info;
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -30,13 +28,6 @@ impl Client {
 
 	pub fn connection(&self) -> ClientConnection {
 		self.connection.clone()
-	}
-
-	pub async fn send(&self, message: ServerResponse) -> Result<(), ()> {
-		let send_result = self.connection.send(message).await;
-		send_result.map_err(|_: ()| {
-			info!("Client with id {} has gone away.", self.id);
-		})
 	}
 }
 

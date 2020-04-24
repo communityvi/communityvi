@@ -8,6 +8,7 @@ use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
+use log::info;
 use std::sync::Arc;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
@@ -64,10 +65,13 @@ impl Room {
 		let futures: Vec<_> = self
 			.clients
 			.iter()
-			.map(move |client| {
+			.map(|client| (client.id(), client.connection()))
+			.map(move |(id, connection)| {
 				let response = response.clone();
 				async move {
-					let _ = client.send(response).await;
+					if connection.send(response).await.is_err() {
+						info!("Client with id {} has gone away during broadcast.", id);
+					}
 				}
 			})
 			.collect();
