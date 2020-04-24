@@ -27,7 +27,7 @@ impl MaybeClientHandle {
 	}
 
 	pub fn name(&self) -> Option<String> {
-		self.client_reference().map(|client| client.name().to_string())
+		self.client_reference().map(|client| client.name.clone())
 	}
 
 	pub fn id(&self) -> ClientId {
@@ -36,7 +36,7 @@ impl MaybeClientHandle {
 
 	pub async fn send(&self, response: ServerResponse) -> bool {
 		let connection = if let Some(client_reference) = self.client_reference() {
-			client_reference.connection()
+			client_reference.connection.clone()
 		} else {
 			info!(
 				"Failed to send message to Client with id {} because it doesn't exist (anymore?).",

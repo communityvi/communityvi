@@ -7,28 +7,9 @@ use std::hash::Hash;
 
 #[derive(DebugStub)]
 pub struct Client {
-	id: ClientId,
-	name: String,
+	pub name: String,
 	#[debug_stub = "ClientConnection"]
-	connection: ClientConnection,
-}
-
-impl Client {
-	pub fn new(id: ClientId, name: String, connection: ClientConnection) -> Self {
-		Self { id, name, connection }
-	}
-
-	pub fn id(&self) -> ClientId {
-		self.id
-	}
-
-	pub fn name(&self) -> &str {
-		&self.name
-	}
-
-	pub fn connection(&self) -> ClientConnection {
-		self.connection.clone()
-	}
+	pub connection: ClientConnection,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]

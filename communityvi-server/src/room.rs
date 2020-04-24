@@ -40,7 +40,7 @@ impl Room {
 		}
 
 		let client_id = self.client_id_sequence.next();
-		let client = Client::new(client_id, name, connection);
+		let client = Client { name, connection };
 
 		if self.clients.insert(client_id, client).is_some() {
 			unreachable!("There must never be two clients with the same id!")
@@ -65,7 +65,7 @@ impl Room {
 		let futures: Vec<_> = self
 			.clients
 			.iter()
-			.map(|client| (client.id(), client.connection()))
+			.map(|entry| (*entry.key(), entry.connection.clone()))
 			.map(move |(id, connection)| {
 				let response = response.clone();
 				async move {
