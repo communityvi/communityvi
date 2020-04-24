@@ -42,15 +42,28 @@ async fn register_client(
 		return None;
 	};
 
-	use RoomError::*;
 	let client = match room.add_client(name, client_connection.clone()) {
 		Ok(client) => client,
-		Err(error @ EmptyClientName) | Err(error @ ClientNameAlreadyInUse) | Err(error @ ClientNameTooLong) => {
-			error!("Client registration failed. Tried to register with invalid name.");
+		Err(error) => {
+			use RoomError::*;
+			let error_response = match error {
+				EmptyClientName | ClientNameTooLong => {
+					error!("Client registration failed. Tried to register with invalid name.");
+					ErrorResponse::InvalidFormat
+				}
+				ClientNameAlreadyInUse => {
+					error!("Client registration failed. Tried to register with name that is already used.");
+					ErrorResponse::InvalidOperation
+				}
+				RoomFull => {
+					error!("Client registration failed. Room is full.");
+					ErrorResponse::InvalidOperation
+				}
+			};
 
 			let _ = client_connection
 				.send(ServerResponse::Error {
-					error: ErrorResponse::InvalidFormat,
+					error: error_response,
 					message: error.to_string(),
 				})
 				.await;
@@ -145,7 +158,7 @@ mod test {
 		const TEST_DELAY: Duration = Duration::from_millis(2);
 
 		let (client_connection, _server_connection, mut test_client) = create_typed_test_connections();
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_handle = room
 			.add_client("Alice".to_string(), client_connection)
 			.expect("Did not get client handle!");
@@ -171,7 +184,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_allow_registering_client_twice() {
 		let (client_connection, server_connection, test_client) = create_typed_test_connections();
-		let room = Room::default();
+		let room = Room::new(10);
 
 		let (client_handle, server_connection, mut test_client) = register_test_client(
 			"Anorak",
@@ -214,7 +227,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_register_clients_with_blank_name() {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let room = Room::default();
+		let room = Room::new(10);
 		let register_request = OrderedMessage {
 			number: 0,
 			message: ClientRequest::Register { name: "	 ".to_string() },
@@ -238,7 +251,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_not_register_clients_with_already_registered_name() {
-		let room = Room::default();
+		let room = Room::new(10);
 
 		// "Ferris" is already a registered client
 		let fake_client_connection = FakeClientConnection::default().into();
@@ -263,8 +276,40 @@ mod test {
 			OrderedMessage {
 				number: 0,
 				message: ServerResponse::Error {
-					error: ErrorResponse::InvalidFormat,
+					error: ErrorResponse::InvalidOperation,
 					message: "Client name is already in use.".to_string()
+				}
+			},
+			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_not_register_clients_if_room_is_full() {
+		let room = Room::new(1);
+		{
+			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			room.add_client("Fake".to_string(), client_connection).unwrap();
+		}
+
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register {
+				name: "second".to_string(),
+			},
+		};
+
+		test_client.send(register_request).await;
+		register_client(room, client_connection, server_connection).await;
+		let response = test_client.receive().await.expect("Did not receive response!");
+
+		assert_eq!(
+			OrderedMessage {
+				number: 0,
+				message: ServerResponse::Error {
+					error: ErrorResponse::InvalidOperation,
+					message: "Can't join, room is already full.".to_string()
 				}
 			},
 			response

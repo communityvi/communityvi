@@ -6,6 +6,7 @@ pub enum RoomError {
 	EmptyClientName,
 	ClientNameAlreadyInUse,
 	ClientNameTooLong,
+	RoomFull,
 }
 
 impl Display for RoomError {
@@ -14,6 +15,7 @@ impl Display for RoomError {
 			RoomError::EmptyClientName => formatter.write_str("Name was empty or whitespace-only."),
 			RoomError::ClientNameAlreadyInUse => formatter.write_str("Client name is already in use."),
 			RoomError::ClientNameTooLong => formatter.write_str("Client name is too long. (>256 bytes UTF-8)"),
+			RoomError::RoomFull => formatter.write_str("Can't join, room is already full."),
 		}
 	}
 }

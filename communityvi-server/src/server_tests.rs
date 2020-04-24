@@ -1,3 +1,4 @@
+use crate::configuration::Configuration;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::room::client_id::ClientId;
 use crate::server::create_server;
@@ -430,11 +431,14 @@ where
 		.expect("Failed to create runtime");
 	let (sender, receiver) = futures::channel::oneshot::channel();
 	let receiver = receiver.then(|_| futures::future::ready(()));
-	let server = create_server(
-		SocketAddr::from_str("127.0.0.1:8000").unwrap(),
-		Box::pin(receiver),
-		enable_reference_client,
-	);
+	let configuration = Configuration {
+		address: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
+		log_filters: "debug".to_string(),
+		room_size_limit: 10,
+	};
+	let server = async move {
+		create_server(Box::pin(receiver), &configuration, enable_reference_client).await;
+	};
 	let server_handle = runtime.spawn(server);
 
 	let output = runtime.block_on(future_to_test);

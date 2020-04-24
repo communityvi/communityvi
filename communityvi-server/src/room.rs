@@ -8,6 +8,8 @@ use crate::room::state::State;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
 use log::info;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
@@ -18,20 +20,33 @@ mod client_id_sequence;
 pub mod error;
 mod state;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Room {
 	inner: Arc<Inner>,
 }
 
-#[derive(Default)]
 struct Inner {
 	client_id_sequence: ClientIdSequence,
 	client_names: DashSet<String>,
 	clients: DashMap<ClientId, Client>,
+	client_count: AtomicUsize,
 	state: State,
+	room_size_limit: usize,
 }
 
 impl Room {
+	pub fn new(room_size_limit: usize) -> Self {
+		let inner = Inner {
+			client_id_sequence: Default::default(),
+			client_names: Default::default(),
+			clients: Default::default(),
+			client_count: AtomicUsize::new(0),
+			state: Default::default(),
+			room_size_limit,
+		};
+		Self { inner: Arc::new(inner) }
+	}
+
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
 	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<Client, RoomError> {
 		if name.trim().is_empty() {
@@ -43,7 +58,12 @@ impl Room {
 			return Err(RoomError::ClientNameTooLong);
 		}
 
+		if !self.try_incrementing_client_count() {
+			return Err(RoomError::RoomFull);
+		}
+
 		if !self.inner.client_names.insert(normalized_name(name.as_str())) {
+			self.inner.client_count.fetch_sub(1, SeqCst);
 			return Err(RoomError::ClientNameAlreadyInUse);
 		}
 
@@ -55,6 +75,25 @@ impl Room {
 		}
 
 		Ok(client)
+	}
+
+	// Does a compare and swap until the room count has been incremented (true) or is `room_size_limit` (false).
+	fn try_incrementing_client_count(&self) -> bool {
+		let mut current_count = self.inner.client_count.load(SeqCst);
+		loop {
+			if current_count == self.inner.room_size_limit {
+				return false;
+			}
+
+			match self
+				.inner
+				.client_count
+				.compare_exchange(current_count, current_count + 1, SeqCst, SeqCst)
+			{
+				Ok(_) => return true,
+				Err(previous_count) => current_count = previous_count,
+			}
+		}
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) -> bool {
@@ -103,7 +142,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_client_with_empty_name() {
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		let result = room.add_client("".to_string(), client_connection.clone());
@@ -113,7 +152,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_client_with_blank_name() {
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		let result = room.add_client("  	 ".to_string(), client_connection.clone());
@@ -155,7 +194,7 @@ mod test {
 
 	#[test]
 	fn should_not_add_two_clients_with_the_same_name() {
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		room.add_client("Anorak  ".to_string(), client_connection.clone())
@@ -167,7 +206,7 @@ mod test {
 
 	#[test]
 	fn should_allow_adding_client_with_the_same_name_after_first_has_been_removed() {
-		let room = Room::default();
+		let room = Room::new(10);
 		let name = "牧瀬 紅莉栖";
 
 		{
@@ -186,7 +225,7 @@ mod test {
 	#[test]
 	fn should_allow_adding_client_with_name_no_longer_than_256_bytes() {
 		let long_name = String::from_utf8(vec![0x41u8; 256]).unwrap();
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		room.add_client(long_name.to_string(), client_connection.clone())
@@ -196,11 +235,39 @@ mod test {
 	#[test]
 	fn should_not_allow_adding_client_with_name_longer_than_256_bytes() {
 		let long_name = String::from_utf8(vec![0x41u8; 257]).unwrap();
-		let room = Room::default();
+		let room = Room::new(10);
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 
 		let result = room.add_client(long_name.to_string(), client_connection.clone());
 
 		assert!(matches!(result, Err(RoomError::ClientNameTooLong)));
+	}
+
+	#[test]
+	fn should_allow_adding_clients_up_to_room_size_limit() {
+		let room = Room::new(2);
+		for count in 1..=2 {
+			let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+			if let Err(error) = room.add_client(format!("{}", count), client_connection.clone()) {
+				panic!("Failed to add client {}: {}", count, error);
+			}
+		}
+	}
+
+	#[test]
+	fn should_not_allow_adding_more_clients_than_room_size() {
+		let room = Room::new(2);
+		for count in 1..=2 {
+			let client_connection = ClientConnection::from(FakeClientConnection::default());
+
+			if let Err(error) = room.add_client(format!("{}", count), client_connection.clone()) {
+				panic!("Failed to add client {}: {}", count, error);
+			}
+		}
+
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let result = room.add_client("elephant".to_string(), client_connection.clone());
+		assert!(matches!(result, Err(RoomError::RoomFull)))
 	}
 }

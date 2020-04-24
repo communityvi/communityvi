@@ -1,3 +1,4 @@
+use crate::configuration::Configuration;
 use crate::connection::split_websocket;
 use crate::lifecycle::run_client;
 use crate::room::Room;
@@ -11,7 +12,6 @@ use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes
 use gotham::state::{FromState, State};
 use log::error;
 use std::future::Future;
-use std::net::SocketAddr;
 use std::pin::Pin;
 
 mod unwind_safe_gotham_handler;
@@ -20,13 +20,13 @@ mod websocket_upgrade;
 pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
 pub async fn create_server(
-	address: SocketAddr,
 	shutdown_handle: Pin<Box<dyn Future<Output = ()> + Send>>,
+	configuration: &Configuration,
 	enable_reference_client: bool,
 ) {
-	let room = Room::default();
+	let room = Room::new(configuration.room_size_limit);
 	let server = gotham::init_server(
-		address,
+		configuration.address,
 		build_simple_router(move |route| {
 			if enable_reference_client {
 				route.scope("/reference", reference_client_scope);
