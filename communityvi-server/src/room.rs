@@ -1,7 +1,8 @@
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
-use crate::room::client::{Client, ClientId};
+use crate::room::client::Client;
 use crate::room::client_handle::ClientHandle;
+use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
 use crate::room::state::State;
@@ -12,8 +13,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
-pub mod client;
+pub(self) mod client;
 pub mod client_handle;
+pub mod client_id;
 mod client_id_sequence;
 pub mod error;
 mod state;

@@ -1,5 +1,5 @@
 use crate::message::ServerResponse;
-use crate::room::client::ClientId;
+use crate::room::client_id::ClientId;
 use crate::room::Room;
 
 use log::info;

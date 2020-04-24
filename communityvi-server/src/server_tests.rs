@@ -1,5 +1,5 @@
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
-use crate::room::client::ClientId;
+use crate::room::client_id::ClientId;
 use crate::server::create_server;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
