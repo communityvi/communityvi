@@ -3,7 +3,6 @@ use crate::message::ServerResponse;
 use crate::room::client::{Client, ClientId};
 use crate::room::client_handle::ClientHandle;
 use crate::room::client_id_sequence::ClientIdSequence;
-use crate::room::client_reference::ClientReference;
 use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::{DashMap, DashSet};
@@ -16,9 +15,10 @@ use unicode_skeleton::UnicodeSkeleton;
 pub mod client;
 pub mod client_handle;
 mod client_id_sequence;
-mod client_reference;
 pub mod error;
 mod state;
+
+pub(self) type ClientReference<'a> = dashmap::mapref::one::Ref<'a, ClientId, Client>;
 
 #[derive(Default)]
 pub struct Room {

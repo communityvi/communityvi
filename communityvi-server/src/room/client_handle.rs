@@ -1,6 +1,5 @@
 use crate::message::ServerResponse;
 use crate::room::client::ClientId;
-use crate::room::client_reference::ClientReference;
 use crate::room::Room;
 
 use log::info;
@@ -27,7 +26,9 @@ impl MaybeClientHandle {
 	}
 
 	pub fn name(&self) -> Option<String> {
-		self.client_reference().map(|client| client.name.clone())
+		self.room
+			.client_reference_by_id(self.client_id)
+			.map(|client| client.name.clone())
 	}
 
 	pub fn id(&self) -> ClientId {
@@ -35,7 +36,7 @@ impl MaybeClientHandle {
 	}
 
 	pub async fn send(&self, response: ServerResponse) -> bool {
-		let connection = if let Some(client_reference) = self.client_reference() {
+		let connection = if let Some(client_reference) = self.room.client_reference_by_id(self.client_id) {
 			client_reference.connection.clone()
 		} else {
 			info!(
@@ -54,10 +55,6 @@ impl MaybeClientHandle {
 		} else {
 			true
 		}
-	}
-
-	fn client_reference(&self) -> Option<ClientReference> {
-		self.room.client_reference_by_id(self.client_id)
 	}
 }
 
