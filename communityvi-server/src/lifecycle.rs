@@ -9,7 +9,7 @@ use log::{debug, error, info, warn};
 pub async fn run_client(room: &Room, client_connection: ClientConnection, server_connection: ServerConnection) {
 	if let Some((client_id, server_connection)) = register_client(&room, client_connection, server_connection).await {
 		handle_messages(server_connection, client_id, &room).await;
-		room.remove_client(client_id).await;
+		room.remove_client(client_id);
 	}
 }
 
@@ -78,7 +78,7 @@ async fn handle_messages(mut server_connection: ServerConnection, client_id: Cli
 	loop {
 		let message = match server_connection.receive().await {
 			Some(message) => message,
-			None => return,
+			None => break, // connection has been closed
 		};
 		debug!(
 			"Received {:?} message from {}",
@@ -95,6 +95,21 @@ async fn handle_messages(mut server_connection: ServerConnection, client_id: Cli
 		};
 		handle_message(room, &client, message).await;
 	}
+
+	let client = match room.get_client_by_id(client_id) {
+		Some(client_handle) => client_handle,
+		None => {
+			warn!("Couldn't find Client: {}", client_id);
+			return;
+		}
+	};
+
+	info!("Client with id {} has left.", client.id());
+	room.broadcast(ServerResponse::Left {
+		id: client.id(),
+		name: client.name().to_string(),
+	})
+	.await;
 }
 
 async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {

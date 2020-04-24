@@ -8,7 +8,6 @@ use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
-use log::info;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
@@ -48,15 +47,8 @@ impl Room {
 		Ok(client_entry.or_insert(client).into())
 	}
 
-	pub async fn remove_client(&self, client_id: ClientId) {
-		if let Some((_, client)) = self.clients.remove(&client_id) {
-			info!("Removed client: {} {}", client.id(), client.name());
-			self.broadcast(ServerResponse::Left {
-				id: client.id(),
-				name: client.name().to_string(),
-			})
-			.await;
-		}
+	pub fn remove_client(&self, client_id: ClientId) -> bool {
+		self.clients.remove(&client_id).is_some()
 	}
 
 	pub fn get_client_by_id(&self, client_id: ClientId) -> Option<ClientReference> {
