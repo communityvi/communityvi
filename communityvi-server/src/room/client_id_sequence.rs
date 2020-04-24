@@ -1,4 +1,4 @@
-use crate::client::ClientId;
+use crate::room::client::ClientId;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::Relaxed;
 

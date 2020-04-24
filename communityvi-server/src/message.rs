@@ -1,4 +1,4 @@
-use crate::client::ClientId;
+use crate::room::client::ClientId;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};

@@ -1,8 +1,8 @@
-use crate::client::{Client, ClientId};
-use crate::client_handle::ClientHandle;
-use crate::client_id_sequence::ClientIdSequence;
 use crate::connection::client::ClientConnection;
 use crate::message::ServerResponse;
+use crate::room::client::{Client, ClientId};
+use crate::room::client_handle::ClientHandle;
+use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
 use crate::room::state::State;
 use dashmap::mapref::entry::Entry;
@@ -12,6 +12,9 @@ use log::info;
 use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
+pub mod client;
+mod client_handle;
+mod client_id_sequence;
 pub mod error;
 mod state;
 

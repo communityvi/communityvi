@@ -1,4 +1,4 @@
-use crate::client::{Client, ClientId};
+use crate::room::client::{Client, ClientId};
 use dashmap::mapref::one::{Ref, RefMut};
 use std::ops::Deref;
 

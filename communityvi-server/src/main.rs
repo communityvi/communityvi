@@ -2,9 +2,6 @@ use crate::commandline::Commandline;
 use crate::error::CommunityviError;
 use structopt::StructOpt;
 
-mod client;
-mod client_handle;
-mod client_id_sequence;
 mod commandline;
 mod configuration;
 mod connection;

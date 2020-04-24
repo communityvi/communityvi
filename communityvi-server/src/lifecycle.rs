@@ -1,7 +1,7 @@
-use crate::client::{Client, ClientId};
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
 use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
+use crate::room::client::{Client, ClientId};
 use crate::room::error::RoomError;
 use crate::room::Room;
 use log::{debug, error, info, warn};
@@ -138,12 +138,12 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 
 #[cfg(test)]
 mod test {
-	use crate::client::ClientId;
 	use crate::connection::client::ClientConnection;
 	use crate::connection::server::ServerConnection;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::{ClientRequest, ErrorResponse, OrderedMessage, ServerResponse};
+	use crate::room::client::ClientId;
 	use crate::room::Room;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use std::time::Duration;
