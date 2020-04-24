@@ -1,13 +1,14 @@
 use crate::connection::client::{ClientConnection, ClientConnectionTrait};
 use crate::message::ServerResponse;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
 pub struct FakeClientConnection {}
 
 impl From<FakeClientConnection> for ClientConnection {
 	fn from(fake_client_connection: FakeClientConnection) -> Self {
-		Box::pin(fake_client_connection)
+		Arc::pin(fake_client_connection)
 	}
 }
 
@@ -18,8 +19,4 @@ impl ClientConnectionTrait for FakeClientConnection {
 	}
 
 	async fn close(&self) {}
-
-	fn clone(&self) -> ClientConnection {
-		Clone::clone(self).into()
-	}
 }

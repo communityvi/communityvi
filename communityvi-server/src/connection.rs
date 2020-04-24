@@ -10,11 +10,10 @@ pub mod server;
 pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
 	let (websocket_sink, websocket_stream) = websocket.split();
 	let websocket_client_connection = WebSocketClientConnection::new(websocket_sink);
-	let stream_server_connection = WebSocketServerConnection::new(
-		InfallibleStream::from(websocket_stream),
-		websocket_client_connection.clone().into(),
-	);
-	(websocket_client_connection.into(), stream_server_connection.into())
+	let client_connection = ClientConnection::from(websocket_client_connection);
+	let stream_server_connection =
+		WebSocketServerConnection::new(InfallibleStream::from(websocket_stream), client_connection.clone());
+	(client_connection, stream_server_connection.into())
 }
 
 #[cfg(test)]
@@ -59,10 +58,9 @@ pub mod test {
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 
 		let sink_client_connection = SinkClientConnection::new(server_sender);
-		let stream_server_connection =
-			StreamServerConnection::new(server_receiver, sink_client_connection.clone().into());
-
 		let client_connection = ClientConnection::from(sink_client_connection);
+		let stream_server_connection = StreamServerConnection::new(server_receiver, client_connection.clone());
+
 		let server_connection = ServerConnection::from(stream_server_connection);
 
 		(

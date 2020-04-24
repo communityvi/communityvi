@@ -8,27 +8,18 @@ use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub type ClientConnection = Pin<Box<dyn ClientConnectionTrait + Send + Sync>>;
+pub type ClientConnection = Pin<Arc<dyn ClientConnectionTrait + Send + Sync>>;
 
 #[async_trait]
 pub trait ClientConnectionTrait {
 	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
 	async fn close(&self);
-	fn clone(&self) -> ClientConnection;
 }
 
 pub type WebSocketClientConnection = SinkClientConnection<SplitSink<WebSocket, WebSocketMessage>>;
 
 pub struct SinkClientConnection<ResponseSink> {
-	inner: Arc<tokio::sync::Mutex<SinkClientConnectionInner<ResponseSink>>>,
-}
-
-impl<T> Clone for SinkClientConnection<T> {
-	fn clone(&self) -> Self {
-		SinkClientConnection {
-			inner: self.inner.clone(),
-		}
-	}
+	inner: tokio::sync::Mutex<SinkClientConnectionInner<ResponseSink>>,
 }
 
 struct SinkClientConnectionInner<ResponseSink> {
@@ -57,10 +48,6 @@ where
 		let mut inner = self.inner.lock().await;
 		let _ = inner.response_sink.send(WebSocketMessage::Close(None)).await;
 	}
-
-	fn clone(&self) -> ClientConnection {
-		Clone::clone(self).into()
-	}
 }
 
 impl<ResponseSink> SinkClientConnection<ResponseSink>
@@ -72,9 +59,7 @@ where
 			response_sink,
 			message_number_sequence: (0..std::u64::MAX),
 		};
-		let connection = Self {
-			inner: Arc::new(inner.into()),
-		};
+		let connection = Self { inner: inner.into() };
 		connection
 	}
 }
@@ -84,6 +69,6 @@ where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
 	fn from(sink_client_connection: SinkClientConnection<ResponseSink>) -> Self {
-		Box::pin(sink_client_connection)
+		Arc::pin(sink_client_connection)
 	}
 }
