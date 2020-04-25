@@ -27,5 +27,4 @@ unicode_skeleton = "0.1"
 
 [dev-dependencies]
 lazy_static = "1.4"
-reqwest = {version = "0.10", features = ["json"]}
 url = "2.1"
