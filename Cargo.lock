@@ -268,7 +268,6 @@ dependencies = [
  "tokio-tungstenite",
  "toml",
  "unicode_skeleton",
- "url",
 ]
 
 [[package]]

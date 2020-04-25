@@ -15,7 +15,6 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use tokio::runtime;
 use tokio_tungstenite::tungstenite;
-use url::Url;
 
 const HOSTNAME_AND_PORT: &str = "localhost:8000";
 lazy_static! {
@@ -46,8 +45,7 @@ async fn websocket_connection() -> (
 	impl Sink<tungstenite::Message, Error = tungstenite::Error>,
 	impl Stream<Item = Result<tungstenite::Message, tungstenite::Error>>,
 ) {
-	let url = Url::parse(&format!("ws://{}/ws", HOSTNAME_AND_PORT)).expect("Failed to build websocket URL");
-	let (websocket_stream, _response) = tokio_tungstenite::connect_async(url)
+	let (websocket_stream, _response) = tokio_tungstenite::connect_async(format!("ws://{}/ws", HOSTNAME_AND_PORT))
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
 		.unwrap();
