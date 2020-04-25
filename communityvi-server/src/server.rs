@@ -7,6 +7,7 @@ use gotham::hyper::http::{header, HeaderMap, Response};
 use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
 use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, ScopeBuilder};
+use gotham::router::Router;
 use gotham::state::{FromState, State};
 use log::error;
 
@@ -17,21 +18,21 @@ pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::
 
 pub async fn run_server(configuration: &Configuration, enable_reference_client: bool) {
 	let room = Room::new(configuration.room_size_limit);
-	let _ = gotham::init_server(
-		configuration.address,
-		build_simple_router(move |route| {
-			if enable_reference_client {
-				route.scope("/reference", reference_client_scope);
-			}
+	let _ = gotham::init_server(configuration.address, create_router(room, enable_reference_client)).await;
+}
 
-			route
-				.get("/ws")
-				.to_new_handler(UnwindSafeGothamHandler::from(move |state| {
-					websocket_handler(room, state)
-				}));
-		}),
-	)
-	.await;
+pub fn create_router(room: Room, enable_reference_client: bool) -> Router {
+	build_simple_router(move |route| {
+		if enable_reference_client {
+			route.scope("/reference", reference_client_scope);
+		}
+
+		route
+			.get("/ws")
+			.to_new_handler(UnwindSafeGothamHandler::from(move |state| {
+				websocket_handler(room, state)
+			}));
+	})
 }
 
 fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
