@@ -1,7 +1,6 @@
 use crate::configuration::Configuration;
 use crate::error::CommunityviError;
-use crate::server::create_server;
-use futures::FutureExt;
+use crate::server::run_server;
 use log::info;
 use structopt::StructOpt;
 
@@ -37,9 +36,6 @@ impl Commandline {
 			.parse_filters(&configuration.log_filters)
 			.init();
 
-		let (_shutdown_sender, shutdown_receiver) = futures::channel::oneshot::channel::<()>();
-		let shutdown_handle = shutdown_receiver.then(|_| futures::future::ready(()));
-
 		let base_command = self.command.unwrap_or_default();
 		match base_command {
 			BaseCommand::Run => {
@@ -47,14 +43,14 @@ impl Commandline {
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
 					configuration.address
 				);
-				create_server(Box::pin(shutdown_handle), &configuration, false).await
+				run_server(&configuration, false).await
 			}
 			BaseCommand::Demo => {
 				info!(
 					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
 					configuration.address
 				);
-				create_server(Box::pin(shutdown_handle), &configuration, true).await
+				run_server(&configuration, true).await
 			}
 			BaseCommand::Configuration => println!("{:?}", configuration),
 		}

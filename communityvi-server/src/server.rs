@@ -3,29 +3,21 @@ use crate::connection::split_websocket;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
-use crate::utils::select_first_future::select_first_future;
-use futures::FutureExt;
 use gotham::hyper::http::{header, HeaderMap, Response};
 use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
 use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, ScopeBuilder};
 use gotham::state::{FromState, State};
 use log::error;
-use std::future::Future;
-use std::pin::Pin;
 
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
 
 pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
-pub async fn create_server(
-	shutdown_handle: Pin<Box<dyn Future<Output = ()> + Send>>,
-	configuration: &Configuration,
-	enable_reference_client: bool,
-) {
+pub async fn run_server(configuration: &Configuration, enable_reference_client: bool) {
 	let room = Room::new(configuration.room_size_limit);
-	let server = gotham::init_server(
+	let _ = gotham::init_server(
 		configuration.address,
 		build_simple_router(move |route| {
 			if enable_reference_client {
@@ -39,8 +31,7 @@ pub async fn create_server(
 				}));
 		}),
 	)
-	.map(|_| ());
-	select_first_future(server, shutdown_handle).await;
+	.await;
 }
 
 fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {

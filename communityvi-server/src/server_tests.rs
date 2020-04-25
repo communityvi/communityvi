@@ -1,7 +1,8 @@
 use crate::configuration::Configuration;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::room::client_id::ClientId;
-use crate::server::create_server;
+use crate::server::run_server;
+use crate::utils::select_first_future::select_first_future;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
@@ -437,7 +438,7 @@ where
 		room_size_limit: 10,
 	};
 	let server = async move {
-		create_server(Box::pin(receiver), &configuration, enable_reference_client).await;
+		select_first_future(receiver, run_server(&configuration, enable_reference_client)).await;
 	};
 	let server_handle = runtime.spawn(server);
 
