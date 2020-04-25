@@ -1,9 +1,11 @@
 use crate::configuration::Configuration;
 use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
 use crate::room::client_id::ClientId;
-use crate::server::run_server;
+use crate::room::Room;
+use crate::server::{create_router, run_server};
 use crate::utils::select_first_future::select_first_future;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
+use gotham::plain::test::{TestConnect, TestServer};
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use reqwest::StatusCode;
@@ -19,6 +21,8 @@ const HOSTNAME_AND_PORT: &str = "localhost:8000";
 lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
+
+type TestClient = gotham::test::TestClient<TestServer, TestConnect>;
 
 async fn typed_websocket_connection() -> (
 	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
@@ -363,10 +367,10 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 
 #[test]
 fn test_server_should_serve_reference_client_javascript_if_enabled() {
-	let future = async {
-		let url = Url::parse(&format!("http://{}/reference/reference.js", HOSTNAME_AND_PORT)).unwrap();
-		let response = reqwest::get(url)
-			.await
+	let test = |client: TestClient| {
+		let response = client
+			.get("http://127.0.0.1:10000/reference/reference.js")
+			.perform()
 			.expect("Failed to request reference client javascript.");
 		assert_eq!(StatusCode::OK, response.status());
 		let content_type = response
@@ -385,10 +389,10 @@ fn test_server_should_serve_reference_client_javascript_if_enabled() {
 			.expect("Cache-Control header is no valid UTF-8");
 		assert_eq!("no-cache", cache_control);
 
-		let response_text = response.text().await.expect("Incorrect response.");
+		let response_text = response.read_utf8_body().expect("Incorrect response.");
 		assert!(response_text.contains("use strict"));
 	};
-	test_future_with_running_server(future, true);
+	test_with_test_server(test, true);
 }
 
 #[test]
@@ -414,6 +418,14 @@ fn test_server_should_not_serve_reference_client_if_disabled() {
 		assert_eq!(StatusCode::NOT_FOUND, response.status());
 	};
 	test_future_with_running_server(future, false);
+}
+
+fn test_with_test_server(test: impl FnOnce(TestClient) -> (), enable_reference_client: bool) {
+	let room = Room::new(10);
+	let router = create_router(room, enable_reference_client);
+	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");
+	let client = server.client();
+	test(client);
 }
 
 fn test_future_with_running_server<OutputType, FutureType>(
