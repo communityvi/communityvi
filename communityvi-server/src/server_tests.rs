@@ -328,9 +328,11 @@ fn test_messages_should_have_sequence_numbers() {
 
 #[test]
 fn test_server_should_serve_reference_client_html_if_enabled() {
-	let future = async {
-		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
-		let response = reqwest::get(url).await.expect("Failed to request reference client.");
+	let test = |client: TestClient| {
+		let response = client
+			.get("http://127.0.0.1:10000/reference")
+			.perform()
+			.expect("Failed to request reference_client.");
 		assert_eq!(StatusCode::OK, response.status());
 		let content_type = response
 			.headers()
@@ -359,10 +361,10 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 			content_security_policy
 		);
 
-		let response_text = response.text().await.expect("Incorrect response.");
+		let response_text = response.read_utf8_body().expect("Incorrect response.");
 		assert!(response_text.contains("html"));
 	};
-	test_future_with_running_server(future, true);
+	test_with_test_server(test, true);
 }
 
 #[test]
@@ -412,12 +414,14 @@ fn server_should_respond_to_websocket_pings() {
 
 #[test]
 fn test_server_should_not_serve_reference_client_if_disabled() {
-	let future = async {
-		let url = Url::parse(&format!("http://{}/reference", HOSTNAME_AND_PORT)).unwrap();
-		let response = reqwest::get(url).await.expect("Failed to request reference client.");
+	let test = |client: TestClient| {
+		let response = client
+			.get("http://127.0.0.1:10000/reference")
+			.perform()
+			.expect("Failed to request reference client.");
 		assert_eq!(StatusCode::NOT_FOUND, response.status());
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 fn test_with_test_server(test: impl FnOnce(TestClient) -> (), enable_reference_client: bool) {
