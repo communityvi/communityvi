@@ -6,7 +6,7 @@ use crate::server::{create_router, run_server};
 use crate::utils::select_first_future::select_first_future;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use gotham::hyper::http::StatusCode;
-use gotham::plain::test::{TestConnect, TestServer};
+use gotham::plain::test::TestServer;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
@@ -20,8 +20,6 @@ const HOSTNAME_AND_PORT: &str = "localhost:8000";
 lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
-
-type TestClient = gotham::test::TestClient<TestServer, TestConnect>;
 
 async fn typed_websocket_connection() -> (
 	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
@@ -326,7 +324,8 @@ fn test_messages_should_have_sequence_numbers() {
 
 #[test]
 fn test_server_should_serve_reference_client_html_if_enabled() {
-	let test = |client: TestClient| {
+	let test = |server: &TestServer| {
+		let client = server.client();
 		let response = client
 			.get("http://127.0.0.1:10000/reference")
 			.perform()
@@ -367,7 +366,8 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 
 #[test]
 fn test_server_should_serve_reference_client_javascript_if_enabled() {
-	let test = |client: TestClient| {
+	let test = |server: &TestServer| {
+		let client = server.client();
 		let response = client
 			.get("http://127.0.0.1:10000/reference/reference.js")
 			.perform()
@@ -412,7 +412,8 @@ fn server_should_respond_to_websocket_pings() {
 
 #[test]
 fn test_server_should_not_serve_reference_client_if_disabled() {
-	let test = |client: TestClient| {
+	let test = |server: &TestServer| {
+		let client = server.client();
 		let response = client
 			.get("http://127.0.0.1:10000/reference")
 			.perform()
@@ -422,12 +423,11 @@ fn test_server_should_not_serve_reference_client_if_disabled() {
 	test_with_test_server(test, false);
 }
 
-fn test_with_test_server(test: impl FnOnce(TestClient) -> (), enable_reference_client: bool) {
+fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_client: bool) {
 	let room = Room::new(10);
 	let router = create_router(room, enable_reference_client);
 	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");
-	let client = server.client();
-	test(client);
+	test(&server);
 }
 
 fn test_future_with_running_server<OutputType, FutureType>(
