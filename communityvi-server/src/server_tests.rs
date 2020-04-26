@@ -5,16 +5,23 @@ use crate::room::Room;
 use crate::server::{create_router, run_server};
 use crate::utils::select_first_future::select_first_future;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
+use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
+use gotham::hyper::Body;
 use gotham::plain::test::TestServer;
+use gotham::test::Server;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use std::convert::TryFrom;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::net::SocketAddr;
+use std::ops::DerefMut;
 use std::str::FromStr;
 use tokio::runtime;
-use tokio_tungstenite::tungstenite;
+use tokio_tungstenite::{tungstenite, WebSocketStream};
+use tungstenite::protocol::Role;
 
 const HOSTNAME_AND_PORT: &str = "localhost:8000";
 lazy_static! {
@@ -419,6 +426,47 @@ fn test_server_should_not_serve_reference_client_if_disabled() {
 			.perform()
 			.expect("Failed to request reference client.");
 		assert_eq!(StatusCode::NOT_FOUND, response.status());
+	};
+	test_with_test_server(test, false);
+}
+
+#[derive(Debug)]
+enum ImpossibleError {}
+impl Display for ImpossibleError {
+	fn fmt(&self, _formatter: &mut Formatter) -> std::fmt::Result {
+		Ok(())
+	}
+}
+impl Error for ImpossibleError {}
+
+#[test]
+fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
+	let test = |server: &TestServer| {
+		let client = server.client();
+		let mut request = client.get("ws://127.0.0.2:10000/ws");
+		let headers = request.headers_mut();
+		headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
+		headers.insert(SEC_WEBSOCKET_KEY, HeaderValue::from_static("dGhlIHNhbXBsZSBub25jZQ=="));
+		let mut response = client.perform(request).expect("Failed to receive response");
+		let mut body = Body::empty();
+		std::mem::swap(&mut body, response.deref_mut().body_mut());
+		server
+			.run_future(async move {
+				let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
+				let mut websocket_stream = WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await;
+				websocket_stream
+					.send(tungstenite::Message::Ping(vec![]))
+					.await
+					.expect("Failed to send ping.");
+				let pong = websocket_stream
+					.next()
+					.await
+					.expect("Websocket ended prematurely")
+					.expect("Didn't receive Pong.");
+				assert!(pong.is_pong());
+				Ok::<_, ImpossibleError>(())
+			})
+			.unwrap();
 	};
 	test_with_test_server(test, false);
 }
