@@ -7,6 +7,7 @@ use crate::utils::select_first_future::select_first_future;
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
+use gotham::hyper::upgrade::Upgraded;
 use gotham::hyper::Body;
 use gotham::plain::test::TestServer;
 use gotham::test::Server;
@@ -442,33 +443,55 @@ impl Error for ImpossibleError {}
 #[test]
 fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let test = |server: &TestServer| {
-		let client = server.client();
-		let mut request = client.get("ws://127.0.0.2:10000/ws");
-		let headers = request.headers_mut();
-		headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
-		headers.insert(SEC_WEBSOCKET_KEY, HeaderValue::from_static("dGhlIHNhbXBsZSBub25jZQ=="));
-		let mut response = client.perform(request).expect("Failed to receive response");
-		let mut body = Body::empty();
-		std::mem::swap(&mut body, response.deref_mut().body_mut());
-		server
-			.run_future(async move {
-				let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
-				let mut websocket_stream = WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await;
-				websocket_stream
-					.send(tungstenite::Message::Ping(vec![]))
-					.await
-					.expect("Failed to send ping.");
-				let pong = websocket_stream
-					.next()
-					.await
-					.expect("Websocket ended prematurely")
-					.expect("Didn't receive Pong.");
-				assert!(pong.is_pong());
-				Ok::<_, ImpossibleError>(())
-			})
-			.unwrap();
+		let mut websocket = connect_to_test_server_websocket(server);
+		let future = async move {
+			websocket
+				.send(tungstenite::Message::Ping(vec![]))
+				.await
+				.expect("Failed to send ping.");
+
+			let pong = websocket
+				.next()
+				.await
+				.expect("Websocket ended prematurely")
+				.expect("Didn't receive Pong.");
+			assert!(pong.is_pong());
+		};
+		run_future_on_test_server(future, server)
 	};
 	test_with_test_server(test, false);
+}
+
+fn connect_to_test_server_websocket(server: &TestServer) -> WebSocketStream<Upgraded> {
+	let client = server.client();
+
+	let mut request = client.get("ws://127.0.0.1:10000/ws");
+	let headers = request.headers_mut();
+	headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
+	headers.insert(SEC_WEBSOCKET_KEY, HeaderValue::from_static("dGhlIHNhbXBsZSBub25jZQ=="));
+
+	let mut response = client
+		.perform(request)
+		.expect("Failed to initiate websocket connection.");
+	// We don't own the `TestRespons`'s `Body`, so we need to swap it out for an empty one ...
+	let mut body = Body::empty();
+	std::mem::swap(&mut body, response.deref_mut().body_mut());
+
+	server
+		.run_future(async move {
+			let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
+			let websocket_stream = WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await;
+			Ok::<_, ImpossibleError>(websocket_stream) // `test::Server::run_future` requires `Result` with `Error` for no apparent reason
+		})
+		.unwrap() // wrap the `ImpossibleError` away, whoooosh
+}
+
+fn run_future_on_test_server<FutureType, Output>(future: FutureType, server: &TestServer) -> Output
+where
+	Output: Send + 'static,
+	FutureType: Future<Output = Output> + Send + 'static,
+{
+	server.run_future(future.map(Ok::<_, ImpossibleError>)).unwrap()
 }
 
 fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_client: bool) {
