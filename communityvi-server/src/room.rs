@@ -189,7 +189,7 @@ mod test {
 		 *  domain owners to check for whole-script homographs and register them."
 		 *  - https://bugzilla.mozilla.org/show_bug.cgi?id=1332714#c5 by Gervase Markham, 2017-01-25
 		 */
-		assert_eq!(normalized_name("аррӏе.com"), "apple.com");
+		assert_eq!(normalized_name("аррӏе.com"), normalized_name("apple.com"));
 	}
 
 	#[test]
