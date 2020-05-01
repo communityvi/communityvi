@@ -48,23 +48,86 @@ playPauseButton.onclick = function () {
 		return;
 	}
 
-	if (playbackState.type === 'paused') {
-		playbackState.type = 'playing';
-		playbackState.startTime = calculateReferenceTime() - playbackState.position;
+	switch (playbackState.type) {
+		case 'playing': {
+			playbackState.type = 'paused';
+			playbackState.position = calculateReferenceTime() - playbackState.startTime;
+			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: false});
 
-		sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false});
-		playPauseButton.innerHTML = '&#9208;';
-	} else if (playbackState.type === 'playing') {
-		playbackState.type = 'paused';
-		playbackState.position = calculateReferenceTime() - playbackState.startTime;
-		console.log(`calc ${calculateReferenceTime()} start ${playbackState.startTime} POS ${playbackState.position}`);
+			break;
+		}
 
-		sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: false});
-		playPauseButton.innerHTML = '&#9654;';
+		case 'paused': {
+			playbackState.type = 'playing';
+			playbackState.startTime = calculateReferenceTime() - playbackState.position;
+			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false});
+
+			break;
+		}
 	}
+
+	updatePlayer();
 };
 const rewind10SecondsButton = document.getElementById('rewind_10');
+rewind10SecondsButton.onclick = function () {
+	if (mediumLength === null) {
+		return;
+	}
+
+	switch (playbackState.type) {
+		case 'playing': {
+			playbackState.startTime += 10 * 1000;
+			const referenceTime = calculateReferenceTime();
+			if (playbackState.startTime > referenceTime) {
+				playbackState.startTime = referenceTime;
+			}
+
+			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true});
+			break;
+		}
+		case 'paused': {
+			playbackState.position -= 10 * 1000;
+			if (playbackState.position < 0) {
+				playbackState.position = 0;
+			}
+
+			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true});
+			break;
+		}
+	}
+
+	updatePlayer();
+};
 const forward10SecondsButton = document.getElementById('forward_10');
+forward10SecondsButton.onclick = function () {
+	if (mediumLength === null) {
+		return;
+	}
+
+	switch (playbackState.type) {
+		case 'playing': {
+			playbackState.startTime -= 10 * 1000;
+			const referenceTime = calculateReferenceTime();
+			if (playbackState.startTime < (referenceTime - mediumLength)) {
+				playbackState.startTime = referenceTime - mediumLength;
+			}
+
+			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true});
+			break;
+		}
+		case 'paused': {
+			playbackState.position += 10 * 1000;
+			if (playbackState.position > mediumLength) {
+				playbackState.position = mediumLength;
+			}
+
+			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true});
+			break;
+		}
+	}
+
+	updatePlayer();
+};
 
 setupButtonPressOnEnter();
 
@@ -196,27 +259,44 @@ function handleMessage(message, messageEvent) {
 		    playbackState.position = 0;
 
 		    playerPositionSlider.max = message.length_in_milliseconds;
-		    playerPositionSlider.value = 0;
-		    playerPositionLabel.textContent = 0;
 
 		    displayChatMessage(message.inserted_by_id, message.inserted_by_name, `<< inserted "${message.name}" >>`);
 
 			mediumLength = message.length_in_milliseconds;
+
+			updatePlayer();
 
 			break;
 		}
 
 		case 'playback_state_changed': {
 		    playbackState.type = message.playback_state.type;
-			if (message.playback_state.type === 'playing') {
-				playbackState.startTime = message.playback_state.start_time_in_milliseconds;
-				playPauseButton.innerHTML = '&#9208;';
-				displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) started playback.`);
-			} else {
-				playbackState.position = message.playback_state.position_in_milliseconds;
-				playPauseButton.innerHTML = '&#9654;';
-				displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) paused playback.`);
+		    switch (message.playback_state.type) {
+				case 'playing': {
+					playbackState.startTime = message.playback_state.start_time_in_milliseconds;
+
+					if (message.skipped === true) {
+						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
+					} else {
+						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) started playback.`);
+					}
+
+					break;
+				}
+				case 'paused': {
+					playbackState.position = message.playback_state.position_in_milliseconds;
+
+					if (message.skipped === true) {
+						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
+					} else {
+						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) paused playback.`);
+					}
+
+					break;
+				}
 			}
+
+			updatePlayer();
 
 			break;
 		}
@@ -273,13 +353,28 @@ function updateApplicationState() {
 
 	    if (currentPosition >= mediumLength) {
 	    	sendMessage({type: 'pause', position_in_milliseconds: mediumLength, skipped: false});
-	    	playbackState.position = mediumLength;
-			playerPositionSlider.value = playbackState.position;
-			playerPositionLabel.textContent = playbackState.position / 1000;
-	    	playbackState.type = 'paused';
-		} else {
-			playerPositionSlider.value = Math.round(currentPosition);
-			playerPositionLabel.textContent = currentPosition / 1000;
+			playbackState.type = 'paused';
+			playbackState.position = mediumLength;
+		}
+
+	    updatePlayer();
+	}
+}
+
+function updatePlayer() {
+	switch (playbackState.type) {
+		case 'playing': {
+		    const position = calculateReferenceTime() - playbackState.startTime;
+			playerPositionSlider.value = Math.round(position);
+			playerPositionLabel.textContent = Math.round(position) / 1000;
+			playPauseButton.innerHTML = '&#9208;';
+			break;
+		}
+		case 'paused': {
+			playerPositionSlider.value = Math.round(playbackState.position);
+			playerPositionLabel.textContent = Math.round(playbackState.position) / 1000;
+			playPauseButton.innerHTML = '&#9654;';
+			break;
 		}
 	}
 }
