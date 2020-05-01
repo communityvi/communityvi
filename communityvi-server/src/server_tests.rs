@@ -80,7 +80,7 @@ async fn register_client(
 
 	let id = if let OrderedMessage {
 		number: _,
-		message: ServerResponse::Hello { id },
+		message: ServerResponse::Hello { id, .. },
 	} = response
 	{
 		id
@@ -156,7 +156,8 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.await
 			.unwrap()
 			.expect("Invalid websocket response received");
-		let expected_hello_response = tungstenite::Message::Text(r#"{"number":0,"type":"hello","id":0}"#.to_string());
+		let expected_hello_response =
+			tungstenite::Message::Text(r#"{"number":0,"type":"hello","id":0,"current_medium":null}"#.to_string());
 		assert_eq!(expected_hello_response, hello_response);
 
 		let _ = stream.next().await.expect("Failed to receive joined response.");

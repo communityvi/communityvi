@@ -1,4 +1,5 @@
 use crate::room::state::medium::SomeMedium;
+use parking_lot::MutexGuard;
 use std::time::{Duration, Instant};
 
 pub mod medium;
@@ -25,5 +26,9 @@ impl State {
 
 	pub fn insert_medium(&self, some_medium: SomeMedium) {
 		*self.medium.lock() = Some(some_medium);
+	}
+
+	pub fn medium(&self) -> MutexGuard<Option<SomeMedium>> {
+		self.medium.lock()
 	}
 }

@@ -9,6 +9,7 @@ use crate::room::state::State;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
 use log::info;
+use parking_lot::MutexGuard;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
@@ -129,6 +130,10 @@ impl Room {
 
 	pub fn insert_medium(&self, medium: SomeMedium) {
 		self.inner.state.insert_medium(medium);
+	}
+
+	pub fn medium(&self) -> MutexGuard<Option<SomeMedium>> {
+		self.inner.state.medium()
 	}
 }
 

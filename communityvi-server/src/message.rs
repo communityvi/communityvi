@@ -1,4 +1,5 @@
 use crate::room::client_id::ClientId;
+use crate::room::state::medium::{Medium, SomeMedium};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -42,6 +43,7 @@ pub enum ServerResponse {
 	},
 	Hello {
 		id: ClientId,
+		current_medium: Option<MediumResponse>,
 	},
 	Joined {
 		id: ClientId,
@@ -64,6 +66,24 @@ pub enum ServerResponse {
 		error: ErrorResponse,
 		message: String,
 	},
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type")]
+pub enum MediumResponse {
+	FixedLength { name: String, length: u64 },
+}
+
+impl From<&SomeMedium> for MediumResponse {
+	fn from(some_medium: &SomeMedium) -> Self {
+		match some_medium {
+			SomeMedium::FixedLength(fixed_length) => Self::FixedLength {
+				name: fixed_length.name().to_string(),
+				length: fixed_length.length.num_milliseconds() as u64,
+			},
+		}
+	}
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -136,6 +156,7 @@ impl<MessageType: Message> TryFrom<&WebSocketMessage> for OrderedMessage<Message
 #[cfg(test)]
 mod test {
 	use super::*;
+	use chrono::Duration;
 
 	fn first_message<MessageType: Message>(message: MessageType) -> OrderedMessage<MessageType> {
 		OrderedMessage { number: 0, message }
@@ -288,10 +309,33 @@ mod test {
 	}
 
 	#[test]
-	fn hello_response_should_serialize_and_deserialize() {
-		let hello_response = first_message(ServerResponse::Hello { id: 42.into() });
+	fn hello_response_without_medium_should_serialize_and_deserialize() {
+		let hello_response = first_message(ServerResponse::Hello {
+			id: 42.into(),
+			current_medium: None,
+		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
-		assert_eq!(r#"{"number":0,"type":"hello","id":42}"#, json);
+		assert_eq!(r#"{"number":0,"type":"hello","id":42,"current_medium":null}"#, json);
+
+		let deserialized_hello_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
+		assert_eq!(hello_response, deserialized_hello_response);
+	}
+
+	#[test]
+	fn hello_response_with_medium_should_serialize_and_deserialize() {
+		let hello_response = first_message(ServerResponse::Hello {
+			id: 42.into(),
+			current_medium: Some(MediumResponse::FixedLength {
+				name: "WarGames".to_string(),
+				length: Duration::minutes(114).num_milliseconds() as u64,
+			}),
+		});
+		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length":6840000}}"#,
+			json
+		);
 
 		let deserialized_hello_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");

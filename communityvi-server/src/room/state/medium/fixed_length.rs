@@ -5,7 +5,7 @@ use chrono::Duration;
 /// A medium with a fixed length. e.g. Video file or online video.
 #[derive(Debug)]
 pub struct FixedLengthMedium {
-	length: Duration,
+	pub length: Duration,
 	name: String,
 	playback: PlaybackState,
 }

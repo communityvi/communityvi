@@ -1,5 +1,6 @@
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
+use crate::message::MediumResponse;
 use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
@@ -75,7 +76,10 @@ async fn register_client(
 		}
 	};
 
-	let hello_response = ServerResponse::Hello { id: client.id() };
+	let hello_response = ServerResponse::Hello {
+		id: client.id(),
+		current_medium: room.medium().as_ref().map(MediumResponse::from),
+	};
 	if client.send(hello_response).await {
 		let id = client.id();
 		let name = client.name().to_string();
@@ -177,7 +181,8 @@ mod test {
 	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
-	use crate::message::OrderedMessage;
+	use crate::message::{MediumResponse, OrderedMessage};
+	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use tokio::time::delay_for;
 
@@ -410,6 +415,39 @@ mod test {
 		);
 	}
 
+	#[tokio::test]
+	async fn should_get_currently_playing_medium_on_hello_response() {
+		let room = Room::new(1);
+		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(
+			"Short Circuit".to_string(),
+			Duration::minutes(98),
+		));
+		room.insert_medium(short_circuit);
+
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register {
+				name: "Johnny 5".to_string(),
+			},
+		};
+
+		test_client.send(register_request).await;
+		register_client(room, client_connection, server_connection).await;
+		let response = test_client.receive().await.expect("Did not receive response!");
+
+		assert_eq!(
+			ServerResponse::Hello {
+				id: ClientId::from(0),
+				current_medium: Some(MediumResponse::FixedLength {
+					name: "Short Circuit".to_string(),
+					length: Duration::minutes(98).num_milliseconds() as u64
+				})
+			},
+			response.message
+		);
+	}
+
 	async fn register_test_client(
 		name: &'static str,
 		room: Room,
@@ -436,7 +474,7 @@ mod test {
 
 		let id = if let OrderedMessage {
 			number: _,
-			message: ServerResponse::Hello { id },
+			message: ServerResponse::Hello { id, .. },
 		} = response
 		{
 			id
