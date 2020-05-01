@@ -3,7 +3,10 @@ use crate::connection::server::ServerConnection;
 use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
+use crate::room::state::medium::fixed_length::FixedLengthMedium;
+use crate::room::state::medium::SomeMedium;
 use crate::room::Room;
+use chrono::Duration;
 use log::{debug, error, info};
 
 pub async fn run_client(room: Room, client_connection: ClientConnection, server_connection: ServerConnection) {
@@ -140,6 +143,32 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			};
 			client.send(message).await;
 		}
+		ClientRequest::InsertMedium {
+			name,
+			length_in_milliseconds,
+		} => {
+			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
+				let response = ServerResponse::Error {
+					error: ErrorResponse::InvalidFormat,
+					message: "Length of a medium must not be larger than one year.".to_string(),
+				};
+				client.send(response).await;
+				return;
+			}
+
+			room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+				name.clone(),
+				Duration::milliseconds(length_in_milliseconds as i64),
+			)));
+
+			room.broadcast(ServerResponse::MediumInserted {
+				inserted_by_name: client.name().to_string(),
+				inserted_by_id: client.id(),
+				name,
+				length_in_milliseconds,
+			})
+			.await;
+		}
 	}
 }
 
@@ -150,12 +179,11 @@ mod test {
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::OrderedMessage;
 	use crate::utils::fake_connection::FakeClientConnection;
-	use std::time::Duration;
 	use tokio::time::delay_for;
 
 	#[tokio::test]
 	async fn the_client_should_get_access_to_the_server_reference_time() {
-		const TEST_DELAY: Duration = Duration::from_millis(2);
+		const TEST_DELAY: std::time::Duration = std::time::Duration::from_millis(2);
 
 		let (client_connection, _server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::new(10);
@@ -179,6 +207,72 @@ mod test {
 			}
 			_ => panic!("Invalid response"),
 		};
+	}
+
+	#[tokio::test]
+	async fn the_client_should_be_able_to_insert_a_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+		let (bob_client_connection, _server_connection, mut bob_test_client) = create_typed_test_connections();
+
+		let room = Room::new(2);
+		let alice = room
+			.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+		room.add_client("Bob".to_string(), bob_client_connection)
+			.expect("Did not get client handle!");
+
+		handle_message(
+			&room,
+			&alice,
+			ClientRequest::InsertMedium {
+				name: "Metropolis".to_string(),
+				length_in_milliseconds: 153 * 60 * 1000,
+			},
+		)
+		.await;
+
+		let alice_broadcast = alice_test_client.receive().await.unwrap();
+		let bob_broadcast = bob_test_client.receive().await.unwrap();
+
+		let expected_broadcast = ServerResponse::MediumInserted {
+			inserted_by_name: alice.name().to_string(),
+			inserted_by_id: alice.id(),
+			name: "Metropolis".to_string(),
+			length_in_milliseconds: 153 * 60 * 1000,
+		};
+
+		assert_eq!(alice_broadcast.message, expected_broadcast);
+		assert_eq!(bob_broadcast.message, expected_broadcast);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_insert_a_too_large_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+
+		let room = Room::new(2);
+		let alice = room
+			.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+
+		handle_message(
+			&room,
+			&alice,
+			ClientRequest::InsertMedium {
+				name: "Metropolis".to_string(),
+				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
+			},
+		)
+		.await;
+
+		let error_response = alice_test_client.receive().await.unwrap();
+
+		assert_eq!(
+			error_response.message,
+			ServerResponse::Error {
+				error: ErrorResponse::InvalidFormat,
+				message: "Length of a medium must not be larger than one year.".to_string(),
+			}
+		)
 	}
 
 	#[tokio::test]

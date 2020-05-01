@@ -11,7 +11,7 @@ pub struct FixedLengthMedium {
 }
 
 impl FixedLengthMedium {
-	pub fn new(length: Duration, name: String) -> Self {
+	pub fn new(name: String, length: Duration) -> Self {
 		Self {
 			length,
 			name,
@@ -61,7 +61,7 @@ mod test {
 	use super::*;
 
 	fn test_medium() -> FixedLengthMedium {
-		FixedLengthMedium::new(Duration::seconds(42), "The Universe".to_string())
+		FixedLengthMedium::new("The Universe".to_string(), Duration::seconds(42))
 	}
 
 	#[test]

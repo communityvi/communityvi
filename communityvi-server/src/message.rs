@@ -24,6 +24,7 @@ pub enum ClientRequest {
 	Chat { message: String },
 	Register { name: String },
 	GetReferenceTime,
+	InsertMedium { name: String, length_in_milliseconds: u64 },
 }
 
 impl Message for ClientRequest {}
@@ -48,6 +49,12 @@ pub enum ServerResponse {
 	},
 	ReferenceTime {
 		milliseconds: u64,
+	},
+	MediumInserted {
+		inserted_by_name: String,
+		inserted_by_id: ClientId,
+		name: String,
+		length_in_milliseconds: u64,
 	},
 	Left {
 		id: ClientId,
@@ -195,6 +202,24 @@ mod test {
 	}
 
 	#[test]
+	fn insert_medium_request_should_serialize_and_deserialize() {
+		let insert_medium_request = first_message(ClientRequest::InsertMedium {
+			name: "Blues Brothers".to_string(),
+			length_in_milliseconds: 8520000,
+		});
+		let json =
+			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"insert_medium","name":"Blues Brothers","length_in_milliseconds":8520000}"#,
+			json
+		);
+
+		let deserialized_insert_medium_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize InsertMedium request from JSON");
+		assert_eq!(insert_medium_request, deserialized_insert_medium_request);
+	}
+
+	#[test]
 	fn ping_response_should_serialize_and_deserialize() {
 		let ping_response = first_message(ServerResponse::Ping);
 		let json = serde_json::to_string(&ping_response).expect("Failed to serialize Ping response to JSON");
@@ -283,6 +308,26 @@ mod test {
 		let deserialized_reference_time_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize ReferenceTime response from JSON");
 		assert_eq!(reference_time_response, deserialized_reference_time_response);
+	}
+
+	#[test]
+	fn medium_inserted_response_should_serialize_and_deserialize() {
+		let medium_inserted_response = first_message(ServerResponse::MediumInserted {
+			inserted_by_name: "Squirrel".to_string(),
+			inserted_by_id: ClientId::from(42),
+			name: "The Acorn".to_string(),
+			length_in_milliseconds: 20 * 60 * 1000,
+		});
+		let json = serde_json::to_string(&medium_inserted_response)
+			.expect("Failed to serialize MediumInserted response to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"medium_inserted","inserted_by_name":"Squirrel","inserted_by_id":42,"name":"The Acorn","length_in_milliseconds":1200000}"#,
+			json
+		);
+
+		let deserialized_medium_inserted_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize MediumInserted response from JSON");
+		assert_eq!(medium_inserted_response, deserialized_medium_inserted_response);
 	}
 
 	#[test]

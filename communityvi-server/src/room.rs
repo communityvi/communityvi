@@ -4,6 +4,7 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
+use crate::room::state::medium::SomeMedium;
 use crate::room::state::State;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
@@ -18,7 +19,7 @@ pub mod client;
 pub mod client_id;
 mod client_id_sequence;
 pub mod error;
-mod state;
+pub mod state;
 
 #[derive(Clone)]
 pub struct Room {
@@ -124,6 +125,10 @@ impl Room {
 
 	pub fn current_reference_time(&self) -> Duration {
 		self.inner.state.current_reference_time()
+	}
+
+	pub fn insert_medium(&self, medium: SomeMedium) {
+		self.inner.state.insert_medium(medium);
 	}
 }
 

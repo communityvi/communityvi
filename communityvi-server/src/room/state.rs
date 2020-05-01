@@ -1,19 +1,19 @@
 use crate::room::state::medium::SomeMedium;
 use std::time::{Duration, Instant};
 
-mod medium;
+pub mod medium;
 
 #[derive(Debug)]
 pub struct State {
 	start_of_reference_time: Instant,
-	medium: Option<SomeMedium>,
+	medium: parking_lot::Mutex<Option<SomeMedium>>,
 }
 
 impl Default for State {
 	fn default() -> Self {
 		Self {
 			start_of_reference_time: Instant::now(),
-			medium: None,
+			medium: Default::default(),
 		}
 	}
 }
@@ -23,7 +23,7 @@ impl State {
 		self.start_of_reference_time.elapsed()
 	}
 
-	pub fn insert_medium(&mut self, some_medium: SomeMedium) {
-		self.medium = Some(some_medium);
+	pub fn insert_medium(&self, some_medium: SomeMedium) {
+		*self.medium.lock() = Some(some_medium);
 	}
 }
