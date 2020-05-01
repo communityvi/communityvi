@@ -1,0 +1,19 @@
+#playing_medium {
+    width: 640px;
+    height: 480px;
+    margin: 10px;
+    border: 3px dashed black;
+}
+
+#player_position_slider {
+    margin: 10px;
+    width: 640px;
+}
+
+#player_position {
+    font-size: 48pt;
+    text-align: center;
+    font-weight: bold;
+    line-height: 480px;
+    padding: 40px;
+}

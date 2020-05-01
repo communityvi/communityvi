@@ -38,6 +38,7 @@ pub fn create_router(room: Room, enable_reference_client: bool) -> Router {
 fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 	const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
 	const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
+	const REFERENCE_CLIENT_CSS: &str = include_str!("../static/reference.css");
 
 	route.get("/").to(|state| {
 		let response = Response::builder()
@@ -57,6 +58,14 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 			.header(header::CONTENT_TYPE, mime::APPLICATION_JAVASCRIPT_UTF_8.to_string())
 			.header(header::CACHE_CONTROL, "no-cache")
 			.body(REFERENCE_CLIENT_JAVASCRIPT.into())
+			.expect("Failed to build reference client JavaScript response");
+		(state, response)
+	});
+	route.get("/reference.css").to(|state| {
+		let response = Response::builder()
+			.header(header::CONTENT_TYPE, mime::TEXT_CSS_UTF_8.to_string())
+			.header(header::CACHE_CONTROL, "no-cache")
+			.body(REFERENCE_CLIENT_CSS.into())
 			.expect("Failed to build reference client JavaScript response");
 		(state, response)
 	});

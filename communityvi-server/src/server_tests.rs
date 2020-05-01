@@ -374,6 +374,37 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 }
 
 #[test]
+fn test_server_should_serve_reference_client_css_if_enabled() {
+	let test = |server: &TestServer| {
+		let client = server.client();
+		let response = client
+			.get("http://127.0.0.1:10000/reference/reference.css")
+			.perform()
+			.expect("Failed to request reference client css.");
+		assert_eq!(StatusCode::OK, response.status());
+		let content_type = response
+			.headers()
+			.get("content-type")
+			.expect("No content-type header.")
+			.to_str()
+			.expect("Content-Type header is no valid UTF-8");
+		assert_eq!("text/css; charset=utf-8", content_type);
+
+		let cache_control = response
+			.headers()
+			.get("cache-control")
+			.expect("No cache-control header.")
+			.to_str()
+			.expect("Cache-Control header is no valid UTF-8");
+		assert_eq!("no-cache", cache_control);
+
+		let response_text = response.read_utf8_body().expect("Incorrect response.");
+		assert!(response_text.contains("width"));
+	};
+	test_with_test_server(test, true);
+}
+
+#[test]
 fn test_server_should_serve_reference_client_javascript_if_enabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
