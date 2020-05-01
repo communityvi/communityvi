@@ -17,3 +17,8 @@
     line-height: 480px;
     padding: 40px;
 }
+
+#medium_name {
+    font-size: 16pt;
+    font-weight: bold;
+}
