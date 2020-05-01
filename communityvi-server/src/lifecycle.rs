@@ -649,10 +649,45 @@ mod test {
 	#[tokio::test]
 	async fn should_get_currently_playing_medium_on_hello_response() {
 		let room = Room::new(1);
-		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(
-			"Short Circuit".to_string(),
-			Duration::minutes(98),
-		));
+		let video_name = "Short Circuit".to_string();
+		let video_length = Duration::minutes(98);
+		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(video_name.clone(), video_length));
+		room.insert_medium(short_circuit);
+		room.play_medium(Duration::milliseconds(0));
+
+		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
+		let register_request = OrderedMessage {
+			number: 0,
+			message: ClientRequest::Register {
+				name: "Johnny 5".to_string(),
+			},
+		};
+
+		test_client.send(register_request).await;
+		register_client(room, client_connection, server_connection).await;
+		let response = test_client.receive().await.expect("Did not receive response!");
+
+		assert_eq!(
+			ServerResponse::Hello {
+				id: ClientId::from(0),
+				current_medium: Some(MediumResponse::FixedLength {
+					name: video_name,
+					length_in_milliseconds: video_length.num_milliseconds() as u64,
+					playback_state: PlaybackStateResponse::Playing {
+						start_time_in_milliseconds: 0,
+					}
+				})
+			},
+			response.message
+		);
+	}
+
+	#[tokio::test]
+	async fn should_get_currently_paused_medium_on_hello_response() {
+		let room = Room::new(1);
+		let video_name = "Short Circuit".to_string();
+		let video_length = Duration::minutes(98);
+		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(video_name.clone(), video_length));
 		room.insert_medium(short_circuit);
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
@@ -671,8 +706,11 @@ mod test {
 			ServerResponse::Hello {
 				id: ClientId::from(0),
 				current_medium: Some(MediumResponse::FixedLength {
-					name: "Short Circuit".to_string(),
-					length_in_milliseconds: Duration::minutes(98).num_milliseconds() as u64
+					name: video_name,
+					length_in_milliseconds: video_length.num_milliseconds() as u64,
+					playback_state: PlaybackStateResponse::Paused {
+						position_in_milliseconds: 0
+					}
 				})
 			},
 			response.message

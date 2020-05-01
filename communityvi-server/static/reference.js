@@ -215,6 +215,21 @@ function handleMessage(message, messageEvent) {
 				mediumLengthLabel.textContent = message.current_medium.length_in_milliseconds / 1000 / 60;
 
 				playerPositionSlider.max = message.current_medium.length_in_milliseconds;
+
+				playbackState.type = message.current_medium.playback_state.type;
+				switch (message.current_medium.playback_state.type) {
+					case 'playing': {
+						playbackState.startTime = message.current_medium.playback_state.start_time_in_milliseconds;
+						break;
+					}
+
+					case 'paused': {
+						playbackState.position = message.current_medium.playback_state.position_in_milliseconds;
+						break;
+					}
+				}
+
+				updatePlayer();
 			}
 
 			// start counter management
