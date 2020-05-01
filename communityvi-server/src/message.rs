@@ -1,4 +1,5 @@
 use crate::room::client_id::ClientId;
+use crate::room::state::medium::playback_state::PlaybackState;
 use crate::room::state::medium::{Medium, SomeMedium};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -22,10 +23,25 @@ pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
 pub enum ClientRequest {
 	Ping,
 	Pong,
-	Chat { message: String },
-	Register { name: String },
+	Register {
+		name: String,
+	},
+	Chat {
+		message: String,
+	},
 	GetReferenceTime,
-	InsertMedium { name: String, length_in_milliseconds: u64 },
+	InsertMedium {
+		name: String,
+		length_in_milliseconds: u64,
+	},
+	Play {
+		skipped: bool,
+		start_time_in_milliseconds: i64,
+	},
+	Pause {
+		skipped: bool,
+		position_in_milliseconds: u64,
+	},
 }
 
 impl Message for ClientRequest {}
@@ -58,6 +74,12 @@ pub enum ServerResponse {
 		name: String,
 		length_in_milliseconds: u64,
 	},
+	PlaybackStateChanged {
+		changed_by_name: String,
+		changed_by_id: ClientId,
+		skipped: bool,
+		playback_state: PlaybackStateResponse,
+	},
 	Left {
 		id: ClientId,
 		name: String,
@@ -66,6 +88,27 @@ pub enum ServerResponse {
 		error: ErrorResponse,
 		message: String,
 	},
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type")]
+pub enum PlaybackStateResponse {
+	Playing { start_time_in_milliseconds: i64 },
+	Paused { position_in_milliseconds: u64 },
+}
+
+impl From<PlaybackState> for PlaybackStateResponse {
+	fn from(playback_state: PlaybackState) -> Self {
+		match playback_state {
+			PlaybackState::Playing { start_time } => Self::Playing {
+				start_time_in_milliseconds: start_time.num_milliseconds(),
+			},
+			PlaybackState::Paused { at_position } => Self::Paused {
+				position_in_milliseconds: at_position.num_milliseconds() as u64,
+			},
+		}
+	}
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -91,6 +134,7 @@ impl From<&SomeMedium> for MediumResponse {
 pub enum ErrorResponse {
 	InvalidFormat,
 	InvalidOperation,
+	NoMedium,
 	InvalidMessageNumber,
 	InternalServerError,
 }
@@ -241,6 +285,40 @@ mod test {
 	}
 
 	#[test]
+	fn play_request_should_serialize_and_deserialize() {
+		let play_request = first_message(ClientRequest::Play {
+			skipped: false,
+			start_time_in_milliseconds: -1337,
+		});
+		let json = serde_json::to_string(&play_request).expect("Failed to serialize Play request to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"play","skipped":false,"start_time_in_milliseconds":-1337}"#,
+			json
+		);
+
+		let deserialized_play_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Play request from JSON");
+		assert_eq!(play_request, deserialized_play_request);
+	}
+
+	#[test]
+	fn pause_request_should_serialize_and_deserialize() {
+		let pause_request = first_message(ClientRequest::Pause {
+			skipped: false,
+			position_in_milliseconds: 42,
+		});
+		let json = serde_json::to_string(&pause_request).expect("Failed to serialize Pause request to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"pause","skipped":false,"position_in_milliseconds":42}"#,
+			json
+		);
+
+		let deserialized_pause_request: OrderedMessage<ClientRequest> =
+			serde_json::from_str(&json).expect("Failed to deserialize Pause request from JSON");
+		assert_eq!(pause_request, deserialized_pause_request);
+	}
+
+	#[test]
 	fn ping_response_should_serialize_and_deserialize() {
 		let ping_response = first_message(ServerResponse::Ping);
 		let json = serde_json::to_string(&ping_response).expect("Failed to serialize Ping response to JSON");
@@ -372,6 +450,56 @@ mod test {
 		let deserialized_medium_inserted_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize MediumInserted response from JSON");
 		assert_eq!(medium_inserted_response, deserialized_medium_inserted_response);
+	}
+
+	#[test]
+	fn playback_state_changed_response_for_playing_should_serialize_and_deserialize() {
+		let playback_state_changed_response = first_message(ServerResponse::PlaybackStateChanged {
+			changed_by_name: "Alice".to_string(),
+			changed_by_id: ClientId::from(0),
+			skipped: false,
+			playback_state: PlaybackStateResponse::Playing {
+				start_time_in_milliseconds: -1337,
+			},
+		});
+		let json = serde_json::to_string(&playback_state_changed_response)
+			.expect("Failed to serialize PlaybackStateChanged response to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"playing","start_time_in_milliseconds":-1337}}"#,
+			json
+		);
+
+		let deserialized_playback_state_changed_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged response from JSON");
+		assert_eq!(
+			playback_state_changed_response,
+			deserialized_playback_state_changed_response
+		);
+	}
+
+	#[test]
+	fn playback_state_changed_response_for_paused_should_serialize_and_deserialize() {
+		let playback_state_changed_response = first_message(ServerResponse::PlaybackStateChanged {
+			changed_by_name: "Alice".to_string(),
+			changed_by_id: ClientId::from(0),
+			skipped: false,
+			playback_state: PlaybackStateResponse::Paused {
+				position_in_milliseconds: 42,
+			},
+		});
+		let json = serde_json::to_string(&playback_state_changed_response)
+			.expect("Failed to serialize PlaybackStateChanged response to JSON");
+		assert_eq!(
+			r#"{"number":0,"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"paused","position_in_milliseconds":42}}"#,
+			json
+		);
+
+		let deserialized_playback_state_changed_response: OrderedMessage<ServerResponse> =
+			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged response from JSON");
+		assert_eq!(
+			playback_state_changed_response,
+			deserialized_playback_state_changed_response
+		);
 	}
 
 	#[test]

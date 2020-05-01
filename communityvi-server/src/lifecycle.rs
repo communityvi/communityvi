@@ -173,6 +173,52 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			})
 			.await;
 		}
+		ClientRequest::Play {
+			skipped,
+			start_time_in_milliseconds,
+		} => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
+			None => {
+				client
+					.send(ServerResponse::Error {
+						error: ErrorResponse::NoMedium,
+						message: "Room has no medium.".to_string(),
+					})
+					.await;
+			}
+			Some(playback_state) => {
+				room.broadcast(ServerResponse::PlaybackStateChanged {
+					changed_by_name: client.name().to_string(),
+					changed_by_id: client.id(),
+					skipped,
+					playback_state: playback_state.into(),
+				})
+				.await;
+			}
+		},
+		ClientRequest::Pause {
+			skipped,
+			position_in_milliseconds,
+		} => match room.pause_medium(Duration::milliseconds(
+			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
+		)) {
+			None => {
+				client
+					.send(ServerResponse::Error {
+						error: ErrorResponse::NoMedium,
+						message: "Room has no medium.".to_string(),
+					})
+					.await;
+			}
+			Some(playback_state) => {
+				room.broadcast(ServerResponse::PlaybackStateChanged {
+					changed_by_name: client.name().to_string(),
+					changed_by_id: client.id(),
+					skipped,
+					playback_state: playback_state.into(),
+				})
+				.await;
+			}
+		},
 	}
 }
 
@@ -181,7 +227,7 @@ mod test {
 	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
-	use crate::message::{MediumResponse, OrderedMessage};
+	use crate::message::{MediumResponse, OrderedMessage, PlaybackStateResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use tokio::time::delay_for;
@@ -278,6 +324,191 @@ mod test {
 				message: "Length of a medium must not be larger than one year.".to_string(),
 			}
 		)
+	}
+
+	#[tokio::test]
+	async fn the_client_should_be_able_to_play_the_inserted_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+		let (bob_client_connection, _server_connection, mut bob_test_client) = create_typed_test_connections();
+
+		let room = Room::new(2);
+		let alice = room
+			.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+		room.add_client("Bob".to_string(), bob_client_connection)
+			.expect("Did not get client handle!");
+		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+			"Metropolis".to_string(),
+			Duration::minutes(153),
+		)));
+
+		handle_message(
+			&room,
+			&alice,
+			ClientRequest::Play {
+				skipped: true,
+				start_time_in_milliseconds: -1024,
+			},
+		)
+		.await;
+
+		let alice_broadcast = alice_test_client.receive().await.unwrap();
+		let bob_broadcast = bob_test_client.receive().await.unwrap();
+
+		let expected_broadcast = ServerResponse::PlaybackStateChanged {
+			changed_by_name: alice.name().to_string(),
+			changed_by_id: alice.id(),
+			skipped: true,
+			playback_state: PlaybackStateResponse::Playing {
+				start_time_in_milliseconds: -1024,
+			},
+		};
+
+		assert_eq!(alice_broadcast.message, expected_broadcast);
+		assert_eq!(bob_broadcast.message, expected_broadcast);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_play_something_without_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+
+		let room = Room::new(1);
+		let alice = room
+			.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+
+		handle_message(
+			&room,
+			&alice,
+			ClientRequest::Play {
+				skipped: true,
+				start_time_in_milliseconds: -1024,
+			},
+		)
+		.await;
+		let response = alice_test_client.receive().await.unwrap();
+
+		assert_eq!(
+			response.message,
+			ServerResponse::Error {
+				error: ErrorResponse::NoMedium,
+				message: "Room has no medium.".to_string(),
+			}
+		);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+		let (bob_client_connection, _server_connection, mut bob_test_client) = create_typed_test_connections();
+
+		let room = Room::new(2);
+		room.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+		let bob = room
+			.add_client("Bob".to_string(), bob_client_connection)
+			.expect("Did not get client handle!");
+		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+			"Metropolis".to_string(),
+			Duration::minutes(153),
+		)));
+		room.play_medium(Duration::milliseconds(-1024));
+
+		handle_message(
+			&room,
+			&bob,
+			ClientRequest::Pause {
+				skipped: false,
+				position_in_milliseconds: 1027,
+			},
+		)
+		.await;
+
+		let alice_broadcast = alice_test_client.receive().await.unwrap();
+		let bob_broadcast = bob_test_client.receive().await.unwrap();
+
+		let expected_broadcast = ServerResponse::PlaybackStateChanged {
+			changed_by_name: bob.name().to_string(),
+			changed_by_id: bob.id(),
+			skipped: false,
+			playback_state: PlaybackStateResponse::Paused {
+				position_in_milliseconds: 1027,
+			},
+		};
+
+		assert_eq!(alice_broadcast.message, expected_broadcast);
+		assert_eq!(bob_broadcast.message, expected_broadcast);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_be_able_to_skip_in_paused_mode() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+		let (bob_client_connection, _server_connection, mut bob_test_client) = create_typed_test_connections();
+
+		let room = Room::new(2);
+		room.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+		let bob = room
+			.add_client("Bob".to_string(), bob_client_connection)
+			.expect("Did not get client handle!");
+		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+			"Metropolis".to_string(),
+			Duration::minutes(153),
+		)));
+
+		handle_message(
+			&room,
+			&bob,
+			ClientRequest::Pause {
+				skipped: true,
+				position_in_milliseconds: 1000,
+			},
+		)
+		.await;
+
+		let alice_broadcast = alice_test_client.receive().await.unwrap();
+		let bob_broadcast = bob_test_client.receive().await.unwrap();
+
+		let expected_broadcast = ServerResponse::PlaybackStateChanged {
+			changed_by_name: bob.name().to_string(),
+			changed_by_id: bob.id(),
+			skipped: true,
+			playback_state: PlaybackStateResponse::Paused {
+				position_in_milliseconds: 1000,
+			},
+		};
+
+		assert_eq!(alice_broadcast.message, expected_broadcast);
+		assert_eq!(bob_broadcast.message, expected_broadcast);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_pause_something_without_medium() {
+		let (alice_client_connection, _server_connection, mut alice_test_client) = create_typed_test_connections();
+
+		let room = Room::new(1);
+		let alice = room
+			.add_client("Alice".to_string(), alice_client_connection)
+			.expect("Did not get client handle!");
+
+		handle_message(
+			&room,
+			&alice,
+			ClientRequest::Pause {
+				skipped: false,
+				position_in_milliseconds: 1000,
+			},
+		)
+		.await;
+		let response = alice_test_client.receive().await.unwrap();
+
+		assert_eq!(
+			response.message,
+			ServerResponse::Error {
+				error: ErrorResponse::NoMedium,
+				message: "Room has no medium.".to_string(),
+			}
+		);
 	}
 
 	#[tokio::test]
