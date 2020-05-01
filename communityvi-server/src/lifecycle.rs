@@ -672,7 +672,7 @@ mod test {
 				id: ClientId::from(0),
 				current_medium: Some(MediumResponse::FixedLength {
 					name: "Short Circuit".to_string(),
-					length: Duration::minutes(98).num_milliseconds() as u64
+					length_in_milliseconds: Duration::minutes(98).num_milliseconds() as u64
 				})
 			},
 			response.message

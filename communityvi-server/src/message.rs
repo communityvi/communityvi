@@ -115,7 +115,7 @@ impl From<PlaybackState> for PlaybackStateResponse {
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum MediumResponse {
-	FixedLength { name: String, length: u64 },
+	FixedLength { name: String, length_in_milliseconds: u64 },
 }
 
 impl From<&SomeMedium> for MediumResponse {
@@ -123,7 +123,7 @@ impl From<&SomeMedium> for MediumResponse {
 		match some_medium {
 			SomeMedium::FixedLength(fixed_length) => Self::FixedLength {
 				name: fixed_length.name().to_string(),
-				length: fixed_length.length.num_milliseconds() as u64,
+				length_in_milliseconds: fixed_length.length.num_milliseconds() as u64,
 			},
 		}
 	}
@@ -406,12 +406,12 @@ mod test {
 			id: 42.into(),
 			current_medium: Some(MediumResponse::FixedLength {
 				name: "WarGames".to_string(),
-				length: Duration::minutes(114).num_milliseconds() as u64,
+				length_in_milliseconds: Duration::minutes(114).num_milliseconds() as u64,
 			}),
 		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length":6840000}}"#,
+			r#"{"number":0,"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length_in_milliseconds":6840000}}"#,
 			json
 		);
 

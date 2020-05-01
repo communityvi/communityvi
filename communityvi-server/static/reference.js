@@ -208,6 +208,15 @@ function handleMessage(message, messageEvent) {
 		case 'hello': {
 			idField.innerText = message.id;
 
+			if (message.current_medium !== null) {
+				mediumLength = message.current_medium.length_in_milliseconds;
+
+				mediumNameLabel.textContent = message.current_medium.name;
+				mediumLengthLabel.textContent = message.current_medium.length_in_milliseconds / 1000 / 60;
+
+				playerPositionSlider.max = message.current_medium.length_in_milliseconds;
+			}
+
 			// start counter management
 			setInterval(updateApplicationState, 16);
 			requestReferenceTime();
