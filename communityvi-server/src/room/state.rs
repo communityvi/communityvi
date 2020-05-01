@@ -31,4 +31,8 @@ impl State {
 	pub fn medium(&self) -> MutexGuard<Option<SomeMedium>> {
 		self.medium.lock()
 	}
+
+	pub fn eject_medium(&self) -> bool {
+		self.medium.lock().take().is_some()
+	}
 }

@@ -13,7 +13,6 @@ use parking_lot::MutexGuard;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-use std::time::Duration;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub mod client;
@@ -103,6 +102,13 @@ impl Room {
 			.clients
 			.remove(&client_id)
 			.map(|(_, client)| self.inner.client_names.remove(&normalized_name(client.name())))
+			.map(|_client_name| {
+				let last_client_was_removed = self.inner.client_count.fetch_sub(1, SeqCst) == 1;
+				if last_client_was_removed {
+					// RISK: This is a race between the last client leaving and a new one joining!
+					self.inner.state.eject_medium();
+				}
+			})
 			.is_some()
 	}
 
@@ -124,7 +130,7 @@ impl Room {
 		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
 	}
 
-	pub fn current_reference_time(&self) -> Duration {
+	pub fn current_reference_time(&self) -> std::time::Duration {
 		self.inner.state.current_reference_time()
 	}
 
@@ -148,7 +154,9 @@ fn normalized_name(name: &str) -> String {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::room::state::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_connection::FakeClientConnection;
+	use chrono::Duration;
 
 	#[test]
 	fn should_not_add_client_with_empty_name() {
@@ -279,5 +287,41 @@ mod test {
 		let client_connection = ClientConnection::from(FakeClientConnection::default());
 		let result = room.add_client("elephant".to_string(), client_connection.clone());
 		assert!(matches!(result, Err(RoomError::RoomFull)))
+	}
+
+	#[test]
+	fn should_count_down_clients_once_they_are_removed() {
+		// With a room size of one
+		let room = Room::new(1);
+
+		// Expect an initial add- and remove work
+		let ferris_connection = ClientConnection::from(FakeClientConnection::default());
+		let ferris = room
+			.add_client("Ferris".to_string(), ferris_connection)
+			.expect("Could not add client!");
+		assert!(room.remove_client(ferris.id()), "Could not remove client!");
+
+		// And a subsequent add also works
+		let crab_connection = ClientConnection::from(FakeClientConnection::default());
+		room.add_client("Crab".to_string(), crab_connection)
+			.expect("Could not add client!");
+	}
+
+	#[test]
+	fn should_eject_the_inserted_medium_once_all_clients_have_left_the_room() {
+		let room = Room::new(10);
+		let name = "牧瀬 紅莉栖";
+
+		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let makise_kurisu = room
+			.add_client(name.to_string(), client_connection.clone())
+			.expect("Failed to add client with same name after first is gone");
+		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+			"愛のむきだし".to_string(),
+			Duration::minutes(237),
+		)));
+
+		assert!(room.remove_client(makise_kurisu.id()), "Could not remove client!");
+		assert!(room.medium().is_none(), "A medium was still left in the room!");
 	}
 }
