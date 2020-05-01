@@ -38,7 +38,16 @@ insertMediumButton.onclick = function () {
 	}
 
 	const name = prompt('What should the fake medium be called?', 'Birdman');
-	const length = Number.parseInt(prompt('How long in minutes should the fake medium be?', '116')) * 60 * 1000;
+	if (name === null) {
+		return;
+	}
+
+	const lengthPrompt = prompt('How long in minutes should the fake medium be?', '116');
+	const length = Number.parseInt(lengthPrompt) * 60 * 1000;
+	if (lengthPrompt === null || Number.isNaN(length)) {
+		return;
+	}
+
 	sendMessage({type: 'insert_medium', name: name, length_in_milliseconds: length});
 };
 const playPauseButton = document.getElementById('play_pause');
