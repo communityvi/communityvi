@@ -31,7 +31,6 @@ let playbackState = {
 const mediumNameLabel = document.getElementById('medium_name');
 const mediumLengthLabel = document.getElementById('medium_length');
 const playerPositionLabel = document.getElementById('player_position');
-const playerPositionSlider = document.getElementById('player_position_slider');
 const insertMediumButton = document.getElementById('insert_medium');
 insertMediumButton.onclick = function () {
 	if (webSocket === null) {
@@ -70,55 +69,52 @@ playPauseButton.onclick = function () {
 };
 const rewind10SecondsButton = document.getElementById('rewind_10');
 rewind10SecondsButton.onclick = function () {
-	if (mediumLength === null) {
-		return;
-	}
-
-	switch (playbackState.type) {
-		case 'playing': {
-			playbackState.startTime += 10 * 1000;
-			const referenceTime = calculateReferenceTime();
-			if (playbackState.startTime > referenceTime) {
-				playbackState.startTime = referenceTime;
-			}
-
-			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true});
-			break;
-		}
-		case 'paused': {
-			playbackState.position -= 10 * 1000;
-			if (playbackState.position < 0) {
-				playbackState.position = 0;
-			}
-
-			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true});
-			break;
-		}
-	}
-
-	updatePlayer();
+	skip(Number.parseInt(playerPositionSlider.value) - (10 * 1000));
 };
 const forward10SecondsButton = document.getElementById('forward_10');
 forward10SecondsButton.onclick = function () {
+	skip(Number.parseInt(playerPositionSlider.value) + (10 * 1000));
+};
+let sliderIsBeingDragged = false;
+const playerPositionSlider = document.getElementById('player_position_slider');
+playerPositionSlider.onmousedown = function () {
+	sliderIsBeingDragged = true;
+}
+playerPositionSlider.onmouseup = function () {
+	sliderIsBeingDragged = false;
+}
+playerPositionSlider.onchange = function () {
+    skip(Number.parseInt(playerPositionSlider.value));
+}
+
+function skip(position) {
 	if (mediumLength === null) {
 		return;
 	}
 
 	switch (playbackState.type) {
 		case 'playing': {
-			playbackState.startTime -= 10 * 1000;
 			const referenceTime = calculateReferenceTime();
-			if (playbackState.startTime < (referenceTime - mediumLength)) {
+			const startTime = referenceTime - position;
+			if (startTime < (referenceTime - mediumLength)) {
 				playbackState.startTime = referenceTime - mediumLength;
+			} else if (startTime > referenceTime) {
+				playbackState.startTime = referenceTime;
+			} else {
+				playbackState.startTime = startTime;
 			}
 
 			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true});
 			break;
 		}
+
 		case 'paused': {
-			playbackState.position += 10 * 1000;
-			if (playbackState.position > mediumLength) {
+			if (position > mediumLength) {
 				playbackState.position = mediumLength;
+			} else if (position < 0) {
+				playbackState.position = 0;
+			} else {
+				playbackState.position = position;
 			}
 
 			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true});
@@ -127,7 +123,7 @@ forward10SecondsButton.onclick = function () {
 	}
 
 	updatePlayer();
-};
+}
 
 setupButtonPressOnEnter();
 
@@ -365,13 +361,17 @@ function updatePlayer() {
 	switch (playbackState.type) {
 		case 'playing': {
 		    const position = calculateReferenceTime() - playbackState.startTime;
-			playerPositionSlider.value = Math.round(position);
+			if (sliderIsBeingDragged === false) {
+				playerPositionSlider.value = Math.round(position);
+			}
 			playerPositionLabel.textContent = Math.round(position) / 1000;
 			playPauseButton.innerHTML = '&#9208;';
 			break;
 		}
 		case 'paused': {
-			playerPositionSlider.value = Math.round(playbackState.position);
+			if (sliderIsBeingDragged === false) {
+				playerPositionSlider.value = Math.round(playbackState.position);
+			}
 			playerPositionLabel.textContent = Math.round(playbackState.position) / 1000;
 			playPauseButton.innerHTML = '&#9654;';
 			break;
