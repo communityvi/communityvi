@@ -66,7 +66,7 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 			.header(header::CONTENT_TYPE, mime::TEXT_CSS_UTF_8.to_string())
 			.header(header::CACHE_CONTROL, "no-cache")
 			.body(REFERENCE_CLIENT_CSS.into())
-			.expect("Failed to build reference client JavaScript response");
+			.expect("Failed to build reference client CSS response");
 		(state, response)
 	});
 }
