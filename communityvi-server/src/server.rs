@@ -47,7 +47,7 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 			// prevent XSS - FIXME: Make this work in Safari.
 			.header(
 				header::CONTENT_SECURITY_POLICY,
-				"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
+				"default-src 'none'; media-src 'self' blob:; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
 			)
 			.body(REFERENCE_CLIENT_HTML.into())
 			.expect("Failed to build reference client HTML response");
