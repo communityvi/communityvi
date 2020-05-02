@@ -22,6 +22,8 @@ let referenceTimeOffset = null;
 let referenceTime = null;
 const referenceTimeDisplay = document.getElementById('reference_time');
 
+let playerMode = 'fake';
+let selectedMediumFile = null;
 let mediumLength = null;
 let playbackState = {
 	type: 'paused',
@@ -31,9 +33,37 @@ let playbackState = {
 const mediumNameLabel = document.getElementById('medium_name');
 const mediumLengthLabel = document.getElementById('medium_length');
 const playerPositionLabel = document.getElementById('player_position');
+const playingMedium = document.getElementById('playing_medium');
+const playerSelect = document.getElementById('player_select');
+playerMode = playerSelect.value;
+const playerReal = document.getElementById('player_real');
+playerSelect.onchange = function () {
+	playerMode = playerSelect.value;
+}
+const insertMediumInput = document.getElementById('insert_medium_input');
+insertMediumInput.onchange = function () {
+	if (insertMediumInput.files.length !== 1) {
+		return;
+	}
+
+	selectedMediumFile = insertMediumInput.files[0];
+	mediumNameLabel.textContent = selectedMediumFile.name;
+	playerReal.src = URL.createObjectURL(selectedMediumFile);
+
+	playerReal.load();
+}
 const insertMediumButton = document.getElementById('insert_medium');
 insertMediumButton.onclick = function () {
 	if (webSocket === null) {
+		return;
+	}
+
+	if (playerMode === 'real') {
+		playerPositionLabel.hidden = true;
+		playerReal.hidden = false;
+
+		insertMediumInput.click();
+
 		return;
 	}
 
@@ -50,6 +80,13 @@ insertMediumButton.onclick = function () {
 
 	sendMessage({type: 'insert_medium', name: name, length_in_milliseconds: length});
 };
+playerReal.addEventListener('loadeddata', function () {
+	playingMedium.style.height = `${this.videoHeight}px`;
+	playingMedium.style.width = `${this.videoWidth}px`;
+	playerPositionSlider.style.width = `${this.videoWidth}px`;
+
+	sendMessage({type: 'insert_medium', name: mediumNameLabel.textContent, length_in_milliseconds: Math.round(this.duration * 1000)});
+});
 const playPauseButton = document.getElementById('play_pause');
 playPauseButton.onclick = function () {
 	if (mediumLength === null) {
@@ -212,7 +249,7 @@ function handleMessage(message, messageEvent) {
 				mediumLength = message.current_medium.length_in_milliseconds;
 
 				mediumNameLabel.textContent = message.current_medium.name;
-				mediumLengthLabel.textContent = message.current_medium.length_in_milliseconds / 1000 / 60;
+				mediumLengthLabel.textContent = Math.round(message.current_medium.length_in_milliseconds / 1000 / 60);
 
 				playerPositionSlider.max = message.current_medium.length_in_milliseconds;
 
@@ -282,7 +319,7 @@ function handleMessage(message, messageEvent) {
 
 		case 'medium_inserted': {
 		    mediumNameLabel.textContent = message.name;
-		    mediumLengthLabel.textContent = message.length_in_milliseconds / 1000 / 60;
+		    mediumLengthLabel.textContent = Math.round(message.length_in_milliseconds / 1000 / 60);
 
 		    playbackState.type = 'paused';
 		    playbackState.position = 0;
@@ -397,7 +434,16 @@ function updatePlayer() {
 			if (sliderIsBeingDragged === false) {
 				playerPositionSlider.value = Math.round(position);
 			}
-			playerPositionLabel.textContent = Math.round(position) / 1000;
+
+			if (playerMode === 'real') {
+				playerReal.currentTime = Math.round(position) / 1000;
+				if (playerReal.paused) {
+					playerReal.play();
+				}
+			} else {
+				playerPositionLabel.textContent = Math.round(position) / 1000;
+			}
+
 			playPauseButton.innerHTML = '&#9208;';
 			break;
 		}
@@ -405,7 +451,16 @@ function updatePlayer() {
 			if (sliderIsBeingDragged === false) {
 				playerPositionSlider.value = Math.round(playbackState.position);
 			}
-			playerPositionLabel.textContent = Math.round(playbackState.position) / 1000;
+
+			if (playerMode === 'real') {
+				playerReal.currentTime = Math.round(playbackState.position) / 1000;
+				if (!playerReal.paused) {
+					playerReal.pause();
+				}
+			} else {
+				playerPositionLabel.textContent = Math.round(playbackState.position) / 1000;
+			}
+
 			playPauseButton.innerHTML = '&#9654;';
 			break;
 		}

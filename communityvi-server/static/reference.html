@@ -16,13 +16,18 @@
 		<hr>
         <p>&nbsp;</p>
 		<div>
-			<b>"Player" controls:</b><br>
+			<select id="player_select">
+				<option value="fake" selected>Fake player</option>
+				<option value="real">Real video</option>
+			</select>
+			<input type="file" id="insert_medium_input" hidden>
 			<button id="insert_medium">Insert Medium...</button><br>
 			<p>
 				<span id="medium_name">n/a</span>
 				(<span id="medium_length">n/a</span> min.)
 			</p>
 			<div id="playing_medium">
+				<video id="player_real" hidden></video>
 				<span id="player_position">NaN</span>
 			</div>
 			<input type="range" min="0" max="10000" value="0" id="player_position_slider">
