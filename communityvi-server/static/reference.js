@@ -436,7 +436,9 @@ function updatePlayer() {
 			}
 
 			if (playerMode === 'real') {
-				playerReal.currentTime = Math.round(position) / 1000;
+				if (Math.abs(((playerReal.currentTime * 1000) - position)) > 1000) {
+					playerReal.currentTime = Math.round(position) / 1000;
+				}
 				if (playerReal.paused) {
 					playerReal.play();
 				}
@@ -453,7 +455,9 @@ function updatePlayer() {
 			}
 
 			if (playerMode === 'real') {
-				playerReal.currentTime = Math.round(playbackState.position) / 1000;
+				if (Math.abs(((playerReal.currentTime * 1000) - playbackState.position)) > 1000) {
+					playerReal.currentTime = Math.round(playbackState.position) / 1000;
+				}
 				if (!playerReal.paused) {
 					playerReal.pause();
 				}
