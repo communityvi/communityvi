@@ -1,5 +1,5 @@
 use crate::configuration::Configuration;
-use crate::message::{ClientRequest, OrderedMessage, ServerResponse};
+use crate::message::{ClientRequest, ServerResponse};
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::{create_router, run_server};
@@ -29,15 +29,12 @@ lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-async fn typed_websocket_connection() -> (
-	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
-	impl Stream<Item = OrderedMessage<ServerResponse>>,
-) {
+async fn typed_websocket_connection() -> (impl Sink<ClientRequest, Error = ()>, impl Stream<Item = ServerResponse>) {
 	let (sink, stream) = websocket_connection().await;
 	let stream = stream.map(|result| {
 		let websocket_message = result.expect("Stream error.");
 		let json = websocket_message.to_text().expect("No text message received.");
-		OrderedMessage::<ServerResponse>::try_from(json).expect("Failed to parse JSON response")
+		ServerResponse::try_from(json).expect("Failed to parse JSON response")
 	});
 	let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message| {
 		let websocket_message =
@@ -60,12 +57,10 @@ async fn websocket_connection() -> (
 
 async fn register_client(
 	name: String,
-	request_sink: &mut (impl Sink<OrderedMessage<ClientRequest>, Error = ()> + Unpin),
-	response_stream: &mut (impl Stream<Item = OrderedMessage<ServerResponse>> + Unpin),
+	request_sink: &mut (impl Sink<ClientRequest, Error = ()> + Unpin),
+	response_stream: &mut (impl Stream<Item = ServerResponse> + Unpin),
 ) -> ClientId {
-	let register_request = OrderedMessage {
-		message: ClientRequest::Register { name: name.clone() },
-	};
+	let register_request = ClientRequest::Register { name: name.clone() };
 
 	request_sink
 		.send(register_request)
@@ -77,17 +72,14 @@ async fn register_client(
 		.await
 		.expect("Failed to get response to register request.");
 
-	let id = if let OrderedMessage {
-		message: ServerResponse::Hello { id, .. },
-	} = response
-	{
+	let id = if let ServerResponse::Hello { id, .. } = response {
 		id
 	} else {
 		panic!("Expected Hello-Response, got '{:?}'", response);
 	};
 
 	let joined_response = response_stream.next().await.expect("Failed to get joined response.");
-	assert!(matches!(joined_response, OrderedMessage {message: ServerResponse::Joined {id: _, name: _}}));
+	assert!(matches!(joined_response, ServerResponse::Joined {id: _, name: _}));
 
 	id
 }
@@ -96,8 +88,8 @@ async fn connect_and_register(
 	name: String,
 ) -> (
 	ClientId,
-	impl Sink<OrderedMessage<ClientRequest>, Error = ()>,
-	impl Stream<Item = OrderedMessage<ServerResponse>>,
+	impl Sink<ClientRequest, Error = ()>,
+	impl Stream<Item = ServerResponse>,
 ) {
 	let (mut request_sink, mut response_stream) = typed_websocket_connection().await;
 	let client_id = register_client(name, &mut request_sink, &mut response_stream).await;
@@ -179,21 +171,17 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 fn should_broadcast_messages() {
 	let future = async move {
 		let message = r#"Hello everyone \o/"#;
-		let request = OrderedMessage {
-			message: ClientRequest::Chat {
-				message: message.to_string(),
-			},
+		let request = ClientRequest::Chat {
+			message: message.to_string(),
 		};
 		let (alice_client_id, mut alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
 		assert_eq!(ClientId::from(0), alice_client_id);
 		let (bob_client_id, _bob_sink, mut bob_stream) = connect_and_register("Bob".to_string()).await;
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let expected_bob_joined_response = OrderedMessage {
-			message: ServerResponse::Joined {
-				id: bob_client_id,
-				name: "Bob".to_string(),
-			},
+		let expected_bob_joined_response = ServerResponse::Joined {
+			id: bob_client_id,
+			name: "Bob".to_string(),
 		};
 		let bob_joined_response = alice_stream.next().await.expect("Didn't get join message for Bob.");
 		assert_eq!(expected_bob_joined_response, bob_joined_response);
@@ -210,18 +198,14 @@ fn should_broadcast_messages() {
 			.expect("Failed to sink broadcast message.");
 
 		assert_eq!(
-			OrderedMessage {
-				message: expected_chat_response.clone()
-			},
+			expected_chat_response,
 			alice_stream
 				.next()
 				.await
 				.expect("Failed to receive response on client 1")
 		);
 		assert_eq!(
-			OrderedMessage {
-				message: expected_chat_response
-			},
+			expected_chat_response,
 			bob_stream.next().await.expect("Failed to receive response on client 2")
 		);
 	};
@@ -238,11 +222,9 @@ fn should_broadcast_when_client_leaves_the_room() {
 		std::mem::drop(bob_sink);
 		std::mem::drop(bob_stream);
 
-		let expected_leave_message = OrderedMessage {
-			message: ServerResponse::Left {
-				id: bob_client_id,
-				name: "Bob".to_string(),
-			},
+		let expected_leave_message = ServerResponse::Left {
+			id: bob_client_id,
+			name: "Bob".to_string(),
 		};
 		let leave_message = alice_stream.next().await.expect("Failed to get Leave message for bob");
 		assert_eq!(expected_leave_message, leave_message);

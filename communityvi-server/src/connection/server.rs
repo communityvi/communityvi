@@ -1,5 +1,5 @@
 use crate::connection::client::ClientConnection;
-use crate::message::{ClientRequest, ErrorResponse, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::message::{ClientRequest, ErrorResponse, MessageError, ServerResponse, WebSocketMessage};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;
@@ -42,8 +42,8 @@ where
 				return None;
 			}
 
-			let ordered_message = match OrderedMessage::try_from(&websocket_message) {
-				Ok(ordered_message) => ordered_message,
+			let client_request = match ClientRequest::try_from(&websocket_message) {
+				Ok(client_request) => client_request,
 				Err(message_error) => {
 					let message = match message_error {
 						MessageError::DeserializationFailed { error, json } => format!(
@@ -66,7 +66,7 @@ where
 				}
 			};
 
-			return Some(ordered_message.message);
+			return Some(client_request);
 		}
 
 		let _ = self

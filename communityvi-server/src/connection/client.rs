@@ -1,4 +1,4 @@
-use crate::message::{OrderedMessage, ServerResponse, WebSocketMessage};
+use crate::message::{ServerResponse, WebSocketMessage};
 use crate::server::WebSocket;
 use async_trait::async_trait;
 use futures::stream::SplitSink;
@@ -30,11 +30,10 @@ impl<ResponseSink> ClientConnectionTrait for SinkClientConnection<ResponseSink>
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
-	async fn send(&self, message: ServerResponse) -> Result<(), ()> {
+	async fn send(&self, response: ServerResponse) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 
-		let ordered_message = OrderedMessage { message };
-		let websocket_message = WebSocketMessage::from(&ordered_message);
+		let websocket_message = WebSocketMessage::from(&response);
 
 		inner.response_sink.send(websocket_message).await.map_err(|_| ())
 	}

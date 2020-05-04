@@ -223,7 +223,7 @@ mod test {
 	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
-	use crate::message::{MediumResponse, OrderedMessage, PlaybackStateResponse};
+	use crate::message::{MediumResponse, PlaybackStateResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use tokio::time::delay_for;
@@ -241,10 +241,8 @@ mod test {
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
 
-		match test_client.receive().await.expect("Invalid ordered message") {
-			OrderedMessage {
-				message: ServerResponse::ReferenceTime { milliseconds },
-			} => {
+		match test_client.receive().await.expect("Invalid server response") {
+			ServerResponse::ReferenceTime { milliseconds } => {
 				assert!(
 					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
 					"milliseconds = {}",
@@ -287,8 +285,8 @@ mod test {
 			length_in_milliseconds: 153 * 60 * 1000,
 		};
 
-		assert_eq!(alice_broadcast.message, expected_broadcast);
-		assert_eq!(bob_broadcast.message, expected_broadcast);
+		assert_eq!(alice_broadcast, expected_broadcast);
+		assert_eq!(bob_broadcast, expected_broadcast);
 	}
 
 	#[tokio::test]
@@ -313,7 +311,7 @@ mod test {
 		let error_response = alice_test_client.receive().await.unwrap();
 
 		assert_eq!(
-			error_response.message,
+			error_response,
 			ServerResponse::Error {
 				error: ErrorResponse::InvalidFormat,
 				message: "Length of a medium must not be larger than one year.".to_string(),
@@ -359,8 +357,8 @@ mod test {
 			},
 		};
 
-		assert_eq!(alice_broadcast.message, expected_broadcast);
-		assert_eq!(bob_broadcast.message, expected_broadcast);
+		assert_eq!(alice_broadcast, expected_broadcast);
+		assert_eq!(bob_broadcast, expected_broadcast);
 	}
 
 	#[tokio::test]
@@ -384,7 +382,7 @@ mod test {
 		let response = alice_test_client.receive().await.unwrap();
 
 		assert_eq!(
-			response.message,
+			response,
 			ServerResponse::Error {
 				error: ErrorResponse::NoMedium,
 				message: "Room has no medium.".to_string(),
@@ -431,8 +429,8 @@ mod test {
 			},
 		};
 
-		assert_eq!(alice_broadcast.message, expected_broadcast);
-		assert_eq!(bob_broadcast.message, expected_broadcast);
+		assert_eq!(alice_broadcast, expected_broadcast);
+		assert_eq!(bob_broadcast, expected_broadcast);
 	}
 
 	#[tokio::test]
@@ -473,8 +471,8 @@ mod test {
 			},
 		};
 
-		assert_eq!(alice_broadcast.message, expected_broadcast);
-		assert_eq!(bob_broadcast.message, expected_broadcast);
+		assert_eq!(alice_broadcast, expected_broadcast);
+		assert_eq!(bob_broadcast, expected_broadcast);
 	}
 
 	#[tokio::test]
@@ -498,7 +496,7 @@ mod test {
 		let response = alice_test_client.receive().await.unwrap();
 
 		assert_eq!(
-			response.message,
+			response,
 			ServerResponse::Error {
 				error: ErrorResponse::NoMedium,
 				message: "Room has no medium.".to_string(),
@@ -528,17 +526,13 @@ mod test {
 			}
 		});
 
-		let register_message = OrderedMessage {
-			message: ClientRequest::Register {
-				name: "Parcival".to_string(),
-			},
+		let register_message = ClientRequest::Register {
+			name: "Parcival".to_string(),
 		};
 
 		test_client.send(register_message).await;
 		match test_client.receive().await.expect("No response to double register.") {
-			OrderedMessage {
-				message: ServerResponse::Error { error, message },
-			} => {
+			ServerResponse::Error { error, message } => {
 				assert_eq!(ErrorResponse::InvalidOperation, error);
 				assert!(message.contains("registered"));
 			}
@@ -550,20 +544,16 @@ mod test {
 	async fn should_not_register_clients_with_blank_name() {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::new(10);
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register { name: "	 ".to_string() },
-		};
+		let register_request = ClientRequest::Register { name: "	 ".to_string() };
 
 		test_client.send(register_request).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
 		assert_eq!(
-			OrderedMessage {
-				message: ServerResponse::Error {
-					error: ErrorResponse::InvalidFormat,
-					message: "Name was empty or whitespace-only.".to_string()
-				}
+			ServerResponse::Error {
+				error: ErrorResponse::InvalidFormat,
+				message: "Name was empty or whitespace-only.".to_string()
 			},
 			response
 		);
@@ -580,10 +570,8 @@ mod test {
 
 		// And I register another client with the same name
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register {
-				name: "Ferris".to_string(),
-			},
+		let register_request = ClientRequest::Register {
+			name: "Ferris".to_string(),
 		};
 
 		test_client.send(register_request).await;
@@ -592,11 +580,9 @@ mod test {
 
 		// Then I expect an error
 		assert_eq!(
-			OrderedMessage {
-				message: ServerResponse::Error {
-					error: ErrorResponse::InvalidOperation,
-					message: "Client name is already in use.".to_string()
-				}
+			ServerResponse::Error {
+				error: ErrorResponse::InvalidOperation,
+				message: "Client name is already in use.".to_string()
 			},
 			response
 		);
@@ -611,10 +597,8 @@ mod test {
 		}
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register {
-				name: "second".to_string(),
-			},
+		let register_request = ClientRequest::Register {
+			name: "second".to_string(),
 		};
 
 		test_client.send(register_request).await;
@@ -622,11 +606,9 @@ mod test {
 		let response = test_client.receive().await.expect("Did not receive response!");
 
 		assert_eq!(
-			OrderedMessage {
-				message: ServerResponse::Error {
-					error: ErrorResponse::InvalidOperation,
-					message: "Can't join, room is already full.".to_string()
-				}
+			ServerResponse::Error {
+				error: ErrorResponse::InvalidOperation,
+				message: "Can't join, room is already full.".to_string()
 			},
 			response
 		);
@@ -642,10 +624,8 @@ mod test {
 		room.play_medium(Duration::milliseconds(0));
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register {
-				name: "Johnny 5".to_string(),
-			},
+		let register_request = ClientRequest::Register {
+			name: "Johnny 5".to_string(),
 		};
 
 		test_client.send(register_request).await;
@@ -663,7 +643,7 @@ mod test {
 					}
 				})
 			},
-			response.message
+			response
 		);
 	}
 
@@ -676,10 +656,8 @@ mod test {
 		room.insert_medium(short_circuit);
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register {
-				name: "Johnny 5".to_string(),
-			},
+		let register_request = ClientRequest::Register {
+			name: "Johnny 5".to_string(),
 		};
 
 		test_client.send(register_request).await;
@@ -697,7 +675,7 @@ mod test {
 					}
 				})
 			},
-			response.message
+			response
 		);
 	}
 
@@ -708,9 +686,7 @@ mod test {
 		server_connection: ServerConnection,
 		mut test_client: TypedTestClient,
 	) -> (Client, ServerConnection, TypedTestClient) {
-		let register_request = OrderedMessage {
-			message: ClientRequest::Register { name: name.into() },
-		};
+		let register_request = ClientRequest::Register { name: name.into() };
 
 		test_client.send(register_request).await;
 
@@ -724,10 +700,7 @@ mod test {
 			.await
 			.expect("Failed to get response to register request.");
 
-		let id = if let OrderedMessage {
-			message: ServerResponse::Hello { id, .. },
-		} = response
-		{
+		let id = if let ServerResponse::Hello { id, .. } = response {
 			id
 		} else {
 			panic!("Expected Hello-Response, got '{:?}'", response);
@@ -735,7 +708,7 @@ mod test {
 		assert_eq!(client_handle.id(), id);
 
 		let joined_response = test_client.receive().await.expect("Failed to get joined response.");
-		assert!(matches!(joined_response, OrderedMessage {message: ServerResponse::Joined {id: _, name: _}}));
+		assert!(matches!(joined_response, ServerResponse::Joined {id: _, name: _}));
 		(client_handle, server_connection, test_client)
 	}
 }

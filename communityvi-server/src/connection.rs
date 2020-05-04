@@ -21,15 +21,15 @@ pub mod test {
 	use super::*;
 	use crate::connection::client::SinkClientConnection;
 	use crate::connection::server::StreamServerConnection;
-	use crate::message::{ClientRequest, MessageError, OrderedMessage, ServerResponse, WebSocketMessage};
+	use crate::message::{ClientRequest, MessageError, ServerResponse, WebSocketMessage};
 	use crate::utils::test_client::TestClient;
 	use futures::{Sink, SinkExt, Stream, StreamExt};
 	use std::convert::TryFrom;
 	use std::pin::Pin;
 
 	pub type TypedTestClient = TestClient<
-		Pin<Box<dyn Sink<OrderedMessage<ClientRequest>, Error = futures::channel::mpsc::SendError>>>,
-		Pin<Box<dyn Stream<Item = Result<OrderedMessage<ServerResponse>, MessageError>>>>,
+		Pin<Box<dyn Sink<ClientRequest, Error = futures::channel::mpsc::SendError>>>,
+		Pin<Box<dyn Stream<Item = Result<ServerResponse, MessageError>>>>,
 	>;
 	pub type RawTestClient = TestClient<
 		Pin<Box<dyn Sink<WebSocketMessage, Error = futures::channel::mpsc::SendError>>>,
@@ -40,11 +40,10 @@ pub mod test {
 		let (client_connection, server_connection, raw_test_client) = create_raw_test_connections();
 		let (raw_client_sender, raw_client_receiver) = raw_test_client.split();
 
-		let client_sender = raw_client_sender.with(|ordered_message| {
-			futures::future::ok::<_, futures::channel::mpsc::SendError>(WebSocketMessage::from(&ordered_message))
+		let client_sender = raw_client_sender.with(|client_request| {
+			futures::future::ok::<_, futures::channel::mpsc::SendError>(WebSocketMessage::from(&client_request))
 		});
-		let client_receiver =
-			raw_client_receiver.map(|websocket_message| OrderedMessage::<ServerResponse>::try_from(&websocket_message));
+		let client_receiver = raw_client_receiver.map(|websocket_message| ServerResponse::try_from(&websocket_message));
 
 		(
 			client_connection,
