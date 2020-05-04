@@ -287,7 +287,9 @@ mod test_helper {
 	pub fn some_ordered_message(number: u64) -> OrderedMessage<ClientRequest> {
 		OrderedMessage {
 			number,
-			message: ClientRequest::Ping,
+			message: ClientRequest::Chat {
+				message: "Hello".to_string(),
+			},
 		}
 	}
 }

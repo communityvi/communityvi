@@ -116,9 +116,6 @@ async fn handle_messages(room: &Room, client: Client, mut server_connection: Ser
 
 async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 	match request {
-		ClientRequest::Ping => {
-			client.send(ServerResponse::Pong).await;
-		}
 		ClientRequest::Chat { message } => {
 			room.broadcast(ServerResponse::Chat {
 				sender_id: client.id(),
@@ -127,7 +124,6 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			})
 			.await
 		}
-		ClientRequest::Pong => info!("Received Pong from client: {}", client.id()),
 		ClientRequest::Register { .. } => {
 			error!(
 				"Client: {} tried to register even though it is already registered.",

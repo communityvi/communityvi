@@ -21,8 +21,6 @@ pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ClientRequest {
-	Ping,
-	Pong,
 	Register {
 		name: String,
 	},
@@ -50,8 +48,6 @@ impl Message for ClientRequest {}
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ServerResponse {
-	Ping,
-	Pong,
 	Chat {
 		sender_id: ClientId,
 		sender_name: String,
@@ -212,28 +208,6 @@ mod test {
 	}
 
 	#[test]
-	fn ping_request_should_serialize_and_deserialize() {
-		let ping_request = first_message(ClientRequest::Ping);
-		let json = serde_json::to_string(&ping_request).expect("Failed to serialize Ping request to JSON");
-		assert_eq!(r#"{"number":0,"type":"ping"}"#, json);
-
-		let deserialized_ping_request: OrderedMessage<ClientRequest> =
-			serde_json::from_str(&json).expect("Failed to deserialize Ping request from JSON");
-		assert_eq!(ping_request, deserialized_ping_request);
-	}
-
-	#[test]
-	fn pong_request_should_serialize_and_deserialize() {
-		let pong_request = first_message(ClientRequest::Pong);
-		let json = serde_json::to_string(&pong_request).expect("Failed to serialize Pong request to JSON");
-		assert_eq!(r#"{"number":0,"type":"pong"}"#, json);
-
-		let deserialized_pong_request: OrderedMessage<ClientRequest> =
-			serde_json::from_str(&json).expect("Failed to deserialize Pong request from JSON");
-		assert_eq!(pong_request, deserialized_pong_request);
-	}
-
-	#[test]
 	fn chat_request_should_serialize_and_deserialize() {
 		let chat_request = first_message(ClientRequest::Chat {
 			message: "hello".into(),
@@ -321,28 +295,6 @@ mod test {
 		let deserialized_pause_request: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize Pause request from JSON");
 		assert_eq!(pause_request, deserialized_pause_request);
-	}
-
-	#[test]
-	fn ping_response_should_serialize_and_deserialize() {
-		let ping_response = first_message(ServerResponse::Ping);
-		let json = serde_json::to_string(&ping_response).expect("Failed to serialize Ping response to JSON");
-		assert_eq!(r#"{"number":0,"type":"ping"}"#, json);
-
-		let deserialized_ping_response: OrderedMessage<ServerResponse> =
-			serde_json::from_str(&json).expect("Failed to deserialize Ping response from JSON");
-		assert_eq!(ping_response, deserialized_ping_response);
-	}
-
-	#[test]
-	fn pong_response_should_serialize_and_deserialize() {
-		let pong_response = first_message(ServerResponse::Pong);
-		let json = serde_json::to_string(&pong_response).expect("Failed to serialize Pong response to JSON");
-		assert_eq!(r#"{"number":0,"type":"pong"}"#, json);
-
-		let deserialized_pong_response: OrderedMessage<ServerResponse> =
-			serde_json::from_str(&json).expect("Failed to deserialize Pong response from JSON");
-		assert_eq!(pong_response, deserialized_pong_response);
 	}
 
 	#[test]

@@ -180,29 +180,6 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 }
 
 #[test]
-fn should_receive_pong_in_response_to_ping() {
-	let future = async {
-		let (client_id, mut sink, mut stream) = connect_and_register("Ferris".to_string()).await;
-		assert_eq!(ClientId::from(0), client_id);
-		let message = OrderedMessage {
-			number: 42,
-			message: ClientRequest::Ping,
-		};
-		sink.send(message).await.expect("Failed to sink message.");
-		let message = stream.next().await.unwrap();
-		assert_eq!(
-			OrderedMessage {
-				number: 2,
-				message: ServerResponse::Pong,
-			},
-			message
-		);
-	};
-
-	test_future_with_running_server(future, false);
-}
-
-#[test]
 fn should_broadcast_messages() {
 	let future = async move {
 		let message = r#"Hello everyone \o/"#;
