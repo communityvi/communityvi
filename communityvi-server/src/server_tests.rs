@@ -363,7 +363,7 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 			.to_str()
 			.expect("Cache-Control header is no valid UTF-8");
 		assert_eq!(
-			"default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
+			"default-src 'none'; media-src 'self' blob:; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
 			content_security_policy
 		);
 
