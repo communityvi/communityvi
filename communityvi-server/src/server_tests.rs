@@ -1,6 +1,6 @@
 use crate::configuration::Configuration;
 use crate::message::client_request::{ChatRequest, ClientRequest, RegisterRequest};
-use crate::message::server_response::ServerResponse;
+use crate::message::server_response::{ChatResponse, HelloResponse, JoinedResponse, LeftResponse, ServerResponse};
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::{create_router, run_server};
@@ -73,14 +73,17 @@ async fn register_client(
 		.await
 		.expect("Failed to get response to register request.");
 
-	let id = if let ServerResponse::Hello { id, .. } = response {
+	let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
 		id
 	} else {
 		panic!("Expected Hello-Response, got '{:?}'", response);
 	};
 
 	let joined_response = response_stream.next().await.expect("Failed to get joined response.");
-	assert!(matches!(joined_response, ServerResponse::Joined {id: _, name: _}));
+	assert!(matches!(
+		joined_response,
+		ServerResponse::Joined(JoinedResponse { id: _, name: _ })
+	));
 
 	id
 }
@@ -180,18 +183,18 @@ fn should_broadcast_messages() {
 		let (bob_client_id, _bob_sink, mut bob_stream) = connect_and_register("Bob".to_string()).await;
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let expected_bob_joined_response = ServerResponse::Joined {
+		let expected_bob_joined_response = ServerResponse::Joined(JoinedResponse {
 			id: bob_client_id,
 			name: "Bob".to_string(),
-		};
+		});
 		let bob_joined_response = alice_stream.next().await.expect("Didn't get join message for Bob.");
 		assert_eq!(expected_bob_joined_response, bob_joined_response);
 
-		let expected_chat_response = ServerResponse::Chat {
+		let expected_chat_response = ServerResponse::Chat(ChatResponse {
 			sender_id: alice_client_id,
 			sender_name: "Alice".to_string(),
 			message: message.to_string(),
-		};
+		});
 
 		alice_sink
 			.send(request.into())
@@ -223,10 +226,10 @@ fn should_broadcast_when_client_leaves_the_room() {
 		std::mem::drop(bob_sink);
 		std::mem::drop(bob_stream);
 
-		let expected_leave_message = ServerResponse::Left {
+		let expected_leave_message = ServerResponse::Left(LeftResponse {
 			id: bob_client_id,
 			name: "Bob".to_string(),
-		};
+		});
 		let leave_message = alice_stream.next().await.expect("Failed to get Leave message for bob");
 		assert_eq!(expected_leave_message, leave_message);
 	};

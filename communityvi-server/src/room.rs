@@ -114,7 +114,10 @@ impl Room {
 			.is_some()
 	}
 
-	pub async fn broadcast(&self, response: ServerResponse) {
+	pub async fn broadcast<Response>(&self, response: Response)
+	where
+		Response: Into<ServerResponse> + Clone,
+	{
 		let futures: Vec<_> = self
 			.inner
 			.clients

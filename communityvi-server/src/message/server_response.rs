@@ -12,43 +12,93 @@ use std::convert::{TryFrom, TryInto};
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ServerResponse {
-	Chat {
-		sender_id: ClientId,
-		sender_name: String,
-		message: String,
-	},
-	Hello {
-		id: ClientId,
-		current_medium: Option<MediumResponse>,
-	},
-	Joined {
-		id: ClientId,
-		name: String,
-	},
-	ReferenceTime {
-		milliseconds: u64,
-	},
-	MediumInserted {
-		inserted_by_name: String,
-		inserted_by_id: ClientId,
-		name: String,
-		length_in_milliseconds: u64,
-	},
-	PlaybackStateChanged {
-		changed_by_name: String,
-		changed_by_id: ClientId,
-		skipped: bool,
-		playback_state: PlaybackStateResponse,
-	},
-	Left {
-		id: ClientId,
-		name: String,
-	},
-	Error {
-		error: ErrorResponse,
-		message: String,
-	},
+	Chat(ChatResponse),
+	Hello(HelloResponse),
+	Joined(JoinedResponse),
+	ReferenceTime(ReferenceTimeResponse),
+	MediumInserted(MediumInsertedResponse),
+	PlaybackStateChanged(PlaybackStateChangedResponse),
+	Left(LeftResponse),
+	Error(ErrorResponse),
 }
+
+macro_rules! server_response_from_struct {
+	($enum_case: ident, $struct_type: ty) => {
+		impl From<$struct_type> for ServerResponse {
+			fn from(response: $struct_type) -> ServerResponse {
+				ServerResponse::$enum_case(response)
+			}
+		}
+	};
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ChatResponse {
+	pub sender_id: ClientId,
+	pub sender_name: String,
+	pub message: String,
+}
+
+server_response_from_struct!(Chat, ChatResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct HelloResponse {
+	pub id: ClientId,
+	pub current_medium: Option<MediumResponse>,
+}
+
+server_response_from_struct!(Hello, HelloResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct JoinedResponse {
+	pub id: ClientId,
+	pub name: String,
+}
+
+server_response_from_struct!(Joined, JoinedResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ReferenceTimeResponse {
+	pub milliseconds: u64,
+}
+
+server_response_from_struct!(ReferenceTime, ReferenceTimeResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct MediumInsertedResponse {
+	pub inserted_by_name: String,
+	pub inserted_by_id: ClientId,
+	pub name: String,
+	pub length_in_milliseconds: u64,
+}
+
+server_response_from_struct!(MediumInserted, MediumInsertedResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PlaybackStateChangedResponse {
+	pub changed_by_name: String,
+	pub changed_by_id: ClientId,
+	pub skipped: bool,
+	pub playback_state: PlaybackStateResponse,
+}
+
+server_response_from_struct!(PlaybackStateChanged, PlaybackStateChangedResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct LeftResponse {
+	pub id: ClientId,
+	pub name: String,
+}
+
+server_response_from_struct!(Left, LeftResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ErrorResponse {
+	pub error: ErrorResponseType,
+	pub message: String,
+}
+
+server_response_from_struct!(Error, ErrorResponse);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -96,7 +146,7 @@ impl From<&SomeMedium> for MediumResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ErrorResponse {
+pub enum ErrorResponseType {
 	InvalidFormat,
 	InvalidOperation,
 	NoMedium,
@@ -136,11 +186,11 @@ mod test {
 
 	#[test]
 	fn chat_response_should_serialize_and_deserialize() {
-		let chat_response = ServerResponse::Chat {
+		let chat_response = ServerResponse::Chat(ChatResponse {
 			sender_id: ClientId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&chat_response).expect("Failed to serialize Chat response to JSON");
 		assert_eq!(
 			r#"{"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello"}"#,
@@ -154,10 +204,10 @@ mod test {
 
 	#[test]
 	fn joined_response_should_serialize_and_deserialize() {
-		let joined_response = ServerResponse::Joined {
+		let joined_response = ServerResponse::Joined(JoinedResponse {
 			id: ClientId::from(42),
 			name: "Hedwig".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&joined_response).expect("Failed to serialize Joined response to JSON");
 		assert_eq!(r#"{"type":"joined","id":42,"name":"Hedwig"}"#, json);
 
@@ -168,10 +218,10 @@ mod test {
 
 	#[test]
 	fn left_response_should_serialize_and_deserialize() {
-		let left_response = ServerResponse::Left {
+		let left_response = ServerResponse::Left(LeftResponse {
 			id: ClientId::from(42),
 			name: "Hedwig".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&left_response).expect("Failed to serialize Left response to JSON");
 		assert_eq!(r#"{"type":"left","id":42,"name":"Hedwig"}"#, json);
 
@@ -182,10 +232,10 @@ mod test {
 
 	#[test]
 	fn hello_response_without_medium_should_serialize_and_deserialize() {
-		let hello_response = ServerResponse::Hello {
+		let hello_response = ServerResponse::Hello(HelloResponse {
 			id: 42.into(),
 			current_medium: None,
-		};
+		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(r#"{"type":"hello","id":42,"current_medium":null}"#, json);
 
@@ -196,7 +246,7 @@ mod test {
 
 	#[test]
 	fn hello_response_with_medium_should_serialize_and_deserialize() {
-		let hello_response = ServerResponse::Hello {
+		let hello_response = ServerResponse::Hello(HelloResponse {
 			id: 42.into(),
 			current_medium: Some(MediumResponse::FixedLength {
 				name: "WarGames".to_string(),
@@ -205,7 +255,7 @@ mod test {
 					position_in_milliseconds: 0,
 				},
 			}),
-		};
+		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(
 			r#"{"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length_in_milliseconds":6840000,"playback_state":{"type":"paused","position_in_milliseconds":0}}}"#,
@@ -219,7 +269,7 @@ mod test {
 
 	#[test]
 	fn reference_time_response_should_serialize_and_deserialize() {
-		let reference_time_response = ServerResponse::ReferenceTime { milliseconds: 1337 };
+		let reference_time_response = ServerResponse::ReferenceTime(ReferenceTimeResponse { milliseconds: 1337 });
 		let json = serde_json::to_string(&reference_time_response)
 			.expect("Failed to serialize ReferenceTime response to JSON");
 		assert_eq!(r#"{"type":"reference_time","milliseconds":1337}"#, json);
@@ -231,12 +281,12 @@ mod test {
 
 	#[test]
 	fn medium_inserted_response_should_serialize_and_deserialize() {
-		let medium_inserted_response = ServerResponse::MediumInserted {
+		let medium_inserted_response = ServerResponse::MediumInserted(MediumInsertedResponse {
 			inserted_by_name: "Squirrel".to_string(),
 			inserted_by_id: ClientId::from(42),
 			name: "The Acorn".to_string(),
 			length_in_milliseconds: 20 * 60 * 1000,
-		};
+		});
 		let json = serde_json::to_string(&medium_inserted_response)
 			.expect("Failed to serialize MediumInserted response to JSON");
 		assert_eq!(
@@ -251,14 +301,14 @@ mod test {
 
 	#[test]
 	fn playback_state_changed_response_for_playing_should_serialize_and_deserialize() {
-		let playback_state_changed_response = ServerResponse::PlaybackStateChanged {
+		let playback_state_changed_response = ServerResponse::PlaybackStateChanged(PlaybackStateChangedResponse {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
 			skipped: false,
 			playback_state: PlaybackStateResponse::Playing {
 				start_time_in_milliseconds: -1337,
 			},
-		};
+		});
 		let json = serde_json::to_string(&playback_state_changed_response)
 			.expect("Failed to serialize PlaybackStateChanged response to JSON");
 		assert_eq!(
@@ -276,14 +326,14 @@ mod test {
 
 	#[test]
 	fn playback_state_changed_response_for_paused_should_serialize_and_deserialize() {
-		let playback_state_changed_response = ServerResponse::PlaybackStateChanged {
+		let playback_state_changed_response = ServerResponse::PlaybackStateChanged(PlaybackStateChangedResponse {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
 			skipped: false,
 			playback_state: PlaybackStateResponse::Paused {
 				position_in_milliseconds: 42,
 			},
-		};
+		});
 		let json = serde_json::to_string(&playback_state_changed_response)
 			.expect("Failed to serialize PlaybackStateChanged response to JSON");
 		assert_eq!(
@@ -301,10 +351,10 @@ mod test {
 
 	#[test]
 	fn invalid_format_error_response_should_serialize_and_deserialize() {
-		let invalid_format_error_response = ServerResponse::Error {
-			error: ErrorResponse::InvalidFormat,
+		let invalid_format_error_response = ServerResponse::Error(ErrorResponse {
+			error: ErrorResponseType::InvalidFormat,
 			message: "�".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&invalid_format_error_response)
 			.expect("Failed to serialize InvalidFormat error response to JSON");
 		assert_eq!(r#"{"type":"error","error":"invalid_format","message":"�"}"#, json);
@@ -319,10 +369,10 @@ mod test {
 
 	#[test]
 	fn invalid_operation_error_response_should_serialize_and_deserialize() {
-		let invalid_operation_error_response = ServerResponse::Error {
-			error: ErrorResponse::InvalidOperation,
+		let invalid_operation_error_response = ServerResponse::Error(ErrorResponse {
+			error: ErrorResponseType::InvalidOperation,
 			message: "I'm a teapot.".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&invalid_operation_error_response)
 			.expect("Failed to serialize InvalidOperation error response to JSON");
 		assert_eq!(
@@ -340,10 +390,10 @@ mod test {
 
 	#[test]
 	fn internal_server_error_response_should_serialize_and_deserialize() {
-		let internal_server_error_error_response = ServerResponse::Error {
-			error: ErrorResponse::InternalServerError,
+		let internal_server_error_error_response = ServerResponse::Error(ErrorResponse {
+			error: ErrorResponseType::InternalServerError,
 			message: "I've found a bug crawling around my circuits.".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&internal_server_error_error_response)
 			.expect("Failed to serialize InternalServerError error response to JSON");
 		assert_eq!(

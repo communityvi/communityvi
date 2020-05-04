@@ -37,8 +37,11 @@ impl Client {
 		self.inner.name.as_str()
 	}
 
-	pub async fn send(&self, response: ServerResponse) -> bool {
-		if self.inner.connection.send(response).await.is_err() {
+	pub async fn send<Response>(&self, response: Response) -> bool
+	where
+		Response: Into<ServerResponse>,
+	{
+		if self.inner.connection.send(response.into()).await.is_err() {
 			info!(
 				"Failed to send message to client with id {} because it went away.",
 				self.inner.id

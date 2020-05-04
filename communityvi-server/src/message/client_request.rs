@@ -18,7 +18,7 @@ pub enum ClientRequest {
 }
 
 macro_rules! client_request_from_struct {
-	($enum_case: ident, $struct_type: ident) => {
+	($enum_case: ident, $struct_type: ty) => {
 		impl From<$struct_type> for ClientRequest {
 			fn from(request: $struct_type) -> ClientRequest {
 				ClientRequest::$enum_case(request)

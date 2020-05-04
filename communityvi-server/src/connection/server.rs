@@ -1,7 +1,7 @@
 use crate::connection::client::ClientConnection;
+use crate::message::server_response::ErrorResponse;
 use crate::message::{
-	client_request::ClientRequest, server_response::ErrorResponse, server_response::ServerResponse, MessageError,
-	WebSocketMessage,
+	client_request::ClientRequest, server_response::ErrorResponseType, MessageError, WebSocketMessage,
 };
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
@@ -60,10 +60,13 @@ where
 					error!("{}", message);
 					let _ = self
 						.client_connection
-						.send(ServerResponse::Error {
-							error: ErrorResponse::InvalidFormat,
-							message,
-						})
+						.send(
+							ErrorResponse {
+								error: ErrorResponseType::InvalidFormat,
+								message,
+							}
+							.into(),
+						)
 						.await;
 					continue;
 				}
@@ -74,10 +77,13 @@ where
 
 		let _ = self
 			.client_connection
-			.send(ServerResponse::Error {
-				error: ErrorResponse::InvalidOperation,
-				message: "Too many retries".to_string(),
-			})
+			.send(
+				ErrorResponse {
+					error: ErrorResponseType::InvalidOperation,
+					message: "Too many retries".to_string(),
+				}
+				.into(),
+			)
 			.await;
 		let _ = self.client_connection.close().await;
 		None
