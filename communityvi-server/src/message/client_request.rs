@@ -9,26 +9,61 @@ use std::convert::{TryFrom, TryInto};
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ClientRequest {
-	Register {
-		name: String,
-	},
-	Chat {
-		message: String,
-	},
+	Register(RegisterRequest),
+	Chat(ChatRequest),
 	GetReferenceTime,
-	InsertMedium {
-		name: String,
-		length_in_milliseconds: u64,
-	},
-	Play {
-		skipped: bool,
-		start_time_in_milliseconds: i64,
-	},
-	Pause {
-		skipped: bool,
-		position_in_milliseconds: u64,
-	},
+	InsertMedium(InsertMediumRequest),
+	Play(PlayRequest),
+	Pause(PauseRequest),
 }
+
+macro_rules! client_request_from_struct {
+	($enum_case: ident, $struct_type: ident) => {
+		impl From<$struct_type> for ClientRequest {
+			fn from(request: $struct_type) -> ClientRequest {
+				ClientRequest::$enum_case(request)
+			}
+		}
+	};
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct RegisterRequest {
+	pub name: String,
+}
+
+client_request_from_struct!(Register, RegisterRequest);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct ChatRequest {
+	pub message: String,
+}
+
+client_request_from_struct!(Chat, ChatRequest);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct InsertMediumRequest {
+	pub name: String,
+	pub length_in_milliseconds: u64,
+}
+
+client_request_from_struct!(InsertMedium, InsertMediumRequest);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PlayRequest {
+	pub skipped: bool,
+	pub start_time_in_milliseconds: i64,
+}
+
+client_request_from_struct!(Play, PlayRequest);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct PauseRequest {
+	pub skipped: bool,
+	pub position_in_milliseconds: u64,
+}
+
+client_request_from_struct!(Pause, PauseRequest);
 
 impl Message for ClientRequest {}
 
@@ -61,9 +96,9 @@ mod test {
 
 	#[test]
 	fn chat_request_should_serialize_and_deserialize() {
-		let chat_request = ClientRequest::Chat {
+		let chat_request = ClientRequest::Chat(ChatRequest {
 			message: "hello".into(),
-		};
+		});
 		let json = serde_json::to_string(&chat_request).expect("Failed to serialize Chat request to JSON");
 		assert_eq!(r#"{"type":"chat","message":"hello"}"#, json);
 
@@ -74,9 +109,9 @@ mod test {
 
 	#[test]
 	fn register_request_should_serialize_and_deserialize() {
-		let register_request = ClientRequest::Register {
+		let register_request = ClientRequest::Register(RegisterRequest {
 			name: "Ferris".to_string(),
-		};
+		});
 		let json = serde_json::to_string(&register_request).expect("Failed to serialize Register request to JSON");
 		assert_eq!(r#"{"type":"register","name":"Ferris"}"#, json);
 
@@ -99,10 +134,10 @@ mod test {
 
 	#[test]
 	fn insert_medium_request_should_serialize_and_deserialize() {
-		let insert_medium_request = ClientRequest::InsertMedium {
+		let insert_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
 			name: "Blues Brothers".to_string(),
 			length_in_milliseconds: 8520000,
-		};
+		});
 		let json =
 			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
@@ -117,10 +152,10 @@ mod test {
 
 	#[test]
 	fn play_request_should_serialize_and_deserialize() {
-		let play_request = ClientRequest::Play {
+		let play_request = ClientRequest::Play(PlayRequest {
 			skipped: false,
 			start_time_in_milliseconds: -1337,
-		};
+		});
 		let json = serde_json::to_string(&play_request).expect("Failed to serialize Play request to JSON");
 		assert_eq!(
 			r#"{"type":"play","skipped":false,"start_time_in_milliseconds":-1337}"#,
@@ -134,10 +169,10 @@ mod test {
 
 	#[test]
 	fn pause_request_should_serialize_and_deserialize() {
-		let pause_request = ClientRequest::Pause {
+		let pause_request = ClientRequest::Pause(PauseRequest {
 			skipped: false,
 			position_in_milliseconds: 42,
-		};
+		});
 		let json = serde_json::to_string(&pause_request).expect("Failed to serialize Pause request to JSON");
 		assert_eq!(
 			r#"{"type":"pause","skipped":false,"position_in_milliseconds":42}"#,

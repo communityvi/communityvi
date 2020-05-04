@@ -1,5 +1,5 @@
 use crate::configuration::Configuration;
-use crate::message::client_request::ClientRequest;
+use crate::message::client_request::{ChatRequest, ClientRequest, RegisterRequest};
 use crate::message::server_response::ServerResponse;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
@@ -61,10 +61,10 @@ async fn register_client(
 	request_sink: &mut (impl Sink<ClientRequest, Error = ()> + Unpin),
 	response_stream: &mut (impl Stream<Item = ServerResponse> + Unpin),
 ) -> ClientId {
-	let register_request = ClientRequest::Register { name: name.clone() };
+	let register_request = RegisterRequest { name: name.clone() };
 
 	request_sink
-		.send(register_request)
+		.send(register_request.into())
 		.await
 		.expect("Failed to send register message.");
 
@@ -172,7 +172,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 fn should_broadcast_messages() {
 	let future = async move {
 		let message = r#"Hello everyone \o/"#;
-		let request = ClientRequest::Chat {
+		let request = ChatRequest {
 			message: message.to_string(),
 		};
 		let (alice_client_id, mut alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
@@ -194,7 +194,7 @@ fn should_broadcast_messages() {
 		};
 
 		alice_sink
-			.send(request)
+			.send(request.into())
 			.await
 			.expect("Failed to sink broadcast message.");
 

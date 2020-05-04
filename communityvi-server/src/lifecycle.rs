@@ -1,5 +1,6 @@
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
+use crate::message::client_request::{ChatRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest};
 use crate::message::server_response::MediumResponse;
 use crate::message::{client_request::ClientRequest, server_response::ErrorResponse, server_response::ServerResponse};
 use crate::room::client::Client;
@@ -32,7 +33,7 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let name = if let ClientRequest::Register { name } = request {
+	let name = if let ClientRequest::Register(RegisterRequest { name }) = request {
 		name
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
@@ -116,7 +117,7 @@ async fn handle_messages(room: &Room, client: Client, mut server_connection: Ser
 
 async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 	match request {
-		ClientRequest::Chat { message } => {
+		ClientRequest::Chat(ChatRequest { message }) => {
 			room.broadcast(ServerResponse::Chat {
 				sender_id: client.id(),
 				sender_name: client.name().to_string(),
@@ -143,10 +144,10 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			};
 			client.send(message).await;
 		}
-		ClientRequest::InsertMedium {
+		ClientRequest::InsertMedium(InsertMediumRequest {
 			name,
 			length_in_milliseconds,
-		} => {
+		}) => {
 			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
 				let response = ServerResponse::Error {
 					error: ErrorResponse::InvalidFormat,
@@ -169,10 +170,10 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 			})
 			.await;
 		}
-		ClientRequest::Play {
+		ClientRequest::Play(PlayRequest {
 			skipped,
 			start_time_in_milliseconds,
-		} => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
+		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
 			None => {
 				client
 					.send(ServerResponse::Error {
@@ -191,10 +192,10 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
 				.await;
 			}
 		},
-		ClientRequest::Pause {
+		ClientRequest::Pause(PauseRequest {
 			skipped,
 			position_in_milliseconds,
-		} => match room.pause_medium(Duration::milliseconds(
+		}) => match room.pause_medium(Duration::milliseconds(
 			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
 		)) {
 			None => {
@@ -223,6 +224,7 @@ mod test {
 	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
+	use crate::message::client_request::PauseRequest;
 	use crate::message::server_response::{MediumResponse, PlaybackStateResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
@@ -268,10 +270,11 @@ mod test {
 		handle_message(
 			&room,
 			&alice,
-			ClientRequest::InsertMedium {
+			InsertMediumRequest {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: 153 * 60 * 1000,
-			},
+			}
+			.into(),
 		)
 		.await;
 
@@ -301,10 +304,11 @@ mod test {
 		handle_message(
 			&room,
 			&alice,
-			ClientRequest::InsertMedium {
+			InsertMediumRequest {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
-			},
+			}
+			.into(),
 		)
 		.await;
 
@@ -338,10 +342,11 @@ mod test {
 		handle_message(
 			&room,
 			&alice,
-			ClientRequest::Play {
+			PlayRequest {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
-			},
+			}
+			.into(),
 		)
 		.await;
 
@@ -373,10 +378,11 @@ mod test {
 		handle_message(
 			&room,
 			&alice,
-			ClientRequest::Play {
+			PlayRequest {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
-			},
+			}
+			.into(),
 		)
 		.await;
 		let response = alice_test_client.receive().await.unwrap();
@@ -410,10 +416,11 @@ mod test {
 		handle_message(
 			&room,
 			&bob,
-			ClientRequest::Pause {
+			PauseRequest {
 				skipped: false,
 				position_in_milliseconds: 1027,
-			},
+			}
+			.into(),
 		)
 		.await;
 
@@ -452,10 +459,11 @@ mod test {
 		handle_message(
 			&room,
 			&bob,
-			ClientRequest::Pause {
+			PauseRequest {
 				skipped: true,
 				position_in_milliseconds: 1000,
-			},
+			}
+			.into(),
 		)
 		.await;
 
@@ -487,10 +495,11 @@ mod test {
 		handle_message(
 			&room,
 			&alice,
-			ClientRequest::Pause {
+			PauseRequest {
 				skipped: false,
 				position_in_milliseconds: 1000,
-			},
+			}
+			.into(),
 		)
 		.await;
 		let response = alice_test_client.receive().await.unwrap();
@@ -526,11 +535,11 @@ mod test {
 			}
 		});
 
-		let register_message = ClientRequest::Register {
+		let register_message = RegisterRequest {
 			name: "Parcival".to_string(),
 		};
 
-		test_client.send(register_message).await;
+		test_client.send(register_message.into()).await;
 		match test_client.receive().await.expect("No response to double register.") {
 			ServerResponse::Error { error, message } => {
 				assert_eq!(ErrorResponse::InvalidOperation, error);
@@ -544,9 +553,9 @@ mod test {
 	async fn should_not_register_clients_with_blank_name() {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::new(10);
-		let register_request = ClientRequest::Register { name: "	 ".to_string() };
+		let register_request = RegisterRequest { name: "	 ".to_string() };
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
@@ -570,11 +579,11 @@ mod test {
 
 		// And I register another client with the same name
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = ClientRequest::Register {
+		let register_request = RegisterRequest {
 			name: "Ferris".to_string(),
 		};
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
@@ -597,11 +606,11 @@ mod test {
 		}
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = ClientRequest::Register {
+		let register_request = RegisterRequest {
 			name: "second".to_string(),
 		};
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
@@ -624,11 +633,11 @@ mod test {
 		room.play_medium(Duration::milliseconds(0));
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = ClientRequest::Register {
+		let register_request = RegisterRequest {
 			name: "Johnny 5".to_string(),
 		};
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
@@ -656,11 +665,11 @@ mod test {
 		room.insert_medium(short_circuit);
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
-		let register_request = ClientRequest::Register {
+		let register_request = RegisterRequest {
 			name: "Johnny 5".to_string(),
 		};
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 		register_client(room, client_connection, server_connection).await;
 		let response = test_client.receive().await.expect("Did not receive response!");
 
@@ -686,9 +695,9 @@ mod test {
 		server_connection: ServerConnection,
 		mut test_client: TypedTestClient,
 	) -> (Client, ServerConnection, TypedTestClient) {
-		let register_request = ClientRequest::Register { name: name.into() };
+		let register_request = RegisterRequest { name: name.into() };
 
-		test_client.send(register_request).await;
+		test_client.send(register_request.into()).await;
 
 		// run server code required for client registration
 		let (client_handle, server_connection) = register_client(room.clone(), client_connection, server_connection)
