@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::Sink;
 use futures::SinkExt;
-use std::ops::Range;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -24,7 +23,6 @@ pub struct SinkClientConnection<ResponseSink> {
 
 struct SinkClientConnectionInner<ResponseSink> {
 	response_sink: ResponseSink,
-	message_number_sequence: Range<u64>,
 }
 
 #[async_trait]
@@ -35,10 +33,7 @@ where
 	async fn send(&self, message: ServerResponse) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 
-		let ordered_message = OrderedMessage {
-			number: inner.message_number_sequence.next().expect("Out of message numbers"),
-			message,
-		};
+		let ordered_message = OrderedMessage { message };
 		let websocket_message = WebSocketMessage::from(&ordered_message);
 
 		inner.response_sink.send(websocket_message).await.map_err(|_| ())
@@ -55,10 +50,7 @@ where
 	ResponseSink: Sink<WebSocketMessage>,
 {
 	pub fn new(response_sink: ResponseSink) -> Self {
-		let inner = SinkClientConnectionInner {
-			response_sink,
-			message_number_sequence: (0..std::u64::MAX),
-		};
+		let inner = SinkClientConnectionInner { response_sink };
 		let connection = Self { inner: inner.into() };
 		connection
 	}

@@ -91,7 +91,7 @@ pub mod test {
 		let too_many_retries_response = test_client.receive().await;
 		assert_eq!(
 			WebSocketMessage::text(
-				r#"{"number":10,"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
+				r#"{"type":"error","error":"invalid_operation","message":"Too many retries"}"#.to_string()
 			),
 			too_many_retries_response
 		);

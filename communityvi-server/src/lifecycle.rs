@@ -243,7 +243,6 @@ mod test {
 
 		match test_client.receive().await.expect("Invalid ordered message") {
 			OrderedMessage {
-				number: _,
 				message: ServerResponse::ReferenceTime { milliseconds },
 			} => {
 				assert!(
@@ -530,7 +529,6 @@ mod test {
 		});
 
 		let register_message = OrderedMessage {
-			number: 1,
 			message: ClientRequest::Register {
 				name: "Parcival".to_string(),
 			},
@@ -539,10 +537,8 @@ mod test {
 		test_client.send(register_message).await;
 		match test_client.receive().await.expect("No response to double register.") {
 			OrderedMessage {
-				number,
 				message: ServerResponse::Error { error, message },
 			} => {
-				assert_eq!(2, number);
 				assert_eq!(ErrorResponse::InvalidOperation, error);
 				assert!(message.contains("registered"));
 			}
@@ -555,7 +551,6 @@ mod test {
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let room = Room::new(10);
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register { name: "	 ".to_string() },
 		};
 
@@ -565,7 +560,6 @@ mod test {
 
 		assert_eq!(
 			OrderedMessage {
-				number: 0,
 				message: ServerResponse::Error {
 					error: ErrorResponse::InvalidFormat,
 					message: "Name was empty or whitespace-only.".to_string()
@@ -587,7 +581,6 @@ mod test {
 		// And I register another client with the same name
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register {
 				name: "Ferris".to_string(),
 			},
@@ -600,7 +593,6 @@ mod test {
 		// Then I expect an error
 		assert_eq!(
 			OrderedMessage {
-				number: 0,
 				message: ServerResponse::Error {
 					error: ErrorResponse::InvalidOperation,
 					message: "Client name is already in use.".to_string()
@@ -620,7 +612,6 @@ mod test {
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register {
 				name: "second".to_string(),
 			},
@@ -632,7 +623,6 @@ mod test {
 
 		assert_eq!(
 			OrderedMessage {
-				number: 0,
 				message: ServerResponse::Error {
 					error: ErrorResponse::InvalidOperation,
 					message: "Can't join, room is already full.".to_string()
@@ -653,7 +643,6 @@ mod test {
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register {
 				name: "Johnny 5".to_string(),
 			},
@@ -688,7 +677,6 @@ mod test {
 
 		let (client_connection, server_connection, mut test_client) = create_typed_test_connections();
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register {
 				name: "Johnny 5".to_string(),
 			},
@@ -721,7 +709,6 @@ mod test {
 		mut test_client: TypedTestClient,
 	) -> (Client, ServerConnection, TypedTestClient) {
 		let register_request = OrderedMessage {
-			number: 0,
 			message: ClientRequest::Register { name: name.into() },
 		};
 
@@ -738,7 +725,6 @@ mod test {
 			.expect("Failed to get response to register request.");
 
 		let id = if let OrderedMessage {
-			number: _,
 			message: ServerResponse::Hello { id, .. },
 		} = response
 		{
@@ -749,9 +735,7 @@ mod test {
 		assert_eq!(client_handle.id(), id);
 
 		let joined_response = test_client.receive().await.expect("Failed to get joined response.");
-		assert!(
-			matches!(joined_response, OrderedMessage {number: _, message: ServerResponse::Joined {id: _, name: _}})
-		);
+		assert!(matches!(joined_response, OrderedMessage {message: ServerResponse::Joined {id: _, name: _}}));
 		(client_handle, server_connection, test_client)
 	}
 }

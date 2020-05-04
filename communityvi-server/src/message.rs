@@ -9,7 +9,6 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct OrderedMessage<MessageType: Message> {
-	pub number: u64,
 	#[serde(bound(deserialize = "MessageType: Message"))]
 	#[serde(flatten)]
 	pub message: MessageType,
@@ -136,7 +135,6 @@ pub enum ErrorResponse {
 	InvalidFormat,
 	InvalidOperation,
 	NoMedium,
-	InvalidMessageNumber,
 	InternalServerError,
 }
 
@@ -204,7 +202,7 @@ mod test {
 	use chrono::Duration;
 
 	fn first_message<MessageType: Message>(message: MessageType) -> OrderedMessage<MessageType> {
-		OrderedMessage { number: 0, message }
+		OrderedMessage { message }
 	}
 
 	#[test]
@@ -213,7 +211,7 @@ mod test {
 			message: "hello".into(),
 		});
 		let json = serde_json::to_string(&chat_request).expect("Failed to serialize Chat request to JSON");
-		assert_eq!(r#"{"number":0,"type":"chat","message":"hello"}"#, json);
+		assert_eq!(r#"{"type":"chat","message":"hello"}"#, json);
 
 		let deserialized_chat_request: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize Chat request from JSON");
@@ -226,7 +224,7 @@ mod test {
 			name: "Ferris".to_string(),
 		});
 		let json = serde_json::to_string(&register_request).expect("Failed to serialize Register request to JSON");
-		assert_eq!(r#"{"number":0,"type":"register","name":"Ferris"}"#, json);
+		assert_eq!(r#"{"type":"register","name":"Ferris"}"#, json);
 
 		let deserialized_register_request: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize Register request from JSON");
@@ -238,7 +236,7 @@ mod test {
 		let get_reference_time_request = first_message(ClientRequest::GetReferenceTime);
 		let json = serde_json::to_string(&get_reference_time_request)
 			.expect("Failed to serialize GetReferenceTime request to JSON");
-		assert_eq!(r#"{"number":0,"type":"get_reference_time"}"#, json);
+		assert_eq!(r#"{"type":"get_reference_time"}"#, json);
 
 		let deserialized_get_reference_time_request: OrderedMessage<ClientRequest> =
 			serde_json::from_str(&json).expect("Failed to deserialize GetReferenceTime request from JSON");
@@ -254,7 +252,7 @@ mod test {
 		let json =
 			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"insert_medium","name":"Blues Brothers","length_in_milliseconds":8520000}"#,
+			r#"{"type":"insert_medium","name":"Blues Brothers","length_in_milliseconds":8520000}"#,
 			json
 		);
 
@@ -271,7 +269,7 @@ mod test {
 		});
 		let json = serde_json::to_string(&play_request).expect("Failed to serialize Play request to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"play","skipped":false,"start_time_in_milliseconds":-1337}"#,
+			r#"{"type":"play","skipped":false,"start_time_in_milliseconds":-1337}"#,
 			json
 		);
 
@@ -288,7 +286,7 @@ mod test {
 		});
 		let json = serde_json::to_string(&pause_request).expect("Failed to serialize Pause request to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"pause","skipped":false,"position_in_milliseconds":42}"#,
+			r#"{"type":"pause","skipped":false,"position_in_milliseconds":42}"#,
 			json
 		);
 
@@ -306,7 +304,7 @@ mod test {
 		});
 		let json = serde_json::to_string(&chat_response).expect("Failed to serialize Chat response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello"}"#,
+			r#"{"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello"}"#,
 			json
 		);
 
@@ -322,7 +320,7 @@ mod test {
 			name: "Hedwig".to_string(),
 		});
 		let json = serde_json::to_string(&joined_response).expect("Failed to serialize Joined response to JSON");
-		assert_eq!(r#"{"number":0,"type":"joined","id":42,"name":"Hedwig"}"#, json);
+		assert_eq!(r#"{"type":"joined","id":42,"name":"Hedwig"}"#, json);
 
 		let deserialized_joined_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Joined response from JSON");
@@ -336,7 +334,7 @@ mod test {
 			name: "Hedwig".to_string(),
 		});
 		let json = serde_json::to_string(&left_response).expect("Failed to serialize Left response to JSON");
-		assert_eq!(r#"{"number":0,"type":"left","id":42,"name":"Hedwig"}"#, json);
+		assert_eq!(r#"{"type":"left","id":42,"name":"Hedwig"}"#, json);
 
 		let deserialized_left_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Left response from JSON");
@@ -350,7 +348,7 @@ mod test {
 			current_medium: None,
 		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
-		assert_eq!(r#"{"number":0,"type":"hello","id":42,"current_medium":null}"#, json);
+		assert_eq!(r#"{"type":"hello","id":42,"current_medium":null}"#, json);
 
 		let deserialized_hello_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
@@ -371,7 +369,7 @@ mod test {
 		});
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length_in_milliseconds":6840000,"playback_state":{"type":"paused","position_in_milliseconds":0}}}"#,
+			r#"{"type":"hello","id":42,"current_medium":{"type":"fixed_length","name":"WarGames","length_in_milliseconds":6840000,"playback_state":{"type":"paused","position_in_milliseconds":0}}}"#,
 			json
 		);
 
@@ -385,7 +383,7 @@ mod test {
 		let reference_time_response = first_message(ServerResponse::ReferenceTime { milliseconds: 1337 });
 		let json = serde_json::to_string(&reference_time_response)
 			.expect("Failed to serialize ReferenceTime response to JSON");
-		assert_eq!(r#"{"number":0,"type":"reference_time","milliseconds":1337}"#, json);
+		assert_eq!(r#"{"type":"reference_time","milliseconds":1337}"#, json);
 
 		let deserialized_reference_time_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize ReferenceTime response from JSON");
@@ -403,7 +401,7 @@ mod test {
 		let json = serde_json::to_string(&medium_inserted_response)
 			.expect("Failed to serialize MediumInserted response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"medium_inserted","inserted_by_name":"Squirrel","inserted_by_id":42,"name":"The Acorn","length_in_milliseconds":1200000}"#,
+			r#"{"type":"medium_inserted","inserted_by_name":"Squirrel","inserted_by_id":42,"name":"The Acorn","length_in_milliseconds":1200000}"#,
 			json
 		);
 
@@ -425,7 +423,7 @@ mod test {
 		let json = serde_json::to_string(&playback_state_changed_response)
 			.expect("Failed to serialize PlaybackStateChanged response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"playing","start_time_in_milliseconds":-1337}}"#,
+			r#"{"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"playing","start_time_in_milliseconds":-1337}}"#,
 			json
 		);
 
@@ -450,7 +448,7 @@ mod test {
 		let json = serde_json::to_string(&playback_state_changed_response)
 			.expect("Failed to serialize PlaybackStateChanged response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"paused","position_in_milliseconds":42}}"#,
+			r#"{"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"paused","position_in_milliseconds":42}}"#,
 			json
 		);
 
@@ -470,10 +468,7 @@ mod test {
 		});
 		let json = serde_json::to_string(&invalid_format_error_response)
 			.expect("Failed to serialize InvalidFormat error response to JSON");
-		assert_eq!(
-			r#"{"number":0,"type":"error","error":"invalid_format","message":"�"}"#,
-			json
-		);
+		assert_eq!(r#"{"type":"error","error":"invalid_format","message":"�"}"#, json);
 
 		let deserialized_invalid_format_error_response: OrderedMessage<ServerResponse> =
 			serde_json::from_str(&json).expect("Failed to deserialize InvalidFormat error response from JSON");
@@ -492,7 +487,7 @@ mod test {
 		let json = serde_json::to_string(&invalid_operation_error_response)
 			.expect("Failed to serialize InvalidOperation error response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"error","error":"invalid_operation","message":"I'm a teapot."}"#,
+			r#"{"type":"error","error":"invalid_operation","message":"I'm a teapot."}"#,
 			json
 		);
 
@@ -513,7 +508,7 @@ mod test {
 		let json = serde_json::to_string(&internal_server_error_error_response)
 			.expect("Failed to serialize InternalServerError error response to JSON");
 		assert_eq!(
-			r#"{"number":0,"type":"error","error":"internal_server_error","message":"I've found a bug crawling around my circuits."}"#,
+			r#"{"type":"error","error":"internal_server_error","message":"I've found a bug crawling around my circuits."}"#,
 			json
 		);
 

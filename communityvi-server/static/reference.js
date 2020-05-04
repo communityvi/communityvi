@@ -1,7 +1,6 @@
 'use strict';
 
 let webSocket = null;
-let messageNumber = 0;
 const websocketURL = `ws://${window.location.host}/ws`;
 
 let lastSentGetReferenceTime = null;
@@ -196,7 +195,6 @@ function registerClient() {
 
 	if (webSocket !== null) {
 		webSocket.close();
-		messageNumber = 0;
 	}
 
 	webSocket = new WebSocket(websocketURL);
@@ -373,8 +371,6 @@ function sendChatMessage() {
 }
 
 function sendMessage(message) {
-	message.number = messageNumber;
-	messageNumber++;
 	webSocket.send(JSON.stringify(message));
 }
 

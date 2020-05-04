@@ -64,7 +64,6 @@ async fn register_client(
 	response_stream: &mut (impl Stream<Item = OrderedMessage<ServerResponse>> + Unpin),
 ) -> ClientId {
 	let register_request = OrderedMessage {
-		number: 0,
 		message: ClientRequest::Register { name: name.clone() },
 	};
 
@@ -79,7 +78,6 @@ async fn register_client(
 		.expect("Failed to get response to register request.");
 
 	let id = if let OrderedMessage {
-		number: _,
 		message: ServerResponse::Hello { id, .. },
 	} = response
 	{
@@ -89,7 +87,7 @@ async fn register_client(
 	};
 
 	let joined_response = response_stream.next().await.expect("Failed to get joined response.");
-	assert!(matches!(joined_response, OrderedMessage {number: _, message: ServerResponse::Joined {id: _, name: _}}));
+	assert!(matches!(joined_response, OrderedMessage {message: ServerResponse::Joined {id: _, name: _}}));
 
 	id
 }
@@ -132,21 +130,19 @@ fn should_not_allow_invalid_messages_during_registration() {
 			.expect("Invalid websocket response received");
 
 		let expected_response =
-			tungstenite::Message::Text(r#"{"number":0,"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
+			tungstenite::Message::Text(r#"{"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
 }
 
-fn register_message_with_number(number: usize) -> String {
-	format!(r#"{{"number":{},"type":"register","name":"Ferris"}}"#, number)
-}
+const REGISTER_MESSAGE: &str = r#"{"type":"register","name":"Ferris"}"#;
 
 #[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
 	let future = async {
 		let (mut sink, mut stream) = websocket_connection().await;
-		let registration_message = tungstenite::Message::Text(register_message_with_number(0));
+		let registration_message = tungstenite::Message::Text(REGISTER_MESSAGE.to_string());
 		sink.send(registration_message)
 			.await
 			.expect("Failed to send register message.");
@@ -157,7 +153,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.unwrap()
 			.expect("Invalid websocket response received");
 		let expected_hello_response =
-			tungstenite::Message::Text(r#"{"number":0,"type":"hello","id":0,"current_medium":null}"#.to_string());
+			tungstenite::Message::Text(r#"{"type":"hello","id":0,"current_medium":null}"#.to_string());
 		assert_eq!(expected_hello_response, hello_response);
 
 		let _ = stream.next().await.expect("Failed to receive joined response.");
@@ -173,7 +169,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			.expect("Invalid websocket response received");
 
 		let expected_response =
-			tungstenite::Message::Text(r#"{"number":2,"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
+			tungstenite::Message::Text(r#"{"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -184,7 +180,6 @@ fn should_broadcast_messages() {
 	let future = async move {
 		let message = r#"Hello everyone \o/"#;
 		let request = OrderedMessage {
-			number: 1337,
 			message: ClientRequest::Chat {
 				message: message.to_string(),
 			},
@@ -195,7 +190,6 @@ fn should_broadcast_messages() {
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let expected_bob_joined_response = OrderedMessage {
-			number: 2,
 			message: ServerResponse::Joined {
 				id: bob_client_id,
 				name: "Bob".to_string(),
@@ -217,7 +211,6 @@ fn should_broadcast_messages() {
 
 		assert_eq!(
 			OrderedMessage {
-				number: 3,
 				message: expected_chat_response.clone()
 			},
 			alice_stream
@@ -227,7 +220,6 @@ fn should_broadcast_messages() {
 		);
 		assert_eq!(
 			OrderedMessage {
-				number: 2,
 				message: expected_chat_response
 			},
 			bob_stream.next().await.expect("Failed to receive response on client 2")
@@ -247,7 +239,6 @@ fn should_broadcast_when_client_leaves_the_room() {
 		std::mem::drop(bob_stream);
 
 		let expected_leave_message = OrderedMessage {
-			number: 3,
 			message: ServerResponse::Left {
 				id: bob_client_id,
 				name: "Bob".to_string(),
@@ -255,55 +246,6 @@ fn should_broadcast_when_client_leaves_the_room() {
 		};
 		let leave_message = alice_stream.next().await.expect("Failed to get Leave message for bob");
 		assert_eq!(expected_leave_message, leave_message);
-	};
-	test_future_with_running_server(future, false);
-}
-
-#[test]
-fn test_messages_should_have_sequence_numbers() {
-	let future = async move {
-		let first_request = OrderedMessage {
-			number: 1,
-			message: ClientRequest::Chat {
-				message: "first".into(),
-			},
-		};
-		let second_request = OrderedMessage {
-			number: 2,
-			message: ClientRequest::Chat {
-				message: "second".into(),
-			},
-		};
-
-		let (client_id, mut sink, mut stream) = connect_and_register("Charlie".to_string()).await;
-		assert_eq!(ClientId::from(0), client_id);
-		sink.send(first_request).await.expect("Failed to sink first message.");
-		sink.send(second_request).await.expect("Failed to sink second message.");
-
-		let first_response = stream.next().await.expect("Didn't receive first message");
-		assert_eq!(
-			OrderedMessage {
-				number: 2,
-				message: ServerResponse::Chat {
-					sender_id: client_id,
-					sender_name: "Charlie".to_string(),
-					message: "first".into(),
-				},
-			},
-			first_response
-		);
-		let second_response = stream.next().await.expect("Didn't receive second message");
-		assert_eq!(
-			OrderedMessage {
-				number: 3,
-				message: ServerResponse::Chat {
-					sender_id: client_id,
-					sender_name: "Charlie".to_string(),
-					message: "second".into(),
-				},
-			},
-			second_response
-		);
 	};
 	test_future_with_running_server(future, false);
 }
