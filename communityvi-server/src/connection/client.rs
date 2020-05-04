@@ -1,4 +1,4 @@
-use crate::message::{ServerResponse, WebSocketMessage};
+use crate::message::{server_response::ServerResponse, WebSocketMessage};
 use crate::server::WebSocket;
 use async_trait::async_trait;
 use futures::stream::SplitSink;

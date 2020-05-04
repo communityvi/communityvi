@@ -21,7 +21,9 @@ pub mod test {
 	use super::*;
 	use crate::connection::client::SinkClientConnection;
 	use crate::connection::server::StreamServerConnection;
-	use crate::message::{ClientRequest, MessageError, ServerResponse, WebSocketMessage};
+	use crate::message::client_request::ClientRequest;
+	use crate::message::server_response::ServerResponse;
+	use crate::message::{MessageError, WebSocketMessage};
 	use crate::utils::test_client::TestClient;
 	use futures::{Sink, SinkExt, Stream, StreamExt};
 	use std::convert::TryFrom;

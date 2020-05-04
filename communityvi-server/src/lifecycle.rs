@@ -1,7 +1,7 @@
 use crate::connection::client::ClientConnection;
 use crate::connection::server::ServerConnection;
-use crate::message::MediumResponse;
-use crate::message::{ClientRequest, ErrorResponse, ServerResponse};
+use crate::message::server_response::MediumResponse;
+use crate::message::{client_request::ClientRequest, server_response::ErrorResponse, server_response::ServerResponse};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::state::medium::fixed_length::FixedLengthMedium;
@@ -223,7 +223,7 @@ mod test {
 	use super::*;
 	use crate::connection::test::{create_typed_test_connections, TypedTestClient};
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
-	use crate::message::{MediumResponse, PlaybackStateResponse};
+	use crate::message::server_response::{MediumResponse, PlaybackStateResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use tokio::time::delay_for;

@@ -1,5 +1,6 @@
 use crate::configuration::Configuration;
-use crate::message::{ClientRequest, ServerResponse};
+use crate::message::client_request::ClientRequest;
+use crate::message::server_response::ServerResponse;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::{create_router, run_server};

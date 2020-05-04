@@ -1,5 +1,8 @@
 use crate::connection::client::ClientConnection;
-use crate::message::{ClientRequest, ErrorResponse, MessageError, ServerResponse, WebSocketMessage};
+use crate::message::{
+	client_request::ClientRequest, server_response::ErrorResponse, server_response::ServerResponse, MessageError,
+	WebSocketMessage,
+};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;

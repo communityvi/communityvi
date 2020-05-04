@@ -1,5 +1,5 @@
 use crate::connection::client::{ClientConnection, ClientConnectionTrait};
-use crate::message::ServerResponse;
+use crate::message::server_response::ServerResponse;
 use async_trait::async_trait;
 use std::sync::Arc;
 
