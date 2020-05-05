@@ -1,5 +1,5 @@
-use crate::connection::client::ClientConnection;
-use crate::connection::server::ServerConnection;
+use crate::connection::receiver::MessageReceiver;
+use crate::connection::sender::MessageSender;
 use crate::message::client_request::{ChatRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest};
 use crate::message::server_response::{
 	ChatResponse, ErrorResponse, HelloResponse, JoinedResponse, LeftResponse, MediumInsertedResponse, MediumResponse,
@@ -14,7 +14,7 @@ use crate::room::Room;
 use chrono::Duration;
 use log::{debug, error, info};
 
-pub async fn run_client(room: Room, client_connection: ClientConnection, server_connection: ServerConnection) {
+pub async fn run_client(room: Room, client_connection: MessageSender, server_connection: MessageReceiver) {
 	if let Some((client, server_connection)) = register_client(room.clone(), client_connection, server_connection).await
 	{
 		let client_id = client.id();
@@ -25,9 +25,9 @@ pub async fn run_client(room: Room, client_connection: ClientConnection, server_
 
 async fn register_client(
 	room: Room,
-	client_connection: ClientConnection,
-	mut server_connection: ServerConnection,
-) -> Option<(Client, ServerConnection)> {
+	client_connection: MessageSender,
+	mut server_connection: MessageReceiver,
+) -> Option<(Client, MessageReceiver)> {
 	let request = match server_connection.receive().await {
 		None => {
 			error!("Client registration failed. Socket closed prematurely.");
@@ -103,7 +103,7 @@ async fn register_client(
 	}
 }
 
-async fn handle_messages(room: &Room, client: Client, mut server_connection: ServerConnection) {
+async fn handle_messages(room: &Room, client: Client, mut server_connection: MessageReceiver) {
 	loop {
 		let message = match server_connection.receive().await {
 			Some(message) => message,
@@ -613,7 +613,7 @@ mod test {
 	async fn should_not_register_clients_if_room_is_full() {
 		let room = Room::new(1);
 		{
-			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			let client_connection = MessageSender::from(FakeClientConnection::default());
 			room.add_client("Fake".to_string(), client_connection).unwrap();
 		}
 
@@ -703,10 +703,10 @@ mod test {
 	async fn register_test_client(
 		name: &'static str,
 		room: Room,
-		client_connection: ClientConnection,
-		server_connection: ServerConnection,
+		client_connection: MessageSender,
+		server_connection: MessageReceiver,
 		mut test_client: TypedTestClient,
-	) -> (Client, ServerConnection, TypedTestClient) {
+	) -> (Client, MessageReceiver, TypedTestClient) {
 		let register_request = RegisterRequest { name: name.into() };
 
 		test_client.send(register_request.into()).await;

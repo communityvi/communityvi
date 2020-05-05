@@ -1,4 +1,4 @@
-use crate::connection::client::ClientConnection;
+use crate::connection::sender::MessageSender;
 use crate::message::server_response::ServerResponse;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
@@ -13,12 +13,12 @@ pub struct Client {
 struct Inner {
 	pub id: ClientId,
 	pub name: String,
-	pub connection: ClientConnection,
+	pub connection: MessageSender,
 	pub room: Room,
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, connection: ClientConnection, room: Room) -> Self {
+	pub fn new(id: ClientId, name: String, connection: MessageSender, room: Room) -> Self {
 		Self {
 			inner: Arc::new(Inner {
 				id,

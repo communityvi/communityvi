@@ -1,4 +1,4 @@
-use crate::connection::client::ClientConnection;
+use crate::connection::sender::MessageSender;
 use crate::message::server_response::ServerResponse;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
@@ -51,7 +51,7 @@ impl Room {
 	}
 
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, connection: ClientConnection) -> Result<Client, RoomError> {
+	pub fn add_client(&self, name: String, connection: MessageSender) -> Result<Client, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
@@ -176,7 +176,7 @@ mod test {
 	#[test]
 	fn should_not_add_client_with_empty_name() {
 		let room = Room::new(10);
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 
 		let result = room.add_client("".to_string(), client_connection.clone());
 
@@ -186,7 +186,7 @@ mod test {
 	#[test]
 	fn should_not_add_client_with_blank_name() {
 		let room = Room::new(10);
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 
 		let result = room.add_client("  	 ".to_string(), client_connection.clone());
 
@@ -228,7 +228,7 @@ mod test {
 	#[test]
 	fn should_not_add_two_clients_with_the_same_name() {
 		let room = Room::new(10);
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 
 		room.add_client("Anorak  ".to_string(), client_connection.clone())
 			.expect("First add did not succeed!");
@@ -243,14 +243,14 @@ mod test {
 		let name = "牧瀬 紅莉栖";
 
 		{
-			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			let client_connection = MessageSender::from(FakeClientConnection::default());
 			let client = room
 				.add_client(name.to_string(), client_connection.clone())
 				.expect("Failed to add client");
 			room.remove_client(client.id());
 		}
 
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 		room.add_client(name.to_string(), client_connection.clone())
 			.expect("Failed to add client with same name after first is gone");
 	}
@@ -259,7 +259,7 @@ mod test {
 	fn should_allow_adding_client_with_name_no_longer_than_256_bytes() {
 		let long_name = String::from_utf8(vec![0x41u8; 256]).unwrap();
 		let room = Room::new(10);
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 
 		room.add_client(long_name.to_string(), client_connection.clone())
 			.expect("Failed to add client with name that is not too long");
@@ -269,7 +269,7 @@ mod test {
 	fn should_not_allow_adding_client_with_name_longer_than_256_bytes() {
 		let long_name = String::from_utf8(vec![0x41u8; 257]).unwrap();
 		let room = Room::new(10);
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 
 		let result = room.add_client(long_name.to_string(), client_connection.clone());
 
@@ -280,7 +280,7 @@ mod test {
 	fn should_allow_adding_clients_up_to_room_size_limit() {
 		let room = Room::new(2);
 		for count in 1..=2 {
-			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			let client_connection = MessageSender::from(FakeClientConnection::default());
 
 			if let Err(error) = room.add_client(format!("{}", count), client_connection.clone()) {
 				panic!("Failed to add client {}: {}", count, error);
@@ -292,14 +292,14 @@ mod test {
 	fn should_not_allow_adding_more_clients_than_room_size() {
 		let room = Room::new(2);
 		for count in 1..=2 {
-			let client_connection = ClientConnection::from(FakeClientConnection::default());
+			let client_connection = MessageSender::from(FakeClientConnection::default());
 
 			if let Err(error) = room.add_client(format!("{}", count), client_connection.clone()) {
 				panic!("Failed to add client {}: {}", count, error);
 			}
 		}
 
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 		let result = room.add_client("elephant".to_string(), client_connection.clone());
 		assert!(matches!(result, Err(RoomError::RoomFull)))
 	}
@@ -310,14 +310,14 @@ mod test {
 		let room = Room::new(1);
 
 		// Expect an initial add- and remove work
-		let ferris_connection = ClientConnection::from(FakeClientConnection::default());
+		let ferris_connection = MessageSender::from(FakeClientConnection::default());
 		let ferris = room
 			.add_client("Ferris".to_string(), ferris_connection)
 			.expect("Could not add client!");
 		assert!(room.remove_client(ferris.id()), "Could not remove client!");
 
 		// And a subsequent add also works
-		let crab_connection = ClientConnection::from(FakeClientConnection::default());
+		let crab_connection = MessageSender::from(FakeClientConnection::default());
 		room.add_client("Crab".to_string(), crab_connection)
 			.expect("Could not add client!");
 	}
@@ -327,7 +327,7 @@ mod test {
 		let room = Room::new(10);
 		let name = "牧瀬 紅莉栖";
 
-		let client_connection = ClientConnection::from(FakeClientConnection::default());
+		let client_connection = MessageSender::from(FakeClientConnection::default());
 		let makise_kurisu = room
 			.add_client(name.to_string(), client_connection.clone())
 			.expect("Failed to add client with same name after first is gone");

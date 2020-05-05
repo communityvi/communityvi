@@ -7,26 +7,26 @@ use futures::SinkExt;
 use std::pin::Pin;
 use std::sync::Arc;
 
-pub type ClientConnection = Pin<Arc<dyn ClientConnectionTrait + Send + Sync>>;
+pub type MessageSender = Pin<Arc<dyn MessageSenderTrait + Send + Sync>>;
 
 #[async_trait]
-pub trait ClientConnectionTrait {
+pub trait MessageSenderTrait {
 	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
 	async fn close(&self);
 }
 
-pub type WebSocketClientConnection = SinkClientConnection<SplitSink<WebSocket, WebSocketMessage>>;
+pub type WebSocketMessageSender = SinkMessageSender<SplitSink<WebSocket, WebSocketMessage>>;
 
-pub struct SinkClientConnection<ResponseSink> {
-	inner: tokio::sync::Mutex<SinkClientConnectionInner<ResponseSink>>,
+pub struct SinkMessageSender<ResponseSink> {
+	inner: tokio::sync::Mutex<SinkMessageSenderInner<ResponseSink>>,
 }
 
-struct SinkClientConnectionInner<ResponseSink> {
+struct SinkMessageSenderInner<ResponseSink> {
 	response_sink: ResponseSink,
 }
 
 #[async_trait]
-impl<ResponseSink> ClientConnectionTrait for SinkClientConnection<ResponseSink>
+impl<ResponseSink> MessageSenderTrait for SinkMessageSender<ResponseSink>
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
@@ -44,22 +44,22 @@ where
 	}
 }
 
-impl<ResponseSink> SinkClientConnection<ResponseSink>
+impl<ResponseSink> SinkMessageSender<ResponseSink>
 where
 	ResponseSink: Sink<WebSocketMessage>,
 {
 	pub fn new(response_sink: ResponseSink) -> Self {
-		let inner = SinkClientConnectionInner { response_sink };
+		let inner = SinkMessageSenderInner { response_sink };
 		let connection = Self { inner: inner.into() };
 		connection
 	}
 }
 
-impl<ResponseSink> From<SinkClientConnection<ResponseSink>> for ClientConnection
+impl<ResponseSink> From<SinkMessageSender<ResponseSink>> for MessageSender
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
-	fn from(sink_client_connection: SinkClientConnection<ResponseSink>) -> Self {
+	fn from(sink_client_connection: SinkMessageSender<ResponseSink>) -> Self {
 		Arc::pin(sink_client_connection)
 	}
 }

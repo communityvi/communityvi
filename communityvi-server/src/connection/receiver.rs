@@ -1,4 +1,4 @@
-use crate::connection::client::ClientConnection;
+use crate::connection::sender::MessageSender;
 use crate::message::server_response::ErrorResponse;
 use crate::message::{
 	client_request::ClientRequest, server_response::ErrorResponseType, MessageError, WebSocketMessage,
@@ -12,22 +12,22 @@ use log::error;
 use std::convert::TryFrom;
 use std::pin::Pin;
 
-pub type ServerConnection = Pin<Box<dyn ServerConnectionTrait + Unpin + Send>>;
-pub type WebSocketServerConnection = StreamServerConnection<InfallibleStream<SplitStream<WebSocket>>>;
+pub type MessageReceiver = Pin<Box<dyn MessageReceiverTrait + Unpin + Send>>;
+pub type WebSocketMessageReceiver = StreamMessageReceiver<InfallibleStream<SplitStream<WebSocket>>>;
 
 #[async_trait]
-pub trait ServerConnectionTrait {
+pub trait MessageReceiverTrait {
 	/// Receive a message from the client or None if the connection has been closed.
 	async fn receive(&mut self) -> Option<ClientRequest>;
 }
 
-pub struct StreamServerConnection<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
+pub struct StreamMessageReceiver<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
 	request_stream: RequestStream,
-	client_connection: ClientConnection,
+	client_connection: MessageSender,
 }
 
 #[async_trait]
-impl<RequestStream> ServerConnectionTrait for StreamServerConnection<RequestStream>
+impl<RequestStream> MessageReceiverTrait for StreamMessageReceiver<RequestStream>
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send,
 {
@@ -90,11 +90,11 @@ where
 	}
 }
 
-impl<RequestStream> StreamServerConnection<RequestStream>
+impl<RequestStream> StreamMessageReceiver<RequestStream>
 where
 	RequestStream: Stream<Item = WebSocketMessage>,
 {
-	pub fn new(request_stream: RequestStream, client_connection: ClientConnection) -> Self {
+	pub fn new(request_stream: RequestStream, client_connection: MessageSender) -> Self {
 		Self {
 			request_stream,
 			client_connection,
@@ -102,11 +102,11 @@ where
 	}
 }
 
-impl<RequestStream> From<StreamServerConnection<RequestStream>> for ServerConnection
+impl<RequestStream> From<StreamMessageReceiver<RequestStream>> for MessageReceiver
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send + 'static,
 {
-	fn from(stream_server_connection: StreamServerConnection<RequestStream>) -> Self {
+	fn from(stream_server_connection: StreamMessageReceiver<RequestStream>) -> Self {
 		Box::pin(stream_server_connection)
 	}
 }

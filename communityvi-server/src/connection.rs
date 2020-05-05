@@ -1,26 +1,26 @@
-use crate::connection::client::{ClientConnection, WebSocketClientConnection};
-use crate::connection::server::{ServerConnection, WebSocketServerConnection};
+use crate::connection::receiver::{MessageReceiver, WebSocketMessageReceiver};
+use crate::connection::sender::{MessageSender, WebSocketMessageSender};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use futures::StreamExt;
 
-pub mod client;
-pub mod server;
+pub mod receiver;
+pub mod sender;
 
-pub fn split_websocket(websocket: WebSocket) -> (ClientConnection, ServerConnection) {
+pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver) {
 	let (websocket_sink, websocket_stream) = websocket.split();
-	let websocket_client_connection = WebSocketClientConnection::new(websocket_sink);
-	let client_connection = ClientConnection::from(websocket_client_connection);
+	let websocket_client_connection = WebSocketMessageSender::new(websocket_sink);
+	let client_connection = MessageSender::from(websocket_client_connection);
 	let stream_server_connection =
-		WebSocketServerConnection::new(InfallibleStream::from(websocket_stream), client_connection.clone());
+		WebSocketMessageReceiver::new(InfallibleStream::from(websocket_stream), client_connection.clone());
 	(client_connection, stream_server_connection.into())
 }
 
 #[cfg(test)]
 pub mod test {
 	use super::*;
-	use crate::connection::client::SinkClientConnection;
-	use crate::connection::server::StreamServerConnection;
+	use crate::connection::receiver::StreamMessageReceiver;
+	use crate::connection::sender::SinkMessageSender;
 	use crate::message::client_request::ClientRequest;
 	use crate::message::server_response::ServerResponse;
 	use crate::message::{MessageError, WebSocketMessage};
@@ -38,7 +38,7 @@ pub mod test {
 		Pin<Box<dyn Stream<Item = WebSocketMessage>>>,
 	>;
 
-	pub fn create_typed_test_connections() -> (ClientConnection, ServerConnection, TypedTestClient) {
+	pub fn create_typed_test_connections() -> (MessageSender, MessageReceiver, TypedTestClient) {
 		let (client_connection, server_connection, raw_test_client) = create_raw_test_connections();
 		let (raw_client_sender, raw_client_receiver) = raw_test_client.split();
 
@@ -54,15 +54,15 @@ pub mod test {
 		)
 	}
 
-	pub fn create_raw_test_connections() -> (ClientConnection, ServerConnection, RawTestClient) {
+	pub fn create_raw_test_connections() -> (MessageSender, MessageReceiver, RawTestClient) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 
-		let sink_client_connection = SinkClientConnection::new(server_sender);
-		let client_connection = ClientConnection::from(sink_client_connection);
-		let stream_server_connection = StreamServerConnection::new(server_receiver, client_connection.clone());
+		let sink_client_connection = SinkMessageSender::new(server_sender);
+		let client_connection = MessageSender::from(sink_client_connection);
+		let stream_server_connection = StreamMessageReceiver::new(server_receiver, client_connection.clone());
 
-		let server_connection = ServerConnection::from(stream_server_connection);
+		let server_connection = MessageReceiver::from(stream_server_connection);
 
 		(
 			client_connection,
