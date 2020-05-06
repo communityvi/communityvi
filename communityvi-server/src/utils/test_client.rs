@@ -7,24 +7,12 @@ use crate::message::WebSocketMessage;
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use std::convert::TryFrom;
 use std::pin::Pin;
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::WebSocketStream;
 
 pub struct TestWebsocketClient {
 	sender: Pin<Box<dyn Sink<WebSocketMessage, Error = ()> + Unpin + Send>>,
 	receiver: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
-}
-
-impl From<WebSocketStream<TcpStream>> for TestWebsocketClient {
-	fn from(websocket: WebSocketStream<TcpStream>) -> Self {
-		let (sender, receiver) = websocket.split();
-		let sender = sender.sink_map_err(|_error| ());
-		let receiver = receiver.map(|result| result.expect("Failed to receive websocket message"));
-		Self {
-			sender: Box::pin(sender),
-			receiver: Box::pin(receiver),
-		}
-	}
 }
 
 impl TestWebsocketClient {
@@ -77,5 +65,20 @@ impl TestWebsocketClient {
 	pub async fn receive_broadcast(&mut self) -> Broadcast {
 		let websocket_message = self.receive_raw().await;
 		Broadcast::try_from(&websocket_message).expect("Failed to deserialize Broadcast")
+	}
+}
+
+impl<Socket> From<WebSocketStream<Socket>> for TestWebsocketClient
+where
+	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+	fn from(websocket: WebSocketStream<Socket>) -> Self {
+		let (sender, receiver) = websocket.split();
+		let sender = sender.sink_map_err(|_error| ());
+		let receiver = receiver.map(|result| result.expect("Failed to receive websocket message"));
+		Self {
+			sender: Box::pin(sender),
+			receiver: Box::pin(receiver),
+		}
 	}
 }
