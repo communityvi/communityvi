@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
+pub mod broadcast;
 pub mod client_request;
 pub mod server_response;
 

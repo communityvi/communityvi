@@ -1,11 +1,14 @@
 use crate::configuration::Configuration;
-use crate::message::client_request::{ChatRequest, ClientRequest, RegisterRequest};
-use crate::message::server_response::{ChatResponse, HelloResponse, JoinedResponse, LeftResponse, ServerResponse};
+use crate::message::broadcast::Broadcast;
+use crate::message::broadcast::{ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast};
+use crate::message::client_request::{ChatRequest, RegisterRequest};
+use crate::message::server_response::{ErrorResponse, ErrorResponseType, HelloResponse, ServerResponse};
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::{create_router, run_server};
 use crate::utils::select_first_future::select_first_future;
-use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
+use crate::utils::test_client::TestWebsocketClient;
+use futures::{FutureExt, SinkExt, StreamExt};
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
 use gotham::hyper::upgrade::Upgraded;
@@ -14,7 +17,6 @@ use gotham::plain::test::TestServer;
 use gotham::test::Server;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
@@ -30,48 +32,20 @@ lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-async fn typed_websocket_connection() -> (impl Sink<ClientRequest, Error = ()>, impl Stream<Item = ServerResponse>) {
-	let (sink, stream) = websocket_connection().await;
-	let stream = stream.map(|result| {
-		let websocket_message = result.expect("Stream error.");
-		let json = websocket_message.to_text().expect("No text message received.");
-		ServerResponse::try_from(json).expect("Failed to parse JSON response")
-	});
-	let sink = sink.sink_map_err(|error| panic!("{}", error)).with(|message| {
-		let websocket_message =
-			tungstenite::Message::text(serde_json::to_string(&message).expect("Failed to convert message to JSON"));
-		futures::future::ok(websocket_message)
-	});
-	(sink, stream)
-}
-
-async fn websocket_connection() -> (
-	impl Sink<tungstenite::Message, Error = tungstenite::Error>,
-	impl Stream<Item = Result<tungstenite::Message, tungstenite::Error>>,
-) {
+async fn websocket_connection() -> TestWebsocketClient {
 	let (websocket_stream, _response) = tokio_tungstenite::connect_async(format!("ws://{}/ws", HOSTNAME_AND_PORT))
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
 		.unwrap();
-	websocket_stream.split()
+	websocket_stream.into()
 }
 
-async fn register_client(
-	name: String,
-	request_sink: &mut (impl Sink<ClientRequest, Error = ()> + Unpin),
-	response_stream: &mut (impl Stream<Item = ServerResponse> + Unpin),
-) -> ClientId {
+async fn register_client(name: String, test_client: &mut TestWebsocketClient) -> ClientId {
 	let register_request = RegisterRequest { name: name.clone() };
 
-	request_sink
-		.send(register_request.into())
-		.await
-		.expect("Failed to send register message.");
+	test_client.send_request(register_request).await;
 
-	let response = response_stream
-		.next()
-		.await
-		.expect("Failed to get response to register request.");
+	let response = test_client.receive_response().await;
 
 	let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
 		id
@@ -79,32 +53,26 @@ async fn register_client(
 		panic!("Expected Hello-Response, got '{:?}'", response);
 	};
 
-	let joined_response = response_stream.next().await.expect("Failed to get joined response.");
+	let joined_response = test_client.receive_broadcast().await;
 	assert!(matches!(
 		joined_response,
-		ServerResponse::Joined(JoinedResponse { id: _, name: _ })
+		Broadcast::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
 	));
 
 	id
 }
 
-async fn connect_and_register(
-	name: String,
-) -> (
-	ClientId,
-	impl Sink<ClientRequest, Error = ()>,
-	impl Stream<Item = ServerResponse>,
-) {
-	let (mut request_sink, mut response_stream) = typed_websocket_connection().await;
-	let client_id = register_client(name, &mut request_sink, &mut response_stream).await;
-	(client_id, request_sink, response_stream)
+async fn connect_and_register(name: String) -> (ClientId, TestWebsocketClient) {
+	let mut test_client = websocket_connection().await;
+	let client_id = register_client(name, &mut test_client).await;
+	(client_id, test_client)
 }
 
 #[test]
 fn should_respond_to_websocket_messages() {
 	let future = async {
-		let (mut sink, mut stream) = typed_websocket_connection().await;
-		let client_id = register_client("Ferris".to_string(), &mut sink, &mut stream).await;
+		let mut test_client = websocket_connection().await;
+		let client_id = register_client("Ferris".to_string(), &mut test_client).await;
 		assert_eq!(ClientId::from(0), client_id);
 	};
 	test_future_with_running_server(future, false);
@@ -113,59 +81,34 @@ fn should_respond_to_websocket_messages() {
 #[test]
 fn should_not_allow_invalid_messages_during_registration() {
 	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
+		let mut test_client = websocket_connection().await;
 		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-		sink.send(invalid_message)
-			.await
-			.expect("Failed to send invalid message.");
+		test_client.send_raw(invalid_message).await;
 
-		let response = stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Invalid websocket response received");
+		let response = test_client.receive_response().await;
 
-		let expected_response =
-			tungstenite::Message::Text(r#"{"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
+		let expected_response = ServerResponse::Error(ErrorResponse {
+			error: ErrorResponseType::InvalidFormat,
+			message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+		});
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
 }
 
-const REGISTER_MESSAGE: &str = r#"{"type":"register","name":"Ferris"}"#;
-
 #[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
 	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
-		let registration_message = tungstenite::Message::Text(REGISTER_MESSAGE.to_string());
-		sink.send(registration_message)
-			.await
-			.expect("Failed to send register message.");
-
-		let hello_response = stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Invalid websocket response received");
-		let expected_hello_response =
-			tungstenite::Message::Text(r#"{"type":"hello","id":0,"current_medium":null}"#.to_string());
-		assert_eq!(expected_hello_response, hello_response);
-
-		let _ = stream.next().await.expect("Failed to receive joined response.");
+		let (_client_id, mut test_client) = connect_and_register("Ferris".to_string()).await;
 
 		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-		sink.send(invalid_message)
-			.await
-			.expect("Failed to send invalid message.");
-		let response = stream
-			.next()
-			.await
-			.unwrap()
-			.expect("Invalid websocket response received");
+		test_client.send_raw(invalid_message).await;
+		let response = test_client.receive_response().await;
 
-		let expected_response =
-			tungstenite::Message::Text(r#"{"type":"error","error":"invalid_format","message":"Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])"}"#.to_string());
+		let expected_response = ServerResponse::Error(ErrorResponse {
+			error: ErrorResponseType::InvalidFormat,
+			message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+		});
 		assert_eq!(expected_response, response);
 	};
 	test_future_with_running_server(future, false);
@@ -178,40 +121,28 @@ fn should_broadcast_messages() {
 		let request = ChatRequest {
 			message: message.to_string(),
 		};
-		let (alice_client_id, mut alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
+		let (alice_client_id, mut alice_test_client) = connect_and_register("Alice".to_string()).await;
 		assert_eq!(ClientId::from(0), alice_client_id);
-		let (bob_client_id, _bob_sink, mut bob_stream) = connect_and_register("Bob".to_string()).await;
+		let (bob_client_id, mut bob_test_client) = connect_and_register("Bob".to_string()).await;
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let expected_bob_joined_response = ServerResponse::Joined(JoinedResponse {
+		let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
 			id: bob_client_id,
 			name: "Bob".to_string(),
 		});
-		let bob_joined_response = alice_stream.next().await.expect("Didn't get join message for Bob.");
-		assert_eq!(expected_bob_joined_response, bob_joined_response);
+		let bob_joined_broadcast = alice_test_client.receive_broadcast().await;
+		assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
 
-		let expected_chat_response = ServerResponse::Chat(ChatResponse {
+		let expected_chat_broadcast = Broadcast::Chat(ChatBroadcast {
 			sender_id: alice_client_id,
 			sender_name: "Alice".to_string(),
 			message: message.to_string(),
 		});
 
-		alice_sink
-			.send(request.into())
-			.await
-			.expect("Failed to sink broadcast message.");
+		alice_test_client.send_request(request).await;
 
-		assert_eq!(
-			expected_chat_response,
-			alice_stream
-				.next()
-				.await
-				.expect("Failed to receive response on client 1")
-		);
-		assert_eq!(
-			expected_chat_response,
-			bob_stream.next().await.expect("Failed to receive response on client 2")
-		);
+		assert_eq!(expected_chat_broadcast, alice_test_client.receive_broadcast().await);
+		assert_eq!(expected_chat_broadcast, bob_test_client.receive_broadcast().await);
 	};
 	test_future_with_running_server(future, false);
 }
@@ -219,18 +150,17 @@ fn should_broadcast_messages() {
 #[test]
 fn should_broadcast_when_client_leaves_the_room() {
 	let future = async {
-		let (_alice_client_id, _alice_sink, mut alice_stream) = connect_and_register("Alice".to_string()).await;
-		let (bob_client_id, bob_sink, bob_stream) = connect_and_register("Bob".to_string()).await;
+		let (_alice_client_id, mut alice_test_client) = connect_and_register("Alice".to_string()).await;
+		let (bob_client_id, bob_test_client) = connect_and_register("Bob".to_string()).await;
 
-		let _ = alice_stream.next().await; // skip join message for bob
-		std::mem::drop(bob_sink);
-		std::mem::drop(bob_stream);
+		let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
+		std::mem::drop(bob_test_client);
 
-		let expected_leave_message = ServerResponse::Left(LeftResponse {
+		let expected_leave_message = Broadcast::ClientLeft(ClientLeftBroadcast {
 			id: bob_client_id,
 			name: "Bob".to_string(),
 		});
-		let leave_message = alice_stream.next().await.expect("Failed to get Leave message for bob");
+		let leave_message = alice_test_client.receive_broadcast().await;
 		assert_eq!(expected_leave_message, leave_message);
 	};
 	test_future_with_running_server(future, false);
@@ -343,12 +273,12 @@ fn test_server_should_serve_reference_client_javascript_if_enabled() {
 #[test]
 fn server_should_respond_to_websocket_pings() {
 	let future = async {
-		let (mut sink, mut stream) = websocket_connection().await;
+		let mut test_client = websocket_connection().await;
 		let ping_content = vec![1u8, 9, 8, 0];
-		sink.send(tungstenite::Message::Ping(ping_content.clone()))
-			.await
-			.expect("Failed to send ping.");
-		let received_pong = stream.next().await.unwrap().expect("Failed to receive pong.");
+		test_client
+			.send_raw(tungstenite::Message::Ping(ping_content.clone()))
+			.await;
+		let received_pong = test_client.receive_raw().await;
 		let expected_pong = tungstenite::Message::Pong(ping_content);
 		assert_eq!(expected_pong, received_pong);
 	};

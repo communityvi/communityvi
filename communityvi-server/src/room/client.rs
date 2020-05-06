@@ -1,4 +1,5 @@
 use crate::connection::sender::MessageSender;
+use crate::message::broadcast::Broadcast;
 use crate::message::server_response::ServerResponse;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
@@ -44,6 +45,27 @@ impl Client {
 		if self.inner.connection.send(response.into()).await.is_err() {
 			info!(
 				"Failed to send message to client with id {} because it went away.",
+				self.inner.id
+			);
+			false
+		} else {
+			true
+		}
+	}
+
+	pub async fn broadcast<IntoBroadcast>(&self, broadcast: IntoBroadcast) -> bool
+	where
+		IntoBroadcast: Into<Broadcast>,
+	{
+		if self
+			.inner
+			.connection
+			.send_broadcast_message(broadcast.into())
+			.await
+			.is_err()
+		{
+			info!(
+				"Failed to send broadcast to client with id {} because it went away.",
 				self.inner.id
 			);
 			false

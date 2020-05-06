@@ -1,5 +1,5 @@
 use crate::connection::sender::MessageSender;
-use crate::message::server_response::ServerResponse;
+use crate::message::broadcast::Broadcast;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
@@ -10,7 +10,6 @@ use crate::room::state::State;
 use chrono::Duration;
 use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
-use log::info;
 use parking_lot::MutexGuard;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
@@ -116,7 +115,7 @@ impl Room {
 
 	pub async fn broadcast<Response>(&self, response: Response)
 	where
-		Response: Into<ServerResponse> + Clone,
+		Response: Into<Broadcast> + Clone,
 	{
 		let futures: Vec<_> = self
 			.inner
@@ -126,9 +125,7 @@ impl Room {
 			.map(move |client| {
 				let response = response.clone();
 				async move {
-					if !client.send(response).await {
-						info!("Client with id {} has gone away during broadcast.", client.id());
-					}
+					client.broadcast(response).await;
 				}
 			})
 			.collect();

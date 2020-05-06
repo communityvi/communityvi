@@ -261,12 +261,12 @@ function handleMessage(message, messageEvent) {
 			break;
 		}
 
-		case 'joined': {
+		case 'client_joined': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
 			break;
 		}
 
-		case 'left': {
+		case 'client_left': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} left the room.`);
 			break;
 		}

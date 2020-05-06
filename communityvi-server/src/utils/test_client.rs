@@ -1,39 +1,81 @@
+use crate::connection::receiver::{MessageReceiver, StreamMessageReceiver};
+use crate::connection::sender::{MessageSender, SinkMessageSender};
+use crate::message::broadcast::Broadcast;
+use crate::message::client_request::ClientRequest;
+use crate::message::server_response::ServerResponse;
+use crate::message::WebSocketMessage;
 use futures::{Sink, SinkExt, Stream, StreamExt};
-use std::fmt::Debug;
+use std::convert::TryFrom;
+use std::pin::Pin;
+use tokio::net::TcpStream;
+use tokio_tungstenite::WebSocketStream;
 
-pub struct TestClient<ClientSink, ClientStream> {
-	sink: ClientSink,
-	stream: ClientStream,
+pub struct TestWebsocketClient {
+	sender: Pin<Box<dyn Sink<WebSocketMessage, Error = ()> + Unpin + Send>>,
+	receiver: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
 }
 
-impl<ClientSink, ClientStream> TestClient<ClientSink, ClientStream> {
-	pub fn new(sink: ClientSink, stream: ClientStream) -> Self {
-		Self { sink, stream }
+impl From<WebSocketStream<TcpStream>> for TestWebsocketClient {
+	fn from(websocket: WebSocketStream<TcpStream>) -> Self {
+		let (sender, receiver) = websocket.split();
+		let sender = sender.sink_map_err(|_error| ());
+		let receiver = receiver.map(|result| result.expect("Failed to receive websocket message"));
+		Self {
+			sender: Box::pin(sender),
+			receiver: Box::pin(receiver),
+		}
+	}
+}
+
+impl TestWebsocketClient {
+	pub fn new() -> (MessageSender, MessageReceiver, Self) {
+		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
+		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
+		let client_sender = client_sender.sink_map_err(|_error| ());
+
+		let sink_client_connection = SinkMessageSender::new(server_sender);
+		let message_sender = MessageSender::from(sink_client_connection);
+		let stream_server_connection = StreamMessageReceiver::new(server_receiver, message_sender.clone());
+
+		let message_receiver = MessageReceiver::from(stream_server_connection);
+
+		let test_client = Self {
+			sender: Box::pin(client_sender),
+			receiver: Box::pin(client_receiver),
+		};
+
+		(message_sender, message_receiver, test_client)
 	}
 
-	pub fn split(self) -> (ClientSink, ClientStream) {
-		let TestClient { sink, stream } = self;
-		(sink, stream)
-	}
-
-	pub async fn send<Request, SinkError>(&mut self, request: Request)
-	where
-		ClientSink: Sink<Request, Error = SinkError> + Unpin,
-		SinkError: Debug,
-	{
-		self.sink
-			.send(request)
+	pub async fn send_raw(&mut self, message: WebSocketMessage) {
+		self.sender
+			.send(message)
 			.await
 			.expect("Failed to send message via TestClient.");
 	}
 
-	pub async fn receive<Response>(&mut self) -> Response
-	where
-		ClientStream: Stream<Item = Response> + Unpin,
-	{
-		self.stream
+	pub async fn receive_raw(&mut self) -> WebSocketMessage {
+		self.receiver
 			.next()
 			.await
 			.expect("Failed to receive message via TestClient")
+	}
+
+	pub async fn send_request<IntoRequest>(&mut self, request: IntoRequest)
+	where
+		IntoRequest: Into<ClientRequest>,
+	{
+		let websocket_message = WebSocketMessage::from(&request.into());
+		self.send_raw(websocket_message).await
+	}
+
+	pub async fn receive_response(&mut self) -> ServerResponse {
+		let websocket_message = self.receive_raw().await;
+		ServerResponse::try_from(&websocket_message).expect("Failed to deserialize ServerResponse")
+	}
+
+	pub async fn receive_broadcast(&mut self) -> Broadcast {
+		let websocket_message = self.receive_raw().await;
+		Broadcast::try_from(&websocket_message).expect("Failed to deserialize Broadcast")
 	}
 }
