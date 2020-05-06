@@ -19,6 +19,8 @@ use std::ops::DerefMut;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
+const TEST_SERVER_URL: &str = "127.0.0.1:10000";
+
 #[test]
 fn should_respond_to_websocket_messages() {
 	let test = |server: &TestServer| {
@@ -137,7 +139,7 @@ fn test_server_should_serve_reference_client_html_if_enabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
 		let response = client
-			.get("http://127.0.0.1:10000/reference")
+			.get(format!("http://{}/reference", TEST_SERVER_URL))
 			.perform()
 			.expect("Failed to request reference_client.");
 		assert_eq!(StatusCode::OK, response.status());
@@ -179,7 +181,7 @@ fn test_server_should_serve_reference_client_css_if_enabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
 		let response = client
-			.get("http://127.0.0.1:10000/reference/reference.css")
+			.get(format!("http://{}/reference/reference.css", TEST_SERVER_URL))
 			.perform()
 			.expect("Failed to request reference client css.");
 		assert_eq!(StatusCode::OK, response.status());
@@ -210,7 +212,7 @@ fn test_server_should_serve_reference_client_javascript_if_enabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
 		let response = client
-			.get("http://127.0.0.1:10000/reference/reference.js")
+			.get(format!("http://{}/reference/reference.js", TEST_SERVER_URL))
 			.perform()
 			.expect("Failed to request reference client javascript.");
 		assert_eq!(StatusCode::OK, response.status());
@@ -241,7 +243,7 @@ fn test_server_should_not_serve_reference_client_if_disabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
 		let response = client
-			.get("http://127.0.0.1:10000/reference")
+			.get(format!("http://{}/reference", TEST_SERVER_URL))
 			.perform()
 			.expect("Failed to request reference client.");
 		assert_eq!(StatusCode::NOT_FOUND, response.status());
@@ -307,7 +309,7 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 	let client = server.client();
 
-	let mut request = client.get("ws://127.0.0.1:10000/ws");
+	let mut request = client.get(format!("ws://{}/ws", TEST_SERVER_URL));
 	let headers = request.headers_mut();
 	headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
 	headers.insert(SEC_WEBSOCKET_KEY, HeaderValue::from_static("dGhlIHNhbXBsZSBub25jZQ=="));
