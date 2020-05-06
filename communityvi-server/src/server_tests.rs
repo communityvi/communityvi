@@ -40,8 +40,8 @@ async fn websocket_connection() -> TestWebsocketClient {
 	websocket_stream.into()
 }
 
-async fn register_client(name: String, test_client: &mut TestWebsocketClient) -> ClientId {
-	let register_request = RegisterRequest { name: name.clone() };
+async fn register_client(name: &str, test_client: &mut TestWebsocketClient) -> ClientId {
+	let register_request = RegisterRequest { name: name.to_string() };
 
 	test_client.send_request(register_request).await;
 
@@ -62,7 +62,7 @@ async fn register_client(name: String, test_client: &mut TestWebsocketClient) ->
 	id
 }
 
-async fn connect_and_register(name: String) -> (ClientId, TestWebsocketClient) {
+async fn connect_and_register(name: &str) -> (ClientId, TestWebsocketClient) {
 	let mut test_client = websocket_connection().await;
 	let client_id = register_client(name, &mut test_client).await;
 	(client_id, test_client)
@@ -72,7 +72,7 @@ async fn connect_and_register(name: String) -> (ClientId, TestWebsocketClient) {
 fn should_respond_to_websocket_messages() {
 	let future = async {
 		let mut test_client = websocket_connection().await;
-		let client_id = register_client("Ferris".to_string(), &mut test_client).await;
+		let client_id = register_client("Ferris", &mut test_client).await;
 		assert_eq!(ClientId::from(0), client_id);
 	};
 	test_future_with_running_server(future, false);
@@ -99,7 +99,7 @@ fn should_not_allow_invalid_messages_during_registration() {
 #[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
 	let future = async {
-		let (_client_id, mut test_client) = connect_and_register("Ferris".to_string()).await;
+		let (_client_id, mut test_client) = connect_and_register("Ferris").await;
 
 		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 		test_client.send_raw(invalid_message).await;
@@ -121,9 +121,9 @@ fn should_broadcast_messages() {
 		let request = ChatRequest {
 			message: message.to_string(),
 		};
-		let (alice_client_id, mut alice_test_client) = connect_and_register("Alice".to_string()).await;
+		let (alice_client_id, mut alice_test_client) = connect_and_register("Alice").await;
 		assert_eq!(ClientId::from(0), alice_client_id);
-		let (bob_client_id, mut bob_test_client) = connect_and_register("Bob".to_string()).await;
+		let (bob_client_id, mut bob_test_client) = connect_and_register("Bob").await;
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
@@ -150,8 +150,8 @@ fn should_broadcast_messages() {
 #[test]
 fn should_broadcast_when_client_leaves_the_room() {
 	let future = async {
-		let (_alice_client_id, mut alice_test_client) = connect_and_register("Alice".to_string()).await;
-		let (bob_client_id, bob_test_client) = connect_and_register("Bob".to_string()).await;
+		let (_alice_client_id, mut alice_test_client) = connect_and_register("Alice").await;
+		let (bob_client_id, bob_test_client) = connect_and_register("Bob").await;
 
 		let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
 		std::mem::drop(bob_test_client);
