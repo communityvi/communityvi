@@ -24,6 +24,3 @@ tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "parkin
 tokio-tungstenite = "0.10"
 toml = "0.5"
 unicode_skeleton = "0.1"
-
-[dev-dependencies]
-lazy_static = "1.4"

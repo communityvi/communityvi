@@ -255,7 +255,6 @@ dependencies = [
  "env_logger",
  "futures",
  "gotham",
- "lazy_static",
  "log",
  "mime",
  "parking_lot",
