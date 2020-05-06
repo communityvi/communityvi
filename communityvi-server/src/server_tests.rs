@@ -62,89 +62,103 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 	id
 }
 
-async fn connect_and_register(name: &str) -> (ClientId, WebsocketTestClient) {
-	let mut test_client = websocket_connection().await;
-	let client_id = register_client(name, &mut test_client).await;
-	(client_id, test_client)
-}
-
 #[test]
 fn should_respond_to_websocket_messages() {
-	let future = async {
-		let mut test_client = websocket_connection().await;
-		let client_id = register_client("Ferris", &mut test_client).await;
-		assert_eq!(ClientId::from(0), client_id);
+	let test = |server: &TestServer| {
+		let test_client = websocket_test_client(server);
+		let future = async move {
+			let mut test_client = test_client.lock().await;
+			let client_id = register_client("Ferris", &mut test_client).await;
+			assert_eq!(ClientId::from(0), client_id);
+		};
+		run_future_on_test_server(future, server);
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 #[test]
 fn should_not_allow_invalid_messages_during_registration() {
-	let future = async {
-		let mut test_client = websocket_connection().await;
-		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-		test_client.send_raw(invalid_message).await;
+	let test = |server: &TestServer| {
+		let test_client = websocket_test_client(server);
+		let future = async move {
+			let mut test_client = test_client.lock().await;
+			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+			test_client.send_raw(invalid_message).await;
 
-		let response = test_client.receive_response().await;
+			let response = test_client.receive_response().await;
 
-		let expected_response = ServerResponse::Error(ErrorResponse {
-			error: ErrorResponseType::InvalidFormat,
-			message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-		});
-		assert_eq!(expected_response, response);
+			let expected_response = ServerResponse::Error(ErrorResponse {
+				error: ErrorResponseType::InvalidFormat,
+				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+			});
+			assert_eq!(expected_response, response);
+		};
+		run_future_on_test_server(future, server);
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 #[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
-	let future = async {
-		let (_client_id, mut test_client) = connect_and_register("Ferris").await;
+	let test = |server: &TestServer| {
+		let (_client_id, test_client) = registered_websocket_test_client("Ferris", server);
 
-		let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-		test_client.send_raw(invalid_message).await;
-		let response = test_client.receive_response().await;
+		let future = async move {
+			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+			test_client.lock().await.send_raw(invalid_message).await;
+			let response = test_client.lock().await.receive_response().await;
 
-		let expected_response = ServerResponse::Error(ErrorResponse {
-			error: ErrorResponseType::InvalidFormat,
-			message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-		});
-		assert_eq!(expected_response, response);
+			let expected_response = ServerResponse::Error(ErrorResponse {
+				error: ErrorResponseType::InvalidFormat,
+				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+			});
+			assert_eq!(expected_response, response);
+		};
+		run_future_on_test_server(future, server);
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 #[test]
 fn should_broadcast_messages() {
-	let future = async move {
+	let test = |server: &TestServer| {
 		let message = r#"Hello everyone \o/"#;
 		let request = ChatRequest {
 			message: message.to_string(),
 		};
-		let (alice_client_id, mut alice_test_client) = connect_and_register("Alice").await;
+		let (alice_client_id, alice_test_client) = registered_websocket_test_client("Alice", server);
 		assert_eq!(ClientId::from(0), alice_client_id);
-		let (bob_client_id, mut bob_test_client) = connect_and_register("Bob").await;
+		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
-			id: bob_client_id,
-			name: "Bob".to_string(),
-		});
-		let bob_joined_broadcast = alice_test_client.receive_broadcast().await;
-		assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
+		let future = async move {
+			let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
+				id: bob_client_id,
+				name: "Bob".to_string(),
+			});
+			let bob_joined_broadcast = alice_test_client.lock().await.receive_broadcast().await;
+			assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
 
-		let expected_chat_broadcast = Broadcast::Chat(ChatBroadcast {
-			sender_id: alice_client_id,
-			sender_name: "Alice".to_string(),
-			message: message.to_string(),
-		});
+			let expected_chat_broadcast = Broadcast::Chat(ChatBroadcast {
+				sender_id: alice_client_id,
+				sender_name: "Alice".to_string(),
+				message: message.to_string(),
+			});
 
-		alice_test_client.send_request(request).await;
+			alice_test_client.lock().await.send_request(request).await;
 
-		assert_eq!(expected_chat_broadcast, alice_test_client.receive_broadcast().await);
-		assert_eq!(expected_chat_broadcast, bob_test_client.receive_broadcast().await);
+			assert_eq!(
+				expected_chat_broadcast,
+				alice_test_client.lock().await.receive_broadcast().await
+			);
+			assert_eq!(
+				expected_chat_broadcast,
+				bob_test_client.lock().await.receive_broadcast().await
+			);
+		};
+		run_future_on_test_server(future, server);
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 #[test]
