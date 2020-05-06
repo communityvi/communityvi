@@ -149,21 +149,24 @@ fn should_broadcast_messages() {
 
 #[test]
 fn should_broadcast_when_client_leaves_the_room() {
-	let future = async {
-		let (_alice_client_id, mut alice_test_client) = connect_and_register("Alice").await;
-		let (bob_client_id, bob_test_client) = connect_and_register("Bob").await;
+	let test = |server: &TestServer| {
+		let (_alice_client_id, alice_test_client) = registered_websocket_test_client("Alice", server);
+		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 
-		let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
-		std::mem::drop(bob_test_client);
+		let future = async move {
+			let _ = alice_test_client.lock().await.receive_broadcast().await; // skip join message for bob
+			std::mem::drop(bob_test_client);
 
-		let expected_leave_message = Broadcast::ClientLeft(ClientLeftBroadcast {
-			id: bob_client_id,
-			name: "Bob".to_string(),
-		});
-		let leave_message = alice_test_client.receive_broadcast().await;
-		assert_eq!(expected_leave_message, leave_message);
+			let expected_leave_message = Broadcast::ClientLeft(ClientLeftBroadcast {
+				id: bob_client_id,
+				name: "Bob".to_string(),
+			});
+			let leave_message = alice_test_client.lock().await.receive_broadcast().await;
+			assert_eq!(expected_leave_message, leave_message);
+		};
+		run_future_on_test_server(future, server);
 	};
-	test_future_with_running_server(future, false);
+	test_with_test_server(test, false);
 }
 
 #[test]
@@ -271,21 +274,6 @@ fn test_server_should_serve_reference_client_javascript_if_enabled() {
 }
 
 #[test]
-fn server_should_respond_to_websocket_pings() {
-	let future = async {
-		let mut test_client = websocket_connection().await;
-		let ping_content = vec![1u8, 9, 8, 0];
-		test_client
-			.send_raw(tungstenite::Message::Ping(ping_content.clone()))
-			.await;
-		let received_pong = test_client.receive_raw().await;
-		let expected_pong = tungstenite::Message::Pong(ping_content);
-		assert_eq!(expected_pong, received_pong);
-	};
-	test_future_with_running_server(future, false);
-}
-
-#[test]
 fn test_server_should_not_serve_reference_client_if_disabled() {
 	let test = |server: &TestServer| {
 		let client = server.client();
@@ -324,6 +312,20 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 		run_future_on_test_server(future, server)
 	};
 	test_with_test_server(test, false);
+}
+
+fn registered_websocket_test_client(
+	name: &'static str,
+	server: &TestServer,
+) -> (ClientId, Arc<tokio::sync::Mutex<WebsocketTestClient>>) {
+	let test_client = websocket_test_client(server);
+	let cloned_client = test_client.clone();
+	let register_future = async move {
+		let mut test_client = cloned_client.lock().await;
+		register_client(name, &mut test_client).await
+	};
+	let client_id = run_future_on_test_server(register_future, server);
+	(client_id, test_client)
 }
 
 fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<WebsocketTestClient>> {
