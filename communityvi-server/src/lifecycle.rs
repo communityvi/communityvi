@@ -236,14 +236,14 @@ mod test {
 	use crate::message::server_response::{MediumResponse, PlaybackStateResponse, ServerResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
-	use crate::utils::test_client::TestWebsocketClient;
+	use crate::utils::test_client::WebsocketTestClient;
 	use tokio::time::delay_for;
 
 	#[tokio::test]
 	async fn the_client_should_get_access_to_the_server_reference_time() {
 		const TEST_DELAY: std::time::Duration = std::time::Duration::from_millis(2);
 
-		let (message_sender, _message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, _message_receiver, mut test_client) = WebsocketTestClient::new();
 		let room = Room::new(10);
 		let client_handle = room
 			.add_client("Alice".to_string(), message_sender)
@@ -266,8 +266,8 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		let alice = room
@@ -303,7 +303,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_insert_a_too_large_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		let alice = room
@@ -335,8 +335,8 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		let alice = room
@@ -378,7 +378,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_play_something_without_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
 		let alice = room
@@ -409,8 +409,8 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		room.add_client("Alice".to_string(), alice_message_sender)
@@ -453,8 +453,8 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		room.add_client("Alice".to_string(), alice_message_sender)
@@ -496,7 +496,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_pause_something_without_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = TestWebsocketClient::new();
+		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
 		let alice = room
@@ -527,7 +527,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_not_allow_registering_client_twice() {
-		let (message_sender, message_receiver, test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, test_client) = WebsocketTestClient::new();
 		let room = Room::new(10);
 
 		let (client_handle, message_receiver, mut test_client) =
@@ -557,7 +557,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_not_register_clients_with_blank_name() {
-		let (message_sender, message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let room = Room::new(10);
 		let register_request = RegisterRequest { name: "	 ".to_string() };
 
@@ -584,7 +584,7 @@ mod test {
 			.expect("Could not register 'Ferris'!");
 
 		// And I register another client with the same name
-		let (message_sender, message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
 			name: "Ferris".to_string(),
 		};
@@ -611,7 +611,7 @@ mod test {
 			room.add_client("Fake".to_string(), message_sender).unwrap();
 		}
 
-		let (message_sender, message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
 			name: "second".to_string(),
 		};
@@ -638,7 +638,7 @@ mod test {
 		room.insert_medium(short_circuit);
 		room.play_medium(Duration::milliseconds(0));
 
-		let (message_sender, message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
 			name: "Johnny 5".to_string(),
 		};
@@ -670,7 +670,7 @@ mod test {
 		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(video_name.clone(), video_length));
 		room.insert_medium(short_circuit);
 
-		let (message_sender, message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
 			name: "Johnny 5".to_string(),
 		};
@@ -699,8 +699,8 @@ mod test {
 		room: Room,
 		message_sender: MessageSender,
 		message_receiver: MessageReceiver,
-		mut test_client: TestWebsocketClient,
-	) -> (Client, MessageReceiver, TestWebsocketClient) {
+		mut test_client: WebsocketTestClient,
+	) -> (Client, MessageReceiver, WebsocketTestClient) {
 		let register_request = RegisterRequest { name: name.into() };
 
 		test_client.send_request(register_request).await;

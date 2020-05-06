@@ -10,12 +10,12 @@ use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::WebSocketStream;
 
-pub struct TestWebsocketClient {
+pub struct WebsocketTestClient {
 	sender: Pin<Box<dyn Sink<WebSocketMessage, Error = ()> + Unpin + Send>>,
 	receiver: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
 }
 
-impl TestWebsocketClient {
+impl WebsocketTestClient {
 	pub fn new() -> (MessageSender, MessageReceiver, Self) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
@@ -68,7 +68,7 @@ impl TestWebsocketClient {
 	}
 }
 
-impl<Socket> From<WebSocketStream<Socket>> for TestWebsocketClient
+impl<Socket> From<WebSocketStream<Socket>> for WebsocketTestClient
 where
 	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {

@@ -7,11 +7,10 @@ use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::{create_router, run_server};
 use crate::utils::select_first_future::select_first_future;
-use crate::utils::test_client::TestWebsocketClient;
-use futures::{FutureExt, SinkExt, StreamExt};
+use crate::utils::test_client::WebsocketTestClient;
+use futures::FutureExt;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
-use gotham::hyper::upgrade::Upgraded;
 use gotham::hyper::Body;
 use gotham::plain::test::TestServer;
 use gotham::test::Server;
@@ -23,6 +22,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::DerefMut;
 use std::str::FromStr;
+use std::sync::Arc;
 use tokio::runtime;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
@@ -32,7 +32,7 @@ lazy_static! {
 	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-async fn websocket_connection() -> TestWebsocketClient {
+async fn websocket_connection() -> WebsocketTestClient {
 	let (websocket_stream, _response) = tokio_tungstenite::connect_async(format!("ws://{}/ws", HOSTNAME_AND_PORT))
 		.await
 		.map_err(|error| panic!("Websocket connection failed: {}", error))
@@ -40,7 +40,7 @@ async fn websocket_connection() -> TestWebsocketClient {
 	websocket_stream.into()
 }
 
-async fn register_client(name: &str, test_client: &mut TestWebsocketClient) -> ClientId {
+async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
 	let register_request = RegisterRequest { name: name.to_string() };
 
 	test_client.send_request(register_request).await;
@@ -62,7 +62,7 @@ async fn register_client(name: &str, test_client: &mut TestWebsocketClient) -> C
 	id
 }
 
-async fn connect_and_register(name: &str) -> (ClientId, TestWebsocketClient) {
+async fn connect_and_register(name: &str) -> (ClientId, WebsocketTestClient) {
 	let mut test_client = websocket_connection().await;
 	let client_id = register_client(name, &mut test_client).await;
 	(client_id, test_client)
@@ -310,18 +310,15 @@ impl Error for ImpossibleError {}
 #[test]
 fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let test = |server: &TestServer| {
-		let mut websocket = connect_to_test_server_websocket(server);
+		let test_client = websocket_test_client(server);
 		let future = async move {
-			websocket
-				.send(tungstenite::Message::Ping(vec![]))
+			test_client
+				.lock()
 				.await
-				.expect("Failed to send ping.");
+				.send_raw(tungstenite::Message::Ping(vec![]))
+				.await;
 
-			let pong = websocket
-				.next()
-				.await
-				.expect("Websocket ended prematurely")
-				.expect("Didn't receive Pong.");
+			let pong = test_client.lock().await.receive_raw().await;
 			assert!(pong.is_pong());
 		};
 		run_future_on_test_server(future, server)
@@ -329,7 +326,7 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	test_with_test_server(test, false);
 }
 
-fn connect_to_test_server_websocket(server: &TestServer) -> WebSocketStream<Upgraded> {
+fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<WebsocketTestClient>> {
 	let client = server.client();
 
 	let mut request = client.get("ws://127.0.0.1:10000/ws");
@@ -344,13 +341,14 @@ fn connect_to_test_server_websocket(server: &TestServer) -> WebSocketStream<Upgr
 	let mut body = Body::empty();
 	std::mem::swap(&mut body, response.deref_mut().body_mut());
 
-	server
+	let websocket = server
 		.run_future(async move {
 			let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
 			let websocket_stream = WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await;
 			Ok::<_, ImpossibleError>(websocket_stream) // `test::Server::run_future` requires `Result` with `Error` for no apparent reason
 		})
-		.unwrap() // wrap the `ImpossibleError` away, whoooosh
+		.unwrap(); // wrap the `ImpossibleError` away, whoooosh
+	Arc::new(tokio::sync::Mutex::new(websocket.into()))
 }
 
 fn run_future_on_test_server<FutureType, Output>(future: FutureType, server: &TestServer) -> Output

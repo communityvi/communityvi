@@ -20,11 +20,11 @@ pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver)
 pub mod test {
 	use crate::message::server_response::{ErrorResponse, ErrorResponseType, ServerResponse};
 	use crate::message::WebSocketMessage;
-	use crate::utils::test_client::TestWebsocketClient;
+	use crate::utils::test_client::WebsocketTestClient;
 
 	#[tokio::test]
 	async fn should_close_after_10_invalid_messages() {
-		let (_message_sender, mut message_receiver, mut test_client) = TestWebsocketClient::new();
+		let (_message_sender, mut message_receiver, mut test_client) = WebsocketTestClient::new();
 
 		// send 10 invalid messages
 		let invalid_message = WebSocketMessage::binary(vec![1u8, 2u8, 3u8, 4u8]);
