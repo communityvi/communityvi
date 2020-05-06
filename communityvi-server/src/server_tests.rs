@@ -1,12 +1,10 @@
-use crate::configuration::Configuration;
 use crate::message::broadcast::Broadcast;
 use crate::message::broadcast::{ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast};
 use crate::message::client_request::{ChatRequest, RegisterRequest};
 use crate::message::server_response::{ErrorResponse, ErrorResponseType, HelloResponse, ServerResponse};
 use crate::room::client_id::ClientId;
 use crate::room::Room;
-use crate::server::{create_router, run_server};
-use crate::utils::select_first_future::select_first_future;
+use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
 use futures::FutureExt;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
@@ -14,53 +12,13 @@ use gotham::hyper::http::StatusCode;
 use gotham::hyper::Body;
 use gotham::plain::test::TestServer;
 use gotham::test::Server;
-use lazy_static::lazy_static;
-use parking_lot::Mutex;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
-use std::net::SocketAddr;
 use std::ops::DerefMut;
-use std::str::FromStr;
 use std::sync::Arc;
-use tokio::runtime;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
-
-const HOSTNAME_AND_PORT: &str = "localhost:8000";
-lazy_static! {
-	static ref TEST_MUTEX: Mutex<()> = Mutex::new(());
-}
-
-async fn websocket_connection() -> WebsocketTestClient {
-	let (websocket_stream, _response) = tokio_tungstenite::connect_async(format!("ws://{}/ws", HOSTNAME_AND_PORT))
-		.await
-		.map_err(|error| panic!("Websocket connection failed: {}", error))
-		.unwrap();
-	websocket_stream.into()
-}
-
-async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
-	let register_request = RegisterRequest { name: name.to_string() };
-
-	test_client.send_request(register_request).await;
-
-	let response = test_client.receive_response().await;
-
-	let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
-		id
-	} else {
-		panic!("Expected Hello-Response, got '{:?}'", response);
-	};
-
-	let joined_response = test_client.receive_broadcast().await;
-	assert!(matches!(
-		joined_response,
-		Broadcast::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
-	));
-
-	id
-}
 
 #[test]
 fn should_respond_to_websocket_messages() {
@@ -342,6 +300,28 @@ fn registered_websocket_test_client(
 	(client_id, test_client)
 }
 
+async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
+	let register_request = RegisterRequest { name: name.to_string() };
+
+	test_client.send_request(register_request).await;
+
+	let response = test_client.receive_response().await;
+
+	let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
+		id
+	} else {
+		panic!("Expected Hello-Response, got '{:?}'", response);
+	};
+
+	let joined_response = test_client.receive_broadcast().await;
+	assert!(matches!(
+		joined_response,
+		Broadcast::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
+	));
+
+	id
+}
+
 fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<WebsocketTestClient>> {
 	let client = server.client();
 
@@ -380,36 +360,4 @@ fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_
 	let router = create_router(room, enable_reference_client);
 	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");
 	test(&server);
-}
-
-fn test_future_with_running_server<OutputType, FutureType>(
-	future_to_test: FutureType,
-	enable_reference_client: bool,
-) -> OutputType
-where
-	OutputType: Send + 'static,
-	FutureType: Future<Output = OutputType> + Send + 'static,
-{
-	let _guard = TEST_MUTEX.lock();
-	let mut runtime = runtime::Builder::new()
-		.threaded_scheduler()
-		.enable_all()
-		.build()
-		.expect("Failed to create runtime");
-	let (sender, receiver) = futures::channel::oneshot::channel();
-	let receiver = receiver.then(|_| futures::future::ready(()));
-	let configuration = Configuration {
-		address: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
-		log_filters: "debug".to_string(),
-		room_size_limit: 10,
-	};
-	let server = async move {
-		select_first_future(receiver, run_server(&configuration, enable_reference_client)).await;
-	};
-	let server_handle = runtime.spawn(server);
-
-	let output = runtime.block_on(future_to_test);
-	sender.send(()).expect("Failed to send shutdown.");
-	runtime.block_on(server_handle).expect("Failed to join server.");
-	output
 }
