@@ -16,16 +16,14 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::ops::DerefMut;
-use std::sync::Arc;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
 #[test]
 fn should_respond_to_websocket_messages() {
 	let test = |server: &TestServer| {
-		let test_client = websocket_test_client(server);
+		let mut test_client = websocket_test_client(server);
 		let future = async move {
-			let mut test_client = test_client.lock().await;
 			let client_id = register_client("Ferris", &mut test_client).await;
 			assert_eq!(ClientId::from(0), client_id);
 		};
@@ -37,9 +35,8 @@ fn should_respond_to_websocket_messages() {
 #[test]
 fn should_not_allow_invalid_messages_during_registration() {
 	let test = |server: &TestServer| {
-		let test_client = websocket_test_client(server);
+		let mut test_client = websocket_test_client(server);
 		let future = async move {
-			let mut test_client = test_client.lock().await;
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
 
@@ -59,10 +56,9 @@ fn should_not_allow_invalid_messages_during_registration() {
 #[test]
 fn should_not_allow_invalid_messages_after_successful_registration() {
 	let test = |server: &TestServer| {
-		let (_client_id, test_client) = registered_websocket_test_client("Ferris", server);
+		let (_client_id, mut test_client) = registered_websocket_test_client("Ferris", server);
 
 		let future = async move {
-			let mut test_client = test_client.lock().await;
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
 			let response = test_client.receive_response().await;
@@ -85,14 +81,12 @@ fn should_broadcast_messages() {
 		let request = ChatRequest {
 			message: message.to_string(),
 		};
-		let (alice_client_id, alice_test_client) = registered_websocket_test_client("Alice", server);
+		let (alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", server);
 		assert_eq!(ClientId::from(0), alice_client_id);
-		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
+		let (bob_client_id, mut bob_test_client) = registered_websocket_test_client("Bob", server);
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let future = async move {
-			let mut alice_test_client = alice_test_client.lock().await;
-			let mut bob_test_client = bob_test_client.lock().await;
 			let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
@@ -119,11 +113,10 @@ fn should_broadcast_messages() {
 #[test]
 fn should_broadcast_when_client_leaves_the_room() {
 	let test = |server: &TestServer| {
-		let (_alice_client_id, alice_test_client) = registered_websocket_test_client("Alice", server);
+		let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", server);
 		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 
 		let future = async move {
-			let mut alice_test_client = alice_test_client.lock().await;
 			let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
 			std::mem::drop(bob_test_client);
 
@@ -268,9 +261,8 @@ impl Error for ImpossibleError {}
 #[test]
 fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let test = |server: &TestServer| {
-		let test_client = websocket_test_client(server);
+		let mut test_client = websocket_test_client(server);
 		let future = async move {
-			let mut test_client = test_client.lock().await;
 			test_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
 			let pong = test_client.receive_raw().await;
@@ -281,16 +273,10 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	test_with_test_server(test, false);
 }
 
-fn registered_websocket_test_client(
-	name: &'static str,
-	server: &TestServer,
-) -> (ClientId, Arc<tokio::sync::Mutex<WebsocketTestClient>>) {
-	let test_client = websocket_test_client(server);
+fn registered_websocket_test_client(name: &'static str, server: &TestServer) -> (ClientId, WebsocketTestClient) {
+	let mut test_client = websocket_test_client(server);
 	let register_future = async move {
-		let client_id = {
-			let mut test_client_guard = test_client.lock().await;
-			register_client(name, &mut test_client_guard).await
-		};
+		let client_id = { register_client(name, &mut test_client).await };
 		(client_id, test_client)
 	};
 	run_future_on_test_server(register_future, server)
@@ -318,7 +304,7 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 	id
 }
 
-fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<WebsocketTestClient>> {
+fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 	let client = server.client();
 
 	let mut request = client.get("ws://127.0.0.1:10000/ws");
@@ -341,15 +327,7 @@ fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<Websocke
 		})
 		.unwrap(); // wrap the `ImpossibleError` away, whoooosh
 
-	// We need to return an Arc<Mutex<_>> because asynchronous `TestServer` tests need to be executed
-	// using `Server::run_future` which requires `Send` and `'static'`.
-	// `tokio::sync::Mutex` is used because both the standard library's and parking_lot's MutexGuard
-	// are `!Send` which is problematic across `await` points since it makes the generated future `!Send`.
-	// If `Server::run_future` wouldn't require `'static` it would probably be possible just to pass in
-	// a `&mut WebsocketTestClient` and the wrapping would not be necessary anymore.
-	// But ideally `TestClient::perform` and `TestRequest::perform` would be `async` methods, then the entire
-	// test could be executed on a regular tokio runtime without requiring the use of `Server::run_future`
-	Arc::new(tokio::sync::Mutex::new(websocket.into()))
+	websocket.into()
 }
 
 fn run_future_on_test_server<FutureType, Output>(future: FutureType, server: &TestServer) -> Output
