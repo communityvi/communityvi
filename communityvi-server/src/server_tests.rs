@@ -62,9 +62,10 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 		let (_client_id, test_client) = registered_websocket_test_client("Ferris", server);
 
 		let future = async move {
+			let mut test_client = test_client.lock().await;
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-			test_client.lock().await.send_raw(invalid_message).await;
-			let response = test_client.lock().await.receive_response().await;
+			test_client.send_raw(invalid_message).await;
+			let response = test_client.receive_response().await;
 
 			let expected_response = ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::InvalidFormat,
@@ -90,11 +91,13 @@ fn should_broadcast_messages() {
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let future = async move {
+			let mut alice_test_client = alice_test_client.lock().await;
+			let mut bob_test_client = bob_test_client.lock().await;
 			let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
 			});
-			let bob_joined_broadcast = alice_test_client.lock().await.receive_broadcast().await;
+			let bob_joined_broadcast = alice_test_client.receive_broadcast().await;
 			assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
 
 			let expected_chat_broadcast = Broadcast::Chat(ChatBroadcast {
@@ -103,16 +106,10 @@ fn should_broadcast_messages() {
 				message: message.to_string(),
 			});
 
-			alice_test_client.lock().await.send_request(request).await;
+			alice_test_client.send_request(request).await;
 
-			assert_eq!(
-				expected_chat_broadcast,
-				alice_test_client.lock().await.receive_broadcast().await
-			);
-			assert_eq!(
-				expected_chat_broadcast,
-				bob_test_client.lock().await.receive_broadcast().await
-			);
+			assert_eq!(expected_chat_broadcast, alice_test_client.receive_broadcast().await);
+			assert_eq!(expected_chat_broadcast, bob_test_client.receive_broadcast().await);
 		};
 		run_future_on_test_server(future, server);
 	};
@@ -126,14 +123,15 @@ fn should_broadcast_when_client_leaves_the_room() {
 		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 
 		let future = async move {
-			let _ = alice_test_client.lock().await.receive_broadcast().await; // skip join message for bob
+			let mut alice_test_client = alice_test_client.lock().await;
+			let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
 			std::mem::drop(bob_test_client);
 
 			let expected_leave_message = Broadcast::ClientLeft(ClientLeftBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
 			});
-			let leave_message = alice_test_client.lock().await.receive_broadcast().await;
+			let leave_message = alice_test_client.receive_broadcast().await;
 			assert_eq!(expected_leave_message, leave_message);
 		};
 		run_future_on_test_server(future, server);
@@ -272,13 +270,10 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let test = |server: &TestServer| {
 		let test_client = websocket_test_client(server);
 		let future = async move {
-			test_client
-				.lock()
-				.await
-				.send_raw(tungstenite::Message::Ping(vec![]))
-				.await;
+			let mut test_client = test_client.lock().await;
+			test_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
-			let pong = test_client.lock().await.receive_raw().await;
+			let pong = test_client.receive_raw().await;
 			assert!(pong.is_pong());
 		};
 		run_future_on_test_server(future, server)
@@ -291,13 +286,14 @@ fn registered_websocket_test_client(
 	server: &TestServer,
 ) -> (ClientId, Arc<tokio::sync::Mutex<WebsocketTestClient>>) {
 	let test_client = websocket_test_client(server);
-	let cloned_client = test_client.clone();
 	let register_future = async move {
-		let mut test_client = cloned_client.lock().await;
-		register_client(name, &mut test_client).await
+		let client_id = {
+			let mut test_client_guard = test_client.lock().await;
+			register_client(name, &mut test_client_guard).await
+		};
+		(client_id, test_client)
 	};
-	let client_id = run_future_on_test_server(register_future, server);
-	(client_id, test_client)
+	run_future_on_test_server(register_future, server)
 }
 
 async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
