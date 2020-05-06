@@ -340,6 +340,15 @@ fn websocket_test_client(server: &TestServer) -> Arc<tokio::sync::Mutex<Websocke
 			Ok::<_, ImpossibleError>(websocket_stream) // `test::Server::run_future` requires `Result` with `Error` for no apparent reason
 		})
 		.unwrap(); // wrap the `ImpossibleError` away, whoooosh
+
+	// We need to return an Arc<Mutex<_>> because asynchronous `TestServer` tests need to be executed
+	// using `Server::run_future` which requires `Send` and `'static'`.
+	// `tokio::sync::Mutex` is used because both the standard library's and parking_lot's MutexGuard
+	// are `!Send` which is problematic across `await` points since it makes the generated future `!Send`.
+	// If `Server::run_future` wouldn't require `'static` it would probably be possible just to pass in
+	// a `&mut WebsocketTestClient` and the wrapping would not be necessary anymore.
+	// But ideally `TestClient::perform` and `TestRequest::perform` would be `async` methods, then the entire
+	// test could be executed on a regular tokio runtime without requiring the use of `Server::run_future`
 	Arc::new(tokio::sync::Mutex::new(websocket.into()))
 }
 
