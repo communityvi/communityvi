@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::message::{
-	deserialize_message_from_str, serialize_message_to_websocket_message, Message, MessageError, WebSocketMessage,
-};
+use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
 use crate::room::state::medium::playback_state::PlaybackState;
 use crate::room::state::medium::{Medium, SomeMedium};
@@ -103,11 +101,10 @@ pub enum ErrorResponseType {
 	InternalServerError,
 }
 
-impl Message for ServerResponse {}
-
 impl From<&ServerResponse> for WebSocketMessage {
 	fn from(response: &ServerResponse) -> Self {
-		serialize_message_to_websocket_message(response)
+		let json = serde_json::to_string(response).expect("Failed to serialize response to JSON.");
+		WebSocketMessage::text(json)
 	}
 }
 
@@ -115,7 +112,10 @@ impl TryFrom<&str> for ServerResponse {
 	type Error = MessageError;
 
 	fn try_from(json: &str) -> Result<Self, MessageError> {
-		deserialize_message_from_str(json)
+		serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
+			error: error.to_string(),
+			json: json.to_string(),
+		})
 	}
 }
 

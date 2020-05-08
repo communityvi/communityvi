@@ -1,5 +1,3 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -7,14 +5,7 @@ pub mod broadcast;
 pub mod client_request;
 pub mod server_response;
 
-pub trait Message: Clone + Debug + DeserializeOwned + Serialize + PartialEq {}
-
 pub type WebSocketMessage = tokio_tungstenite::tungstenite::Message;
-
-fn serialize_message_to_websocket_message<MessageType: Message>(message: &MessageType) -> WebSocketMessage {
-	let json = serde_json::to_string(message).expect("Failed to serialize message to JSON.");
-	WebSocketMessage::text(json)
-}
 
 #[derive(Debug)]
 pub enum MessageError {
@@ -40,10 +31,3 @@ impl Display for MessageError {
 }
 
 impl Error for MessageError {}
-
-fn deserialize_message_from_str<MessageType: Message>(json: &str) -> Result<MessageType, MessageError> {
-	serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
-		error: error.to_string(),
-		json: json.to_string(),
-	})
-}

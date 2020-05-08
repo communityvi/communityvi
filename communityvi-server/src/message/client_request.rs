@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::message::{
-	deserialize_message_from_str, serialize_message_to_websocket_message, Message, MessageError, WebSocketMessage,
-};
+use crate::message::{MessageError, WebSocketMessage};
 use std::convert::{TryFrom, TryInto};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -65,11 +63,10 @@ pub struct PauseRequest {
 
 client_request_from_struct!(Pause, PauseRequest);
 
-impl Message for ClientRequest {}
-
 impl From<&ClientRequest> for WebSocketMessage {
 	fn from(request: &ClientRequest) -> Self {
-		serialize_message_to_websocket_message(request)
+		let json = serde_json::to_string(request).expect("Failed to serialize request to JSON.");
+		WebSocketMessage::text(json)
 	}
 }
 
@@ -77,7 +74,10 @@ impl TryFrom<&str> for ClientRequest {
 	type Error = MessageError;
 
 	fn try_from(json: &str) -> Result<Self, Self::Error> {
-		deserialize_message_from_str(json)
+		serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
+			error: error.to_string(),
+			json: json.to_string(),
+		})
 	}
 }
 impl TryFrom<&WebSocketMessage> for ClientRequest {
