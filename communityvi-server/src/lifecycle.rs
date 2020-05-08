@@ -3,11 +3,10 @@ use crate::connection::sender::MessageSender;
 use crate::message::broadcast::{
 	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumInsertedBroadcast, PlaybackStateChangedBroadcast,
 };
-use crate::message::client_request::{
-	ChatRequest, ClientRequestWithId, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
-};
+use crate::message::client_request::{ChatRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest};
 use crate::message::server_response::{
-	ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse, ResponseConvertible,
+	ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse, ResponseConvertible, ServerResponse,
+	SuccessResponse,
 };
 use crate::message::{client_request::ClientRequest, server_response::ErrorResponseType};
 use crate::room::client::Client;
@@ -119,7 +118,8 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 			client.id(),
 		);
 
-		handle_message(room, &client, message).await;
+		let response = handle_request(room, &client, message.request).await;
+		client.send(response.with_id(message.request_id)).await;
 	}
 
 	let id = client.id();
@@ -128,73 +128,71 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 	room.broadcast(ClientLeftBroadcast { id, name }).await;
 }
 
-// TODO: This should take a ClientRequest and return a ServerResponse
-async fn handle_message(room: &Room, client: &Client, request: ClientRequestWithId) {
-	let ClientRequestWithId { request_id, request } = request;
+async fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> ServerResponse {
+	use ClientRequest::*;
 	match request {
-		ClientRequest::Chat(ChatRequest { message }) => {
+		Chat(ChatRequest { message }) => {
 			room.broadcast(ChatBroadcast {
 				sender_id: client.id(),
 				sender_name: client.name().to_string(),
 				message,
 			})
-			.await
+			.await;
+			SuccessResponse.into()
 		}
-		ClientRequest::Register { .. } => {
+		Register { .. } => {
 			error!(
 				"Client: {} tried to register even though it is already registered.",
 				client.id()
 			);
-			let response = ErrorResponse {
+			ErrorResponse {
 				error: ErrorResponseType::InvalidOperation,
 				message: "Already registered".to_string(),
-			};
-			client.send(response.with_id(request_id)).await;
+			}
+			.into()
 		}
-		ClientRequest::GetReferenceTime => {
+		GetReferenceTime => {
 			let reference_time = room.current_reference_time();
-			let message = ReferenceTimeResponse {
+			ReferenceTimeResponse {
 				milliseconds: reference_time.as_millis() as u64,
-			};
-			client.send(message.with_id(request_id)).await;
+			}
+			.into()
 		}
-		ClientRequest::InsertMedium(InsertMediumRequest {
+		InsertMedium(InsertMediumRequest {
 			name,
 			length_in_milliseconds,
 		}) => {
 			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
-				let response = ErrorResponse {
+				ErrorResponse {
 					error: ErrorResponseType::InvalidFormat,
 					message: "Length of a medium must not be larger than one year.".to_string(),
-				};
-				client.send(response.with_id(request_id)).await;
-				return;
+				}
+				.into()
+			} else {
+				room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+					name.clone(),
+					Duration::milliseconds(length_in_milliseconds as i64),
+				)));
+
+				room.broadcast(MediumInsertedBroadcast {
+					inserted_by_name: client.name().to_string(),
+					inserted_by_id: client.id(),
+					name,
+					length_in_milliseconds,
+				})
+				.await;
+				SuccessResponse.into()
 			}
-
-			room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
-				name.clone(),
-				Duration::milliseconds(length_in_milliseconds as i64),
-			)));
-
-			room.broadcast(MediumInsertedBroadcast {
-				inserted_by_name: client.name().to_string(),
-				inserted_by_id: client.id(),
-				name,
-				length_in_milliseconds,
-			})
-			.await;
 		}
-		ClientRequest::Play(PlayRequest {
+		Play(PlayRequest {
 			skipped,
 			start_time_in_milliseconds,
 		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
-			None => {
-				let response = ErrorResponse {
-					error: ErrorResponseType::NoMedium,
-					message: "Room has no medium.".to_string(),
-				};
-				client.send(response.with_id(request_id)).await;
+			None => ErrorResponse {
+				error: ErrorResponseType::NoMedium,
+				message: "Room has no medium.".to_string(),
 			}
+			.into(),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -203,21 +201,20 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 					playback_state: playback_state.into(),
 				})
 				.await;
+				SuccessResponse.into()
 			}
 		},
-		ClientRequest::Pause(PauseRequest {
+		Pause(PauseRequest {
 			skipped,
 			position_in_milliseconds,
 		}) => match room.pause_medium(Duration::milliseconds(
 			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
 		)) {
-			None => {
-				let response = ErrorResponse {
-					error: ErrorResponseType::NoMedium,
-					message: "Room has no medium.".to_string(),
-				};
-				client.send(response.with_id(request_id)).await;
+			None => ErrorResponse {
+				error: ErrorResponseType::NoMedium,
+				message: "Room has no medium.".to_string(),
 			}
+			.into(),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -226,6 +223,7 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 					playback_state: playback_state.into(),
 				})
 				.await;
+				SuccessResponse.into()
 			}
 		},
 	}
@@ -234,10 +232,9 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::lifecycle::{handle_message, handle_messages, register_client};
+	use crate::lifecycle::{handle_messages, handle_request, register_client};
 	use crate::message::broadcast::Broadcast;
 	use crate::message::client_request::PauseRequest;
-	use crate::message::client_request::RequestConvertible;
 	use crate::message::server_response::{
 		MediumResponse, PlaybackStateResponse, ServerResponse, ServerResponseWithId,
 	};
@@ -250,16 +247,16 @@ mod test {
 	async fn the_client_should_get_access_to_the_server_reference_time() {
 		const TEST_DELAY: std::time::Duration = std::time::Duration::from_millis(2);
 
-		let (message_sender, _message_receiver, mut test_client) = WebsocketTestClient::new();
+		let (message_sender, _message_receiver, _test_client) = WebsocketTestClient::new();
 		let room = Room::new(10);
 		let client_handle = room
 			.add_client("Alice".to_string(), message_sender)
 			.expect("Did not get client handle!");
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
-		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime.with_id(101)).await;
+		let response = handle_request(&room, &client_handle, ClientRequest::GetReferenceTime).await;
 
-		match test_client.receive_response().await.response {
+		match response {
 			ServerResponse::ReferenceTime(ReferenceTimeResponse { milliseconds }) => {
 				assert!(
 					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
@@ -283,16 +280,17 @@ mod test {
 		room.add_client("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 
-		handle_message(
+		let response = handle_request(
 			&room,
 			&alice,
 			InsertMediumRequest {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: 153 * 60 * 1000,
 			}
-			.with_id(1337),
+			.into(),
 		)
 		.await;
+		assert_eq!(response, ServerResponse::Success(SuccessResponse));
 
 		let alice_broadcast = alice_test_client.receive_broadcast().await;
 		let bob_broadcast = bob_test_client.receive_broadcast().await;
@@ -310,34 +308,30 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_insert_a_too_large_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
 		let alice = room
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
-		let request_id = 7;
-		handle_message(
+		let response = handle_request(
 			&room,
 			&alice,
 			InsertMediumRequest {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
 			}
-			.with_id(request_id),
+			.into(),
 		)
 		.await;
 
-		let error_response = alice_test_client.receive_response().await;
-
 		assert_eq!(
-			error_response,
-			ErrorResponse {
+			response,
+			ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::InvalidFormat,
 				message: "Length of a medium must not be larger than one year.".to_string(),
-			}
-			.with_id(request_id)
+			})
 		)
 	}
 
@@ -357,16 +351,17 @@ mod test {
 			Duration::minutes(153),
 		)));
 
-		handle_message(
+		let response = handle_request(
 			&room,
 			&alice,
 			PlayRequest {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
-			.with_id(39),
+			.into(),
 		)
 		.await;
+		assert_eq!(response, ServerResponse::Success(SuccessResponse));
 
 		let alice_broadcast = alice_test_client.receive_broadcast().await;
 		let bob_broadcast = bob_test_client.receive_broadcast().await;
@@ -386,33 +381,30 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_play_something_without_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
 		let alice = room
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
-		let request_id = 1234;
-		handle_message(
+		let response = handle_request(
 			&room,
 			&alice,
 			PlayRequest {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
-			.with_id(request_id),
+			.into(),
 		)
 		.await;
-		let response = alice_test_client.receive_response().await;
 
 		assert_eq!(
 			response,
-			ErrorResponse {
+			ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			}
-			.with_id(request_id)
+			})
 		);
 	}
 
@@ -433,16 +425,17 @@ mod test {
 		)));
 		room.play_medium(Duration::milliseconds(-1024));
 
-		handle_message(
+		let response = handle_request(
 			&room,
 			&bob,
 			PauseRequest {
 				skipped: false,
 				position_in_milliseconds: 1027,
 			}
-			.with_id(99),
+			.into(),
 		)
 		.await;
+		assert_eq!(response, ServerResponse::Success(SuccessResponse));
 
 		let alice_broadcast = alice_test_client.receive_broadcast().await;
 		let bob_broadcast = bob_test_client.receive_broadcast().await;
@@ -476,16 +469,17 @@ mod test {
 			Duration::minutes(153),
 		)));
 
-		handle_message(
+		let response = handle_request(
 			&room,
 			&bob,
 			PauseRequest {
 				skipped: true,
 				position_in_milliseconds: 1000,
 			}
-			.with_id(2020),
+			.into(),
 		)
 		.await;
+		assert_eq!(response, ServerResponse::Success(SuccessResponse));
 
 		let alice_broadcast = alice_test_client.receive_broadcast().await;
 		let bob_broadcast = bob_test_client.receive_broadcast().await;
@@ -505,33 +499,30 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_not_be_able_to_pause_something_without_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
 		let alice = room
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
-		let request_id = 3;
-		handle_message(
+		let response = handle_request(
 			&room,
 			&alice,
 			PauseRequest {
 				skipped: false,
 				position_in_milliseconds: 1000,
 			}
-			.with_id(request_id),
+			.into(),
 		)
 		.await;
-		let response = alice_test_client.receive_response().await;
 
 		assert_eq!(
 			response,
-			ErrorResponse {
+			ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			}
-			.with_id(request_id)
+			})
 		);
 	}
 
