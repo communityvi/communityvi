@@ -3,7 +3,9 @@ use crate::connection::sender::MessageSender;
 use crate::message::broadcast::{
 	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumInsertedBroadcast, PlaybackStateChangedBroadcast,
 };
-use crate::message::client_request::{ChatRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest};
+use crate::message::client_request::{
+	ChatRequest, ClientRequestWithId, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
+};
 use crate::message::server_response::{ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse};
 use crate::message::{client_request::ClientRequest, server_response::ErrorResponseType};
 use crate::room::client::Client;
@@ -35,7 +37,11 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let name = if let ClientRequest::Register(RegisterRequest { name }) = request {
+	let name = if let ClientRequestWithId {
+		request_id: _,
+		request: ClientRequest::Register(RegisterRequest { name }),
+	} = request
+	{
 		name
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
@@ -123,7 +129,9 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 	room.broadcast(ClientLeftBroadcast { id, name }).await;
 }
 
-async fn handle_message(room: &Room, client: &Client, request: ClientRequest) {
+// TODO: This should take a ClientRequest and return a ServerResponse
+async fn handle_message(room: &Room, client: &Client, request: ClientRequestWithId) {
+	let ClientRequestWithId { request_id: _, request } = request;
 	match request {
 		ClientRequest::Chat(ChatRequest { message }) => {
 			room.broadcast(ChatBroadcast {
@@ -233,6 +241,7 @@ mod test {
 	use crate::lifecycle::{handle_message, handle_messages, register_client};
 	use crate::message::broadcast::Broadcast;
 	use crate::message::client_request::PauseRequest;
+	use crate::message::client_request::RequestConvertible;
 	use crate::message::server_response::{MediumResponse, PlaybackStateResponse, ServerResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
@@ -250,7 +259,7 @@ mod test {
 			.expect("Did not get client handle!");
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
-		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime).await;
+		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime.with_id(101)).await;
 
 		match test_client.receive_response().await {
 			ServerResponse::ReferenceTime(ReferenceTimeResponse { milliseconds }) => {
@@ -283,7 +292,7 @@ mod test {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: 153 * 60 * 1000,
 			}
-			.into(),
+			.with_id(1337),
 		)
 		.await;
 
@@ -317,7 +326,7 @@ mod test {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
 			}
-			.into(),
+			.with_id(7),
 		)
 		.await;
 
@@ -356,7 +365,7 @@ mod test {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
-			.into(),
+			.with_id(39),
 		)
 		.await;
 
@@ -392,7 +401,7 @@ mod test {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
-			.into(),
+			.with_id(1234),
 		)
 		.await;
 		let response = alice_test_client.receive_response().await;
@@ -431,7 +440,7 @@ mod test {
 				skipped: false,
 				position_in_milliseconds: 1027,
 			}
-			.into(),
+			.with_id(99),
 		)
 		.await;
 
@@ -474,7 +483,7 @@ mod test {
 				skipped: true,
 				position_in_milliseconds: 1000,
 			}
-			.into(),
+			.with_id(2020),
 		)
 		.await;
 
@@ -510,7 +519,7 @@ mod test {
 				skipped: false,
 				position_in_milliseconds: 1000,
 			}
-			.into(),
+			.with_id(3),
 		)
 		.await;
 		let response = alice_test_client.receive_response().await;

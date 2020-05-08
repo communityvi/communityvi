@@ -1,8 +1,7 @@
 use crate::connection::sender::MessageSender;
+use crate::message::client_request::ClientRequestWithId;
 use crate::message::server_response::ErrorResponse;
-use crate::message::{
-	client_request::ClientRequest, server_response::ErrorResponseType, MessageError, WebSocketMessage,
-};
+use crate::message::{server_response::ErrorResponseType, MessageError, WebSocketMessage};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;
@@ -18,7 +17,7 @@ pub type WebSocketMessageReceiver = StreamMessageReceiver<InfallibleStream<Split
 #[async_trait]
 pub trait MessageReceiverTrait {
 	/// Receive a message from the client or None if the connection has been closed.
-	async fn receive(&mut self) -> Option<ClientRequest>;
+	async fn receive(&mut self) -> Option<ClientRequestWithId>;
 }
 
 pub struct StreamMessageReceiver<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
@@ -31,7 +30,7 @@ impl<RequestStream> MessageReceiverTrait for StreamMessageReceiver<RequestStream
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send,
 {
-	async fn receive(&mut self) -> Option<ClientRequest> {
+	async fn receive(&mut self) -> Option<ClientRequestWithId> {
 		const MAXIMUM_RETRIES: usize = 10;
 
 		for _ in 0..MAXIMUM_RETRIES {
@@ -45,7 +44,7 @@ where
 				return None;
 			}
 
-			let client_request = match ClientRequest::try_from(&websocket_message) {
+			let client_request = match ClientRequestWithId::try_from(&websocket_message) {
 				Ok(client_request) => client_request,
 				Err(message_error) => {
 					let message = match message_error {

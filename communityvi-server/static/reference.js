@@ -7,6 +7,7 @@ let lastSentGetReferenceTime = null;
 let referenceTimeOffset = null;
 let referenceTime = null;
 const referenceTimeDisplay = document.getElementById('reference_time');
+let nextRequestId = 0;
 
 let playerMode = 'fake';
 let selectedMediumFile = null;
@@ -371,6 +372,8 @@ function sendChatMessage() {
 }
 
 function sendMessage(message) {
+	message['request_id'] = nextRequestId;
+	nextRequestId++;
 	webSocket.send(JSON.stringify(message));
 }
 

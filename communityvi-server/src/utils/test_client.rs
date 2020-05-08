@@ -1,7 +1,7 @@
 use crate::connection::receiver::{MessageReceiver, StreamMessageReceiver};
 use crate::connection::sender::{MessageSender, SinkMessageSender};
 use crate::message::broadcast::Broadcast;
-use crate::message::client_request::ClientRequest;
+use crate::message::client_request::RequestConvertible;
 use crate::message::server_response::ServerResponse;
 use crate::message::WebSocketMessage;
 use futures::{Sink, SinkExt, Stream, StreamExt};
@@ -49,11 +49,19 @@ impl WebsocketTestClient {
 			.expect("Failed to receive message via TestClient")
 	}
 
-	pub async fn send_request<IntoRequest>(&mut self, request: IntoRequest)
+	pub async fn send_request<RequestWithoutId>(&mut self, request: RequestWithoutId)
 	where
-		IntoRequest: Into<ClientRequest>,
+		RequestWithoutId: RequestConvertible,
 	{
-		let websocket_message = WebSocketMessage::from(&request.into());
+		const TEST_REQUEST_ID: u64 = 1337;
+		self.send_request_with_id(request, TEST_REQUEST_ID).await
+	}
+
+	pub async fn send_request_with_id<RequestWithoutId>(&mut self, request: RequestWithoutId, request_id: u64)
+	where
+		RequestWithoutId: RequestConvertible,
+	{
+		let websocket_message = WebSocketMessage::from(&request.into().with_id(request_id));
 		self.send_raw(websocket_message).await
 	}
 
