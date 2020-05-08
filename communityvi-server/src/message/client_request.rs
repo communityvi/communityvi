@@ -4,7 +4,6 @@ use crate::message::{MessageError, WebSocketMessage};
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
 pub struct ClientRequestWithId {
 	pub request_id: u64,
 	#[serde(flatten)]
@@ -21,15 +20,6 @@ pub enum ClientRequest {
 	InsertMedium(InsertMediumRequest),
 	Play(PlayRequest),
 	Pause(PauseRequest),
-}
-
-impl ClientRequest {
-	pub fn with_id(self, request_id: u64) -> ClientRequestWithId {
-		ClientRequestWithId {
-			request_id,
-			request: self,
-		}
-	}
 }
 
 pub trait RequestConvertible: Into<ClientRequest> {
@@ -121,6 +111,23 @@ impl TryFrom<&WebSocketMessage> for ClientRequestWithId {
 		}
 	}
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct RequestIdOnly {
+	pub request_id: u64,
+}
+
+impl TryFrom<&WebSocketMessage> for RequestIdOnly {
+	type Error = ();
+
+	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
+		match websocket_message {
+			WebSocketMessage::Text(json) => serde_json::from_str(json).map_err(|_| ()),
+			_ => Err(()),
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -218,5 +225,25 @@ mod test {
 		let deserialized_pause_request: ClientRequestWithId =
 			serde_json::from_str(&json).expect("Failed to deserialize Pause request from JSON");
 		assert_eq!(pause_request, deserialized_pause_request);
+	}
+
+	#[test]
+	fn request_id_only_should_serialize_and_deserialize() {
+		let request_id_only = RequestIdOnly { request_id: 42 };
+		let json = serde_json::to_string(&request_id_only).expect("Failed to serialize RequestIdOnly to JSON");
+		assert_eq!(r#"{"request_id":42}"#, json);
+
+		let deserialized_request_id_only: RequestIdOnly =
+			serde_json::from_str(&json).expect("Failed to deserialize RequestIdOnly from JSON");
+		assert_eq!(request_id_only, deserialized_request_id_only);
+	}
+
+	#[test]
+	fn request_id_only_should_deserialize_even_with_additional_fields() {
+		let json = r#"{"request_id":42,"garbage":"smelly"}"#;
+		let request_id_only: RequestIdOnly =
+			serde_json::from_str(json).expect("Failed to deserialize RequestIdOnly from JSON");
+
+		assert_eq!(request_id_only.request_id, 42);
 	}
 }

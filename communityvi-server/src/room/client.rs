@@ -1,6 +1,6 @@
 use crate::connection::sender::MessageSender;
 use crate::message::broadcast::Broadcast;
-use crate::message::server_response::ServerResponse;
+use crate::message::server_response::ServerResponseWithId;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use log::info;
@@ -38,11 +38,8 @@ impl Client {
 		self.inner.name.as_str()
 	}
 
-	pub async fn send<Response>(&self, response: Response) -> bool
-	where
-		Response: Into<ServerResponse>,
-	{
-		if self.inner.connection.send(response.into()).await.is_err() {
+	pub async fn send(&self, response: ServerResponseWithId) -> bool {
+		if self.inner.connection.send_response(response).await.is_err() {
 			info!(
 				"Failed to send message to client with id {} because it went away.",
 				self.inner.id

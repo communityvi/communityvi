@@ -1,7 +1,9 @@
 use crate::message::broadcast::Broadcast;
 use crate::message::broadcast::{ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast};
 use crate::message::client_request::{ChatRequest, RegisterRequest};
-use crate::message::server_response::{ErrorResponse, ErrorResponseType, HelloResponse, ServerResponse};
+use crate::message::server_response::{
+	ErrorResponse, ErrorResponseType, HelloResponse, ServerResponse, ServerResponseWithId,
+};
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_router;
@@ -44,10 +46,13 @@ fn should_not_allow_invalid_messages_during_registration() {
 
 			let response = test_client.receive_response().await;
 
-			let expected_response = ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::InvalidFormat,
-				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-			});
+			let expected_response = ServerResponseWithId {
+				request_id: None,
+				response: ServerResponse::Error(ErrorResponse {
+					error: ErrorResponseType::InvalidFormat,
+					message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+				}),
+			};
 			assert_eq!(expected_response, response);
 		};
 		run_future_on_test_server(future, server);
@@ -65,10 +70,13 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			test_client.send_raw(invalid_message).await;
 			let response = test_client.receive_response().await;
 
-			let expected_response = ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::InvalidFormat,
-				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-			});
+			let expected_response = ServerResponseWithId {
+				request_id: None,
+				response: ServerResponse::Error(ErrorResponse {
+					error: ErrorResponseType::InvalidFormat,
+					message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
+				}),
+			};
 			assert_eq!(expected_response, response);
 		};
 		run_future_on_test_server(future, server);
@@ -291,7 +299,11 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 
 	let response = test_client.receive_response().await;
 
-	let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
+	let id = if let ServerResponseWithId {
+		request_id: _,
+		response: ServerResponse::Hello(HelloResponse { id, .. }),
+	} = response
+	{
 		id
 	} else {
 		panic!("Expected Hello-Response, got '{:?}'", response);

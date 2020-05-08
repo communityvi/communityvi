@@ -1,6 +1,6 @@
 use crate::connection::sender::{MessageSender, MessageSenderTrait};
 use crate::message::broadcast::Broadcast;
-use crate::message::server_response::ServerResponse;
+use crate::message::server_response::ServerResponseWithId;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ impl From<FakeClientConnection> for MessageSender {
 
 #[async_trait]
 impl MessageSenderTrait for FakeClientConnection {
-	async fn send(&self, _message: ServerResponse) -> Result<(), ()> {
+	async fn send_response(&self, _message: ServerResponseWithId) -> Result<(), ()> {
 		Ok(())
 	}
 

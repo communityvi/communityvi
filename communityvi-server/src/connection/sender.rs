@@ -1,5 +1,6 @@
 use crate::message::broadcast::Broadcast;
-use crate::message::{server_response::ServerResponse, WebSocketMessage};
+use crate::message::server_response::ServerResponseWithId;
+use crate::message::WebSocketMessage;
 use crate::server::WebSocket;
 use async_trait::async_trait;
 use futures::stream::SplitSink;
@@ -12,7 +13,7 @@ pub type MessageSender = Pin<Arc<dyn MessageSenderTrait + Send + Sync>>;
 
 #[async_trait]
 pub trait MessageSenderTrait {
-	async fn send(&self, message: ServerResponse) -> Result<(), ()>;
+	async fn send_response(&self, message: ServerResponseWithId) -> Result<(), ()>;
 	async fn send_broadcast_message(&self, message: Broadcast) -> Result<(), ()>;
 	async fn close(&self);
 }
@@ -32,7 +33,7 @@ impl<ResponseSink> MessageSenderTrait for SinkMessageSender<ResponseSink>
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
-	async fn send(&self, response: ServerResponse) -> Result<(), ()> {
+	async fn send_response(&self, response: ServerResponseWithId) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 
 		let websocket_message = WebSocketMessage::from(&response);

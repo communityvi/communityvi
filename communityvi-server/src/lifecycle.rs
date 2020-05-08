@@ -6,7 +6,9 @@ use crate::message::broadcast::{
 use crate::message::client_request::{
 	ChatRequest, ClientRequestWithId, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
 };
-use crate::message::server_response::{ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse};
+use crate::message::server_response::{
+	ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse, ResponseConvertible,
+};
 use crate::message::{client_request::ClientRequest, server_response::ErrorResponseType};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
@@ -37,22 +39,18 @@ async fn register_client(
 		Some(request) => request,
 	};
 
-	let name = if let ClientRequestWithId {
-		request_id: _,
-		request: ClientRequest::Register(RegisterRequest { name }),
-	} = request
-	{
+	let name = if let ClientRequest::Register(RegisterRequest { name }) = request.request {
 		name
 	} else {
 		error!("Client registration failed. Invalid request: {:?}", request);
 
 		let _ = message_sender
-			.send(
+			.send_response(
 				ErrorResponse {
 					error: ErrorResponseType::InvalidOperation,
 					message: "Invalid request".to_string(),
 				}
-				.into(),
+				.with_id(request.request_id),
 			)
 			.await;
 		return None;
@@ -78,12 +76,12 @@ async fn register_client(
 			};
 
 			let _ = message_sender
-				.send(
+				.send_response(
 					ErrorResponse {
 						error: error_response,
 						message: error.to_string(),
 					}
-					.into(),
+					.with_id(request.request_id),
 				)
 				.await;
 
@@ -94,7 +92,8 @@ async fn register_client(
 	let hello_response = HelloResponse {
 		id: client.id(),
 		current_medium: room.medium().as_ref().map(MediumResponse::from),
-	};
+	}
+	.with_id(request.request_id);
 	if client.send(hello_response).await {
 		let id = client.id();
 		let name = client.name().to_string();
@@ -131,7 +130,7 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 
 // TODO: This should take a ClientRequest and return a ServerResponse
 async fn handle_message(room: &Room, client: &Client, request: ClientRequestWithId) {
-	let ClientRequestWithId { request_id: _, request } = request;
+	let ClientRequestWithId { request_id, request } = request;
 	match request {
 		ClientRequest::Chat(ChatRequest { message }) => {
 			room.broadcast(ChatBroadcast {
@@ -146,19 +145,18 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 				"Client: {} tried to register even though it is already registered.",
 				client.id()
 			);
-			client
-				.send(ErrorResponse {
-					error: ErrorResponseType::InvalidOperation,
-					message: "Already registered".to_string(),
-				})
-				.await;
+			let response = ErrorResponse {
+				error: ErrorResponseType::InvalidOperation,
+				message: "Already registered".to_string(),
+			};
+			client.send(response.with_id(request_id)).await;
 		}
 		ClientRequest::GetReferenceTime => {
 			let reference_time = room.current_reference_time();
 			let message = ReferenceTimeResponse {
 				milliseconds: reference_time.as_millis() as u64,
 			};
-			client.send(message).await;
+			client.send(message.with_id(request_id)).await;
 		}
 		ClientRequest::InsertMedium(InsertMediumRequest {
 			name,
@@ -169,7 +167,7 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 					error: ErrorResponseType::InvalidFormat,
 					message: "Length of a medium must not be larger than one year.".to_string(),
 				};
-				client.send(response).await;
+				client.send(response.with_id(request_id)).await;
 				return;
 			}
 
@@ -191,12 +189,11 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 			start_time_in_milliseconds,
 		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
 			None => {
-				client
-					.send(ErrorResponse {
-						error: ErrorResponseType::NoMedium,
-						message: "Room has no medium.".to_string(),
-					})
-					.await;
+				let response = ErrorResponse {
+					error: ErrorResponseType::NoMedium,
+					message: "Room has no medium.".to_string(),
+				};
+				client.send(response.with_id(request_id)).await;
 			}
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
@@ -215,12 +212,11 @@ async fn handle_message(room: &Room, client: &Client, request: ClientRequestWith
 			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
 		)) {
 			None => {
-				client
-					.send(ErrorResponse {
-						error: ErrorResponseType::NoMedium,
-						message: "Room has no medium.".to_string(),
-					})
-					.await;
+				let response = ErrorResponse {
+					error: ErrorResponseType::NoMedium,
+					message: "Room has no medium.".to_string(),
+				};
+				client.send(response.with_id(request_id)).await;
 			}
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
@@ -242,7 +238,9 @@ mod test {
 	use crate::message::broadcast::Broadcast;
 	use crate::message::client_request::PauseRequest;
 	use crate::message::client_request::RequestConvertible;
-	use crate::message::server_response::{MediumResponse, PlaybackStateResponse, ServerResponse};
+	use crate::message::server_response::{
+		MediumResponse, PlaybackStateResponse, ServerResponse, ServerResponseWithId,
+	};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use crate::utils::test_client::WebsocketTestClient;
@@ -261,7 +259,7 @@ mod test {
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		handle_message(&room, &client_handle, ClientRequest::GetReferenceTime.with_id(101)).await;
 
-		match test_client.receive_response().await {
+		match test_client.receive_response().await.response {
 			ServerResponse::ReferenceTime(ReferenceTimeResponse { milliseconds }) => {
 				assert!(
 					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
@@ -319,6 +317,7 @@ mod test {
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
+		let request_id = 7;
 		handle_message(
 			&room,
 			&alice,
@@ -326,7 +325,7 @@ mod test {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
 			}
-			.with_id(7),
+			.with_id(request_id),
 		)
 		.await;
 
@@ -338,7 +337,7 @@ mod test {
 				error: ErrorResponseType::InvalidFormat,
 				message: "Length of a medium must not be larger than one year.".to_string(),
 			}
-			.into()
+			.with_id(request_id)
 		)
 	}
 
@@ -394,6 +393,7 @@ mod test {
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
+		let request_id = 1234;
 		handle_message(
 			&room,
 			&alice,
@@ -401,7 +401,7 @@ mod test {
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
-			.with_id(1234),
+			.with_id(request_id),
 		)
 		.await;
 		let response = alice_test_client.receive_response().await;
@@ -412,7 +412,7 @@ mod test {
 				error: ErrorResponseType::NoMedium,
 				message: "Room has no medium.".to_string(),
 			}
-			.into()
+			.with_id(request_id)
 		);
 	}
 
@@ -512,6 +512,7 @@ mod test {
 			.add_client("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
+		let request_id = 3;
 		handle_message(
 			&room,
 			&alice,
@@ -519,7 +520,7 @@ mod test {
 				skipped: false,
 				position_in_milliseconds: 1000,
 			}
-			.with_id(3),
+			.with_id(request_id),
 		)
 		.await;
 		let response = alice_test_client.receive_response().await;
@@ -530,7 +531,7 @@ mod test {
 				error: ErrorResponseType::NoMedium,
 				message: "Room has no medium.".to_string(),
 			}
-			.into()
+			.with_id(request_id)
 		);
 	}
 
@@ -555,7 +556,7 @@ mod test {
 		};
 
 		test_client.send_request(register_message).await;
-		match test_client.receive_response().await {
+		match test_client.receive_response().await.response {
 			ServerResponse::Error(ErrorResponse { error, message }) => {
 				assert_eq!(ErrorResponseType::InvalidOperation, error);
 				assert!(message.contains("registered"));
@@ -570,7 +571,7 @@ mod test {
 		let room = Room::new(10);
 		let register_request = RegisterRequest { name: "	 ".to_string() };
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
 		let response = test_client.receive_response().await;
 
@@ -578,7 +579,8 @@ mod test {
 			ServerResponse::from(ErrorResponse {
 				error: ErrorResponseType::InvalidFormat,
 				message: "Name was empty or whitespace-only.".to_string()
-			}),
+			})
+			.with_id(request_id),
 			response
 		);
 	}
@@ -598,7 +600,7 @@ mod test {
 			name: "Ferris".to_string(),
 		};
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
 		let response = test_client.receive_response().await;
 
@@ -607,7 +609,8 @@ mod test {
 			ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::InvalidOperation,
 				message: "Client name is already in use.".to_string()
-			}),
+			})
+			.with_id(request_id),
 			response
 		);
 	}
@@ -625,7 +628,7 @@ mod test {
 			name: "second".to_string(),
 		};
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
 		let response = test_client.receive_response().await;
 
@@ -633,7 +636,8 @@ mod test {
 			ServerResponse::Error(ErrorResponse {
 				error: ErrorResponseType::InvalidOperation,
 				message: "Can't join, room is already full.".to_string()
-			}),
+			})
+			.with_id(request_id),
 			response
 		);
 	}
@@ -652,7 +656,7 @@ mod test {
 			name: "Johnny 5".to_string(),
 		};
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
 		let response = test_client.receive_response().await;
 
@@ -666,7 +670,8 @@ mod test {
 						start_time_in_milliseconds: 0,
 					}
 				})
-			}),
+			})
+			.with_id(request_id),
 			response
 		);
 	}
@@ -684,7 +689,7 @@ mod test {
 			name: "Johnny 5".to_string(),
 		};
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
 		let response = test_client.receive_response().await;
 
@@ -698,7 +703,8 @@ mod test {
 						position_in_milliseconds: 0
 					}
 				})
-			}),
+			})
+			.with_id(request_id),
 			response
 		);
 	}
@@ -721,7 +727,11 @@ mod test {
 
 		let response = test_client.receive_response().await;
 
-		let id = if let ServerResponse::Hello(HelloResponse { id, .. }) = response {
+		let id = if let ServerResponseWithId {
+			request_id: _,
+			response: ServerResponse::Hello(HelloResponse { id, .. }),
+		} = response
+		{
 			id
 		} else {
 			panic!("Expected Hello-Response, got '{:?}'", response);

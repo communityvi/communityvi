@@ -2,7 +2,7 @@ use crate::connection::receiver::{MessageReceiver, StreamMessageReceiver};
 use crate::connection::sender::{MessageSender, SinkMessageSender};
 use crate::message::broadcast::Broadcast;
 use crate::message::client_request::RequestConvertible;
-use crate::message::server_response::ServerResponse;
+use crate::message::server_response::ServerResponseWithId;
 use crate::message::WebSocketMessage;
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use std::convert::TryFrom;
@@ -49,12 +49,13 @@ impl WebsocketTestClient {
 			.expect("Failed to receive message via TestClient")
 	}
 
-	pub async fn send_request<RequestWithoutId>(&mut self, request: RequestWithoutId)
+	pub async fn send_request<RequestWithoutId>(&mut self, request: RequestWithoutId) -> u64
 	where
 		RequestWithoutId: RequestConvertible,
 	{
-		const TEST_REQUEST_ID: u64 = 1337;
-		self.send_request_with_id(request, TEST_REQUEST_ID).await
+		let request_id = rand::random();
+		self.send_request_with_id(request, request_id).await;
+		request_id
 	}
 
 	pub async fn send_request_with_id<RequestWithoutId>(&mut self, request: RequestWithoutId, request_id: u64)
@@ -65,9 +66,9 @@ impl WebsocketTestClient {
 		self.send_raw(websocket_message).await
 	}
 
-	pub async fn receive_response(&mut self) -> ServerResponse {
+	pub async fn receive_response(&mut self) -> ServerResponseWithId {
 		let websocket_message = self.receive_raw().await;
-		ServerResponse::try_from(&websocket_message).expect("Failed to deserialize ServerResponse")
+		ServerResponseWithId::try_from(&websocket_message).expect("Failed to deserialize ServerResponse")
 	}
 
 	pub async fn receive_broadcast(&mut self) -> Broadcast {

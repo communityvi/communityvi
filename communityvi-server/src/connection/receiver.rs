@@ -1,6 +1,6 @@
 use crate::connection::sender::MessageSender;
-use crate::message::client_request::ClientRequestWithId;
-use crate::message::server_response::ErrorResponse;
+use crate::message::client_request::{ClientRequestWithId, RequestIdOnly};
+use crate::message::server_response::{ErrorResponse, ServerResponseWithId};
 use crate::message::{server_response::ErrorResponseType, MessageError, WebSocketMessage};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
@@ -47,6 +47,9 @@ where
 			let client_request = match ClientRequestWithId::try_from(&websocket_message) {
 				Ok(client_request) => client_request,
 				Err(message_error) => {
+					let request_id = RequestIdOnly::try_from(&websocket_message)
+						.map(|request| request.request_id)
+						.ok();
 					let message = match message_error {
 						MessageError::DeserializationFailed { error, json } => format!(
 							"Failed to deserialize client message with error: {}, message was: {}",
@@ -59,13 +62,14 @@ where
 					error!("{}", message);
 					let _ = self
 						.client_connection
-						.send(
-							ErrorResponse {
+						.send_response(ServerResponseWithId {
+							request_id,
+							response: ErrorResponse {
 								error: ErrorResponseType::InvalidFormat,
 								message,
 							}
 							.into(),
-						)
+						})
 						.await;
 					continue;
 				}
@@ -76,13 +80,14 @@ where
 
 		let _ = self
 			.client_connection
-			.send(
-				ErrorResponse {
+			.send_response(ServerResponseWithId {
+				request_id: None,
+				response: ErrorResponse {
 					error: ErrorResponseType::InvalidOperation,
 					message: "Too many retries".to_string(),
 				}
 				.into(),
-			)
+			})
 			.await;
 		let _ = self.client_connection.close().await;
 		None
