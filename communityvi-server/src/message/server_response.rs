@@ -19,6 +19,7 @@ pub struct ServerResponseWithId {
 pub enum ServerResponse {
 	Hello(HelloResponse),
 	ReferenceTime(ReferenceTimeResponse),
+	Success(SuccessResponse),
 	Error(ErrorResponse),
 }
 
@@ -59,6 +60,11 @@ pub struct ReferenceTimeResponse {
 }
 
 server_response_from_struct!(ReferenceTime, ReferenceTimeResponse);
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct SuccessResponse;
+
+server_response_from_struct!(Success, SuccessResponse);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ErrorResponse {
@@ -271,6 +277,17 @@ mod test {
 			internal_server_error_error_response,
 			deserialized_internal_server_error_error_response
 		);
+	}
+
+	#[test]
+	fn success_response_should_serialize_and_deserialize() {
+		let success_response = ServerResponse::Success(SuccessResponse).with_id(1337);
+		let json = serde_json::to_string(&success_response).expect("Failed to serialize Success response to JSON");
+		assert_eq!(r#"{"request_id":1337,"type":"success"}"#, json);
+
+		let deserialized_success_response: ServerResponseWithId =
+			serde_json::from_str(&json).expect("Failed to deserialize Success response from JSON");
+		assert_eq!(success_response, deserialized_success_response);
 	}
 
 	#[test]
