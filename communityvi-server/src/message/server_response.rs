@@ -4,7 +4,7 @@ use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
 use crate::room::state::medium::playback_state::PlaybackState;
 use crate::room::state::medium::{Medium, SomeMedium};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
@@ -108,23 +108,17 @@ impl From<&ServerResponse> for WebSocketMessage {
 	}
 }
 
-impl TryFrom<&str> for ServerResponse {
-	type Error = MessageError;
-
-	fn try_from(json: &str) -> Result<Self, MessageError> {
-		serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
-			error: error.to_string(),
-			json: json.to_string(),
-		})
-	}
-}
-
 impl TryFrom<&WebSocketMessage> for ServerResponse {
 	type Error = MessageError;
 
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, MessageError> {
 		match websocket_message {
-			WebSocketMessage::Text(json) => json.as_str().try_into(),
+			WebSocketMessage::Text(json) => {
+				serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
+					error: error.to_string(),
+					json: json.to_string(),
+				})
+			}
 			_ => Err(MessageError::WrongMessageType(websocket_message.clone())),
 		}
 	}

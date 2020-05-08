@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::message::{MessageError, WebSocketMessage};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -106,23 +106,17 @@ impl From<&ClientRequestWithId> for WebSocketMessage {
 	}
 }
 
-impl TryFrom<&str> for ClientRequestWithId {
-	type Error = MessageError;
-
-	fn try_from(json: &str) -> Result<Self, Self::Error> {
-		serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
-			error: error.to_string(),
-			json: json.to_string(),
-		})
-	}
-}
-
 impl TryFrom<&WebSocketMessage> for ClientRequestWithId {
 	type Error = MessageError;
 
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
 		match websocket_message {
-			WebSocketMessage::Text(json) => json.as_str().try_into(),
+			WebSocketMessage::Text(json) => {
+				serde_json::from_str(json).map_err(|error| MessageError::DeserializationFailed {
+					error: error.to_string(),
+					json: json.to_string(),
+				})
+			}
 			_ => Err(MessageError::WrongMessageType(websocket_message.clone())),
 		}
 	}
