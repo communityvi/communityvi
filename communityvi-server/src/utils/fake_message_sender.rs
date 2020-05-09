@@ -6,16 +6,16 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
-pub struct FakeClientConnection {}
+pub struct FakeMessageSender {}
 
-impl From<FakeClientConnection> for MessageSender {
-	fn from(fake_client_connection: FakeClientConnection) -> Self {
-		Arc::pin(fake_client_connection)
+impl From<FakeMessageSender> for MessageSender {
+	fn from(fake_message_sender: FakeMessageSender) -> Self {
+		Arc::pin(fake_message_sender)
 	}
 }
 
 #[async_trait]
-impl MessageSenderTrait for FakeClientConnection {
+impl MessageSenderTrait for FakeMessageSender {
 	async fn send_success_message(&self, _message: SuccessMessage, _request_id: u64) -> Result<(), ()> {
 		Ok(())
 	}

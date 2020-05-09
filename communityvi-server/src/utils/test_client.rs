@@ -23,8 +23,8 @@ impl WebsocketTestClient {
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 		let client_sender = client_sender.sink_map_err(|_error| ());
 
-		let sink_client_connection = SinkMessageSender::new(server_sender);
-		let message_sender = MessageSender::from(sink_client_connection);
+		let sink_message_sender = SinkMessageSender::new(server_sender);
+		let message_sender = MessageSender::from(sink_message_sender);
 		let stream_server_connection = StreamMessageReceiver::new(server_receiver, message_sender.clone());
 
 		let message_receiver = MessageReceiver::from(stream_server_connection);

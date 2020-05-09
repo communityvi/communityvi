@@ -80,7 +80,7 @@ impl<ResponseSink> From<SinkMessageSender<ResponseSink>> for MessageSender
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
-	fn from(sink_client_connection: SinkMessageSender<ResponseSink>) -> Self {
-		Arc::pin(sink_client_connection)
+	fn from(sink_message_sender: SinkMessageSender<ResponseSink>) -> Self {
+		Arc::pin(sink_message_sender)
 	}
 }

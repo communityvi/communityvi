@@ -9,11 +9,11 @@ pub mod sender;
 
 pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver) {
 	let (websocket_sink, websocket_stream) = websocket.split();
-	let websocket_client_connection = WebSocketMessageSender::new(websocket_sink);
-	let client_connection = MessageSender::from(websocket_client_connection);
+	let websocket_message_sender = WebSocketMessageSender::new(websocket_sink);
+	let message_sender = MessageSender::from(websocket_message_sender);
 	let stream_server_connection =
-		WebSocketMessageReceiver::new(InfallibleStream::from(websocket_stream), client_connection.clone());
-	(client_connection, stream_server_connection.into())
+		WebSocketMessageReceiver::new(InfallibleStream::from(websocket_stream), message_sender.clone());
+	(message_sender, stream_server_connection.into())
 }
 
 #[cfg(test)]

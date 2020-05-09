@@ -22,7 +22,7 @@ pub trait MessageReceiverTrait {
 
 pub struct StreamMessageReceiver<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
 	request_stream: RequestStream,
-	client_connection: MessageSender,
+	message_sender: MessageSender,
 }
 
 #[async_trait]
@@ -40,7 +40,7 @@ where
 			};
 
 			if websocket_message.is_close() {
-				self.client_connection.close().await;
+				self.message_sender.close().await;
 				return None;
 			}
 
@@ -61,7 +61,7 @@ where
 					};
 					error!("{}", message);
 					let _ = self
-						.client_connection
+						.message_sender
 						.send_error_message(
 							ErrorMessage::builder()
 								.error(ErrorMessageType::InvalidFormat)
@@ -78,7 +78,7 @@ where
 		}
 
 		let _ = self
-			.client_connection
+			.message_sender
 			.send_error_message(
 				ErrorMessage::builder()
 					.error(ErrorMessageType::InvalidOperation)
@@ -87,7 +87,7 @@ where
 				None,
 			)
 			.await;
-		let _ = self.client_connection.close().await;
+		let _ = self.message_sender.close().await;
 		None
 	}
 }
@@ -96,10 +96,10 @@ impl<RequestStream> StreamMessageReceiver<RequestStream>
 where
 	RequestStream: Stream<Item = WebSocketMessage>,
 {
-	pub fn new(request_stream: RequestStream, client_connection: MessageSender) -> Self {
+	pub fn new(request_stream: RequestStream, message_sender: MessageSender) -> Self {
 		Self {
 			request_stream,
-			client_connection,
+			message_sender,
 		}
 	}
 }

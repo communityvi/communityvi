@@ -241,7 +241,7 @@ mod test {
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::PlaybackStateResponse;
 	use crate::room::client_id::ClientId;
-	use crate::utils::fake_connection::FakeClientConnection;
+	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
 	use tokio::time::delay_for;
 
@@ -592,7 +592,7 @@ mod test {
 		let room = Room::new(10);
 
 		// "Ferris" is already a registered client
-		let fake_message_sender = FakeClientConnection::default().into();
+		let fake_message_sender = FakeMessageSender::default().into();
 		room.add_client("Ferris".to_string(), fake_message_sender)
 			.expect("Could not register 'Ferris'!");
 
@@ -620,7 +620,7 @@ mod test {
 	async fn should_not_register_clients_if_room_is_full() {
 		let room = Room::new(1);
 		{
-			let message_sender = MessageSender::from(FakeClientConnection::default());
+			let message_sender = MessageSender::from(FakeMessageSender::default());
 			room.add_client("Fake".to_string(), message_sender).unwrap();
 		}
 
@@ -679,7 +679,7 @@ mod test {
 	#[tokio::test]
 	async fn should_list_other_clients_when_joining_a_room() {
 		let room = Room::new(2);
-		let fake_message_sender = FakeClientConnection::default();
+		let fake_message_sender = FakeMessageSender::default();
 		let stephanie = room
 			.add_client("Stephanie".to_string(), fake_message_sender.into())
 			.unwrap();
