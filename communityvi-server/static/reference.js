@@ -9,7 +9,7 @@ let referenceTime = null;
 const referenceTimeDisplay = document.getElementById('reference_time');
 let nextRequestId = 0;
 
-// requestId -> {"resolve", "reject"}
+// requestId -> {"resolve": function, "reject": function, "requestType": string}
 let pendingPromises = {}
 
 let playerMode = 'fake';
@@ -118,11 +118,11 @@ playPauseButton.onclick = function () {
 };
 const rewind10SecondsButton = document.getElementById('rewind_10');
 rewind10SecondsButton.onclick = function () {
-	skip(Number.parseInt(playerPositionSlider.value) - (10 * 1000));
+	skip(playerPositionSlider.valueAsNumber - (10 * 1000));
 };
 const forward10SecondsButton = document.getElementById('forward_10');
 forward10SecondsButton.onclick = function () {
-	skip(Number.parseInt(playerPositionSlider.value) + (10 * 1000));
+	skip(playerPositionSlider.valueAsNumber + (10 * 1000));
 };
 let sliderIsBeingDragged = false;
 const playerPositionSlider = document.getElementById('player_position_slider');
@@ -133,7 +133,7 @@ playerPositionSlider.onmouseup = function () {
 	sliderIsBeingDragged = false;
 }
 playerPositionSlider.onchange = function () {
-	skip(Number.parseInt(playerPositionSlider.value));
+	skip(playerPositionSlider.value);
 }
 
 function skip(position) {
@@ -227,7 +227,42 @@ function registerClient() {
 			type: 'register',
 			name: name,
 		};
-		sendMessage(registerMessage).catch((error) => console.error(`Registration failed. ${error}`));
+		sendMessage(registerMessage)
+			.then((response) => {
+				const idField = document.getElementById('client_id');
+				idField.innerText = response.id;
+
+				const currentMedium = response.currentMedium;
+				if (currentMedium !== null) {
+					mediumLength = currentMedium.length_in_milliseconds;
+
+					mediumNameLabel.textContent = currentMedium.name;
+					mediumLengthLabel.textContent = Math.round(currentMedium.length_in_milliseconds / 1000 / 60).toString();
+
+					playerPositionSlider.max = currentMedium.length_in_milliseconds;
+
+					playbackState.type = currentMedium.playback_state.type;
+					switch (currentMedium.playback_state.type) {
+						case 'playing': {
+							playbackState.startTime = currentMedium.playback_state.start_time_in_milliseconds;
+							break;
+						}
+
+						case 'paused': {
+							playbackState.position = currentMedium.playback_state.position_in_milliseconds;
+							break;
+						}
+					}
+
+					updatePlayer();
+				}
+
+				// start counter management
+				setInterval(updateApplicationState, 16);
+				requestReferenceTime();
+				setInterval(requestReferenceTime, 10000);
+			})
+			.catch((error) => console.error(`Registration failed. ${error}`));
 	};
 
 	webSocket.onmessage = function (messageEvent) {
@@ -242,22 +277,26 @@ function registerClient() {
 	};
 
 	webSocket.onerror = function (event) {
-		console.log('Received error.', event);
+		console.error('Received websocket error.', event);
 	};
 }
 
 function handleMessage(message, messageEvent) {
-	const idField = document.getElementById('client_id');
 
 	const requestID = message.request_id;
-	if (requestID !== null) {
+	if (requestID !== undefined) {
 		// handle singlecast messages
 		const pendingPromise = pendingPromises[requestID];
-		if (message.type === 'error') {
-			const response = {message: message, event: messageEvent}
-			pendingPromise.reject(response)
+		if ((message.type === 'success') && (pendingPromise.requestType !== 'get_reference_time')) {
+			pendingPromise.resolve();
+		} else if ((message.type === 'reference_time') && (pendingPromise.requestType === 'get_reference_time')) {
+			pendingPromise.resolve({referenceTime: message.milliseconds, timeStamp: messageEvent.timeStamp});
+		} else if ((message.type === 'hello') && (pendingPromise.requestType === 'register')) {
+			pendingPromise.resolve({currentMedium: message.current_medium, id: message.id})
+		} else if (message.type === 'error') {
+			pendingPromise.reject(`${message.error}: ${message.message}`)
 		} else {
-			pendingPromise.resolve(`${message.error}: ${message.message}`)
+			pendingPromise.reject(`Incorrect type ${message.type} in response to ${pendingPromise.type}`);
 		}
 		return;
 	}
@@ -265,40 +304,6 @@ function handleMessage(message, messageEvent) {
 
 	// handle broadcast messages
 	switch (message.type) {
-		case 'hello': {
-			idField.innerText = message.id;
-
-			if (message.current_medium !== null) {
-				mediumLength = message.current_medium.length_in_milliseconds;
-
-				mediumNameLabel.textContent = message.current_medium.name;
-				mediumLengthLabel.textContent = Math.round(message.current_medium.length_in_milliseconds / 1000 / 60);
-
-				playerPositionSlider.max = message.current_medium.length_in_milliseconds;
-
-				playbackState.type = message.current_medium.playback_state.type;
-				switch (message.current_medium.playback_state.type) {
-					case 'playing': {
-						playbackState.startTime = message.current_medium.playback_state.start_time_in_milliseconds;
-						break;
-					}
-
-					case 'paused': {
-						playbackState.position = message.current_medium.playback_state.position_in_milliseconds;
-						break;
-					}
-				}
-
-				updatePlayer();
-			}
-
-			// start counter management
-			setInterval(updateApplicationState, 16);
-			requestReferenceTime();
-			setInterval(requestReferenceTime, 10000);
-			break;
-		}
-
 		case 'client_joined': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
 			break;
@@ -316,7 +321,7 @@ function handleMessage(message, messageEvent) {
 
 		case 'medium_inserted': {
 		    mediumNameLabel.textContent = message.name;
-		    mediumLengthLabel.textContent = Math.round(message.length_in_milliseconds / 1000 / 60);
+		    mediumLengthLabel.textContent = Math.round(message.length_in_milliseconds / 1000 / 60).toString();
 
 		    playbackState.type = 'paused';
 		    playbackState.position = 0;
@@ -390,6 +395,7 @@ async function sendMessage(message) {
 		pendingPromises[nextRequestId] = {
 			resolve: resolve,
 			reject: reject,
+			requestType: message.type,
 		}
 		nextRequestId++;
 		webSocket.send(JSON.stringify(message));
@@ -444,7 +450,7 @@ function updatePlayer() {
 					playerReal.play();
 				}
 			} else {
-				playerPositionLabel.textContent = Math.round(position) / 1000;
+				playerPositionLabel.textContent = (Math.round(position) / 1000).toString();
 			}
 
 			playPauseButton.innerHTML = '&#9208;';
@@ -463,7 +469,7 @@ function updatePlayer() {
 					playerReal.pause();
 				}
 			} else {
-				playerPositionLabel.textContent = Math.round(playbackState.position) / 1000;
+				playerPositionLabel.textContent = (Math.round(playbackState.position) / 1000).toString();
 			}
 
 			playPauseButton.innerHTML = '&#9654;';
@@ -483,8 +489,8 @@ function requestReferenceTime() {
 
 	lastSentGetReferenceTime = performance.now();
 	sendMessage({type: "get_reference_time"}).then((response) => {
-		const elapsed = response.event.timeStamp - lastSentGetReferenceTime;
-		const serverReferenceTime = response.message.milliseconds;
+		const elapsed = response.timeStamp - lastSentGetReferenceTime;
+		const serverReferenceTime = response.referenceTime;
 		const now = performance.now();
 		if (referenceTimeOffset == null) {
 			referenceTimeOffset = serverReferenceTime - (now - elapsed / 2);
