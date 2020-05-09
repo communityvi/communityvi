@@ -108,8 +108,8 @@ impl<RequestStream> From<StreamMessageReceiver<RequestStream>> for MessageReceiv
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send + 'static,
 {
-	fn from(stream_server_connection: StreamMessageReceiver<RequestStream>) -> Self {
-		Box::pin(stream_server_connection)
+	fn from(stream_message_receiver: StreamMessageReceiver<RequestStream>) -> Self {
+		Box::pin(stream_message_receiver)
 	}
 }
 

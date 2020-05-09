@@ -11,9 +11,9 @@ pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver)
 	let (websocket_sink, websocket_stream) = websocket.split();
 	let websocket_message_sender = WebSocketMessageSender::new(websocket_sink);
 	let message_sender = MessageSender::from(websocket_message_sender);
-	let stream_server_connection =
+	let stream_message_receiver =
 		WebSocketMessageReceiver::new(InfallibleStream::from(websocket_stream), message_sender.clone());
-	(message_sender, stream_server_connection.into())
+	(message_sender, stream_message_receiver.into())
 }
 
 #[cfg(test)]

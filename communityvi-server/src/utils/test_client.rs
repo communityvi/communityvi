@@ -25,9 +25,9 @@ impl WebsocketTestClient {
 
 		let sink_message_sender = SinkMessageSender::new(server_sender);
 		let message_sender = MessageSender::from(sink_message_sender);
-		let stream_server_connection = StreamMessageReceiver::new(server_receiver, message_sender.clone());
+		let stream_message_receiver = StreamMessageReceiver::new(server_receiver, message_sender.clone());
 
-		let message_receiver = MessageReceiver::from(stream_server_connection);
+		let message_receiver = MessageReceiver::from(stream_message_receiver);
 
 		let test_client = Self {
 			sender: Box::pin(client_sender),
