@@ -9,6 +9,9 @@ let referenceTime = null;
 const referenceTimeDisplay = document.getElementById('reference_time');
 let nextRequestId = 0;
 
+// requestId -> {"resolve", "reject"}
+let pendingPromises = {}
+
 let playerMode = 'fake';
 let selectedMediumFile = null;
 let mediumLength = null;
@@ -65,14 +68,19 @@ insertMediumButton.onclick = function () {
 		return;
 	}
 
-	sendMessage({type: 'insert_medium', name: name, length_in_milliseconds: length});
+	sendMessage({type: 'insert_medium', name: name, length_in_milliseconds: length})
+		.catch((error) => {
+			console.error(`Failed to insert fake medium. ${error}`);
+		});
 };
 playerReal.addEventListener('loadeddata', function () {
 	playingMedium.style.height = `${this.videoHeight}px`;
 	playingMedium.style.width = `${this.videoWidth}px`;
 	playerPositionSlider.style.width = `${this.videoWidth}px`;
 
-	sendMessage({type: 'insert_medium', name: mediumNameLabel.textContent, length_in_milliseconds: Math.round(this.duration * 1000)});
+	sendMessage({type: 'insert_medium', name: mediumNameLabel.textContent, length_in_milliseconds: Math.round(this.duration * 1000)}).catch((error) => {
+		console.error(`Failed to insert medium. ${error}`);
+	});
 });
 const playPauseButton = document.getElementById('play_pause');
 playPauseButton.onclick = function () {
@@ -84,7 +92,11 @@ playPauseButton.onclick = function () {
 		case 'playing': {
 			playbackState.type = 'paused';
 			playbackState.position = calculateReferenceTime() - playbackState.startTime;
-			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: false});
+			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: false})
+				.catch((error) => {
+					// TODO: Use this information to pause again?
+					console.log(`Failed to pause video. ${error}`);
+				});
 
 			break;
 		}
@@ -92,7 +104,11 @@ playPauseButton.onclick = function () {
 		case 'paused': {
 			playbackState.type = 'playing';
 			playbackState.startTime = calculateReferenceTime() - playbackState.position;
-			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false});
+			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false})
+				.catch((error) => {
+					// TODO: Use this information to play again?
+					console.log(`Failed to play video. ${error}`);
+				});
 
 			break;
 		}
@@ -117,7 +133,7 @@ playerPositionSlider.onmouseup = function () {
 	sliderIsBeingDragged = false;
 }
 playerPositionSlider.onchange = function () {
-    skip(Number.parseInt(playerPositionSlider.value));
+	skip(Number.parseInt(playerPositionSlider.value));
 }
 
 function skip(position) {
@@ -137,7 +153,10 @@ function skip(position) {
 				playbackState.startTime = startTime;
 			}
 
-			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true});
+			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true})
+				.catch((error) => {
+					console.error(`Failed to skip in playing video. ${error}`);
+				});
 			break;
 		}
 
@@ -150,7 +169,10 @@ function skip(position) {
 				playbackState.position = position;
 			}
 
-			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true});
+			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true})
+				.catch((error) => {
+					console.error(`Failed to skip in paused video. ${error}`)
+				});
 			break;
 		}
 	}
@@ -205,7 +227,7 @@ function registerClient() {
 			type: 'register',
 			name: name,
 		};
-		sendMessage(registerMessage);
+		sendMessage(registerMessage).catch((error) => console.error(`Registration failed. ${error}`));
 	};
 
 	webSocket.onmessage = function (messageEvent) {
@@ -227,6 +249,21 @@ function registerClient() {
 function handleMessage(message, messageEvent) {
 	const idField = document.getElementById('client_id');
 
+	const requestID = message.request_id;
+	if (requestID !== null) {
+		// handle singlecast messages
+		const pendingPromise = pendingPromises[requestID];
+		if (message.type === 'error') {
+			const response = {message: message, event: messageEvent}
+			pendingPromise.reject(response)
+		} else {
+			pendingPromise.resolve(`${message.error}: ${message.message}`)
+		}
+		return;
+	}
+
+
+	// handle broadcast messages
 	switch (message.type) {
 		case 'hello': {
 			idField.innerText = message.id;
@@ -274,25 +311,6 @@ function handleMessage(message, messageEvent) {
 
 		case 'chat': {
 			displayChatMessage(message.sender_id, message.sender_name, message.message);
-			break;
-		}
-
-		case 'reference_time': {
-			const elapsed = messageEvent.timeStamp - lastSentGetReferenceTime;
-			const serverReferenceTime = message.milliseconds;
-			const now = performance.now();
-			if (referenceTimeOffset == null) {
-				referenceTimeOffset = serverReferenceTime - (now - elapsed / 2);
-			} else {
-				const localReferenceTime = (now - elapsed / 2) + referenceTimeOffset;
-				referenceTimeOffset += serverReferenceTime - localReferenceTime;
-			}
-			console.log(`offset: ${referenceTimeOffset}`);
-
-			if (referenceTime == null) {
-				referenceTime = now + referenceTimeOffset;
-			}
-
 			break;
 		}
 
@@ -346,11 +364,6 @@ function handleMessage(message, messageEvent) {
 			break;
 		}
 
-		case 'error': {
-			console.error(`Received error message: [${message.error}] '${message.message}'`);
-			break;
-		}
-
 		default: {
 			console.error(`UNKNOWN MESSAGE TYPE: '${message.type}'!`);
 			break;
@@ -358,7 +371,7 @@ function handleMessage(message, messageEvent) {
 	}
 }
 
-function sendChatMessage() {
+async function sendChatMessage() {
 	const messageField = document.getElementById('message');
 	const message = messageField.value;
 
@@ -366,15 +379,21 @@ function sendChatMessage() {
 		type: "chat",
 		message: message,
 	};
-	sendMessage(chatMessage);
+	await sendMessage(chatMessage);
 
 	messageField.value = '';
 }
 
-function sendMessage(message) {
-	message['request_id'] = nextRequestId;
-	nextRequestId++;
-	webSocket.send(JSON.stringify(message));
+async function sendMessage(message) {
+	return new Promise((resolve, reject) => {
+		message['request_id'] = nextRequestId;
+		pendingPromises[nextRequestId] = {
+			resolve: resolve,
+			reject: reject,
+		}
+		nextRequestId++;
+		webSocket.send(JSON.stringify(message));
+	})
 }
 
 function displayChatMessage(id, name, message) {
@@ -396,20 +415,23 @@ function updateApplicationState() {
 	if (playbackState.type === 'playing') {
 	    const currentPosition = referenceTime - playbackState.startTime;
 
-	    if (currentPosition >= mediumLength) {
-	    	sendMessage({type: 'pause', position_in_milliseconds: mediumLength, skipped: false});
+		if (currentPosition >= mediumLength) {
+			sendMessage({type: 'pause', position_in_milliseconds: mediumLength, skipped: false})
+				.catch((error) => {
+					console.error(`Failed to pause at the end of the video. ${error}`)
+				});
 			playbackState.type = 'paused';
 			playbackState.position = mediumLength;
 		}
 
-	    updatePlayer();
+		updatePlayer();
 	}
 }
 
 function updatePlayer() {
 	switch (playbackState.type) {
 		case 'playing': {
-		    const position = calculateReferenceTime() - playbackState.startTime;
+			const position = calculateReferenceTime() - playbackState.startTime;
 			if (sliderIsBeingDragged === false) {
 				playerPositionSlider.value = Math.round(position);
 			}
@@ -460,5 +482,22 @@ function requestReferenceTime() {
 	}
 
 	lastSentGetReferenceTime = performance.now();
-	sendMessage({type: "get_reference_time"});
+	sendMessage({type: "get_reference_time"}).then((response) => {
+		const elapsed = response.event.timeStamp - lastSentGetReferenceTime;
+		const serverReferenceTime = response.message.milliseconds;
+		const now = performance.now();
+		if (referenceTimeOffset == null) {
+			referenceTimeOffset = serverReferenceTime - (now - elapsed / 2);
+		} else {
+			const localReferenceTime = (now - elapsed / 2) + referenceTimeOffset;
+			referenceTimeOffset += serverReferenceTime - localReferenceTime;
+		}
+		console.log(`offset: ${referenceTimeOffset}`);
+
+		if (referenceTime == null) {
+			referenceTime = now + referenceTimeOffset;
+		}
+	}).catch((error) => {
+		console.error(`Failed to get reference time. ${error}`)
+	});
 }
