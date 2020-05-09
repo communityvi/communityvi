@@ -1,14 +1,13 @@
 use crate::connection::receiver::MessageReceiver;
 use crate::connection::sender::MessageSender;
-use crate::message::broadcast::{
+use crate::message::client_request::{
+	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
+};
+use crate::message::outgoing::broadcast_message::{
 	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumInsertedBroadcast, PlaybackStateChangedBroadcast,
 };
-use crate::message::client_request::{ChatRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest};
-use crate::message::server_response::{
-	ErrorResponse, HelloResponse, MediumResponse, ReferenceTimeResponse, ResponseConvertible, ServerResponse,
-	SuccessResponse,
-};
-use crate::message::{client_request::ClientRequest, server_response::ErrorResponseType};
+use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
+use crate::message::outgoing::success_message::{MediumResponse, SuccessMessage};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::state::medium::fixed_length::FixedLengthMedium;
@@ -44,12 +43,12 @@ async fn register_client(
 		error!("Client registration failed. Invalid request: {:?}", request);
 
 		let _ = message_sender
-			.send_response(
-				ErrorResponse {
-					error: ErrorResponseType::InvalidOperation,
+			.send_error_message(
+				ErrorMessage {
+					error: ErrorMessageType::InvalidOperation,
 					message: "Invalid request".to_string(),
-				}
-				.with_id(request.request_id),
+				},
+				Some(request.request_id),
 			)
 			.await;
 		return None;
@@ -62,25 +61,25 @@ async fn register_client(
 			let error_response = match error {
 				EmptyClientName | ClientNameTooLong => {
 					error!("Client registration failed. Tried to register with invalid name.");
-					ErrorResponseType::InvalidFormat
+					ErrorMessageType::InvalidFormat
 				}
 				ClientNameAlreadyInUse => {
 					error!("Client registration failed. Tried to register with name that is already used.");
-					ErrorResponseType::InvalidOperation
+					ErrorMessageType::InvalidOperation
 				}
 				RoomFull => {
 					error!("Client registration failed. Room is full.");
-					ErrorResponseType::InvalidOperation
+					ErrorMessageType::InvalidOperation
 				}
 			};
 
 			let _ = message_sender
-				.send_response(
-					ErrorResponse {
+				.send_error_message(
+					ErrorMessage {
 						error: error_response,
 						message: error.to_string(),
-					}
-					.with_id(request.request_id),
+					},
+					Some(request.request_id),
 				)
 				.await;
 
@@ -88,12 +87,11 @@ async fn register_client(
 		}
 	};
 
-	let hello_response = HelloResponse {
+	let hello_response = SuccessMessage::Hello {
 		id: client.id(),
 		current_medium: room.medium().as_ref().map(MediumResponse::from),
-	}
-	.with_id(request.request_id);
-	if client.send(hello_response).await {
+	};
+	if client.send_success_message(hello_response, request.request_id).await {
 		let id = client.id();
 		let name = client.name().to_string();
 
@@ -118,8 +116,10 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 			client.id(),
 		);
 
-		let response = handle_request(room, &client, message.request).await;
-		client.send(response.with_id(message.request_id)).await;
+		match handle_request(room, &client, message.request).await {
+			Ok(success_message) => client.send_success_message(success_message, message.request_id).await,
+			Err(error_message) => client.send_error_message(error_message, Some(message.request_id)).await,
+		};
 	}
 
 	let id = client.id();
@@ -128,7 +128,7 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 	room.broadcast(ClientLeftBroadcast { id, name }).await;
 }
 
-async fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> ServerResponse {
+async fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
 	use ClientRequest::*;
 	match request {
 		Chat(ChatRequest { message }) => {
@@ -138,36 +138,35 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				message,
 			})
 			.await;
-			SuccessResponse.into()
+			Ok(SuccessMessage::Success)
 		}
 		Register { .. } => {
 			error!(
 				"Client: {} tried to register even though it is already registered.",
 				client.id()
 			);
-			ErrorResponse {
-				error: ErrorResponseType::InvalidOperation,
+			Err(ErrorMessage {
+				error: ErrorMessageType::InvalidOperation,
 				message: "Already registered".to_string(),
 			}
-			.into()
+			.into())
 		}
 		GetReferenceTime => {
 			let reference_time = room.current_reference_time();
-			ReferenceTimeResponse {
+			Ok(SuccessMessage::ReferenceTime {
 				milliseconds: reference_time.as_millis() as u64,
-			}
-			.into()
+			})
 		}
 		InsertMedium(InsertMediumRequest {
 			name,
 			length_in_milliseconds,
 		}) => {
 			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
-				ErrorResponse {
-					error: ErrorResponseType::InvalidFormat,
+				Err(ErrorMessage {
+					error: ErrorMessageType::InvalidFormat,
 					message: "Length of a medium must not be larger than one year.".to_string(),
 				}
-				.into()
+				.into())
 			} else {
 				room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
 					name.clone(),
@@ -181,18 +180,17 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 					length_in_milliseconds,
 				})
 				.await;
-				SuccessResponse.into()
+				Ok(SuccessMessage::Success)
 			}
 		}
 		Play(PlayRequest {
 			skipped,
 			start_time_in_milliseconds,
 		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
-			None => ErrorResponse {
-				error: ErrorResponseType::NoMedium,
+			None => Err(ErrorMessage {
+				error: ErrorMessageType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			}
-			.into(),
+			}),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -201,7 +199,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 					playback_state: playback_state.into(),
 				})
 				.await;
-				SuccessResponse.into()
+				Ok(SuccessMessage::Success)
 			}
 		},
 		Pause(PauseRequest {
@@ -210,11 +208,10 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 		}) => match room.pause_medium(Duration::milliseconds(
 			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
 		)) {
-			None => ErrorResponse {
-				error: ErrorResponseType::NoMedium,
+			None => Err(ErrorMessage {
+				error: ErrorMessageType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			}
-			.into(),
+			}),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -223,7 +220,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 					playback_state: playback_state.into(),
 				})
 				.await;
-				SuccessResponse.into()
+				Ok(SuccessMessage::Success)
 			}
 		},
 	}
@@ -233,11 +230,10 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 mod test {
 	use super::*;
 	use crate::lifecycle::{handle_messages, handle_request, register_client};
-	use crate::message::broadcast::Broadcast;
 	use crate::message::client_request::PauseRequest;
-	use crate::message::server_response::{
-		MediumResponse, PlaybackStateResponse, ServerResponse, ServerResponseWithId,
-	};
+	use crate::message::outgoing::broadcast_message::BroadcastMessage;
+	use crate::message::outgoing::error_message::ErrorMessageType;
+	use crate::message::outgoing::success_message::PlaybackStateResponse;
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_connection::FakeClientConnection;
 	use crate::utils::test_client::WebsocketTestClient;
@@ -254,10 +250,12 @@ mod test {
 			.expect("Did not get client handle!");
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
-		let response = handle_request(&room, &client_handle, ClientRequest::GetReferenceTime).await;
+		let response = handle_request(&room, &client_handle, ClientRequest::GetReferenceTime)
+			.await
+			.expect("Failed to get reference time message");
 
 		match response {
-			ServerResponse::ReferenceTime(ReferenceTimeResponse { milliseconds }) => {
+			SuccessMessage::ReferenceTime { milliseconds } => {
 				assert!(
 					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
 					"milliseconds = {}",
@@ -289,11 +287,12 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
-		assert_eq!(response, ServerResponse::Success(SuccessResponse));
+		.await
+		.expect("Failed to get successful response");
+		assert_eq!(response, SuccessMessage::Success);
 
-		let alice_broadcast = alice_test_client.receive_broadcast().await;
-		let bob_broadcast = bob_test_client.receive_broadcast().await;
+		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
+		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
 		let expected_broadcast = MediumInsertedBroadcast {
 			inserted_by_name: alice.name().to_string(),
@@ -324,14 +323,15 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
+		.await
+		.expect_err("Failed to ger error response");
 
 		assert_eq!(
 			response,
-			ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::InvalidFormat,
+			ErrorMessage {
+				error: ErrorMessageType::InvalidFormat,
 				message: "Length of a medium must not be larger than one year.".to_string(),
-			})
+			}
 		)
 	}
 
@@ -360,11 +360,12 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
-		assert_eq!(response, ServerResponse::Success(SuccessResponse));
+		.await
+		.expect("Failed to get success response");
+		assert_eq!(response, SuccessMessage::Success);
 
-		let alice_broadcast = alice_test_client.receive_broadcast().await;
-		let bob_broadcast = bob_test_client.receive_broadcast().await;
+		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
+		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
 		let expected_broadcast = PlaybackStateChangedBroadcast {
 			changed_by_name: alice.name().to_string(),
@@ -397,14 +398,15 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
+		.await
+		.expect_err("Failed to get error response");
 
 		assert_eq!(
 			response,
-			ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::NoMedium,
+			ErrorMessage {
+				error: ErrorMessageType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			})
+			}
 		);
 	}
 
@@ -434,11 +436,12 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
-		assert_eq!(response, ServerResponse::Success(SuccessResponse));
+		.await
+		.expect("Failed to get success response");
+		assert_eq!(response, SuccessMessage::Success);
 
-		let alice_broadcast = alice_test_client.receive_broadcast().await;
-		let bob_broadcast = bob_test_client.receive_broadcast().await;
+		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
+		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
 		let expected_broadcast = PlaybackStateChangedBroadcast {
 			changed_by_name: bob.name().to_string(),
@@ -478,11 +481,12 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
-		assert_eq!(response, ServerResponse::Success(SuccessResponse));
+		.await
+		.expect("Failed to get success response");
+		assert_eq!(response, SuccessMessage::Success);
 
-		let alice_broadcast = alice_test_client.receive_broadcast().await;
-		let bob_broadcast = bob_test_client.receive_broadcast().await;
+		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
+		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
 		let expected_broadcast = PlaybackStateChangedBroadcast {
 			changed_by_name: bob.name().to_string(),
@@ -515,14 +519,15 @@ mod test {
 			}
 			.into(),
 		)
-		.await;
+		.await
+		.expect_err("Failed to get error response");
 
 		assert_eq!(
 			response,
-			ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::NoMedium,
+			ErrorMessage {
+				error: ErrorMessageType::NoMedium,
 				message: "Room has no medium.".to_string(),
-			})
+			}
 		);
 	}
 
@@ -546,14 +551,15 @@ mod test {
 			name: "Parcival".to_string(),
 		};
 
-		test_client.send_request(register_message).await;
-		match test_client.receive_response().await.response {
-			ServerResponse::Error(ErrorResponse { error, message }) => {
-				assert_eq!(ErrorResponseType::InvalidOperation, error);
-				assert!(message.contains("registered"));
+		let request_id = test_client.send_request(register_message).await;
+		let error = test_client.receive_error_message(Some(request_id)).await;
+		assert_eq!(
+			error,
+			ErrorMessage {
+				error: ErrorMessageType::InvalidOperation,
+				message: "Already registered".to_string()
 			}
-			_ => panic!("Incorrect message received."),
-		}
+		);
 	}
 
 	#[tokio::test]
@@ -564,14 +570,13 @@ mod test {
 
 		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_error_message(Some(request_id)).await;
 
 		assert_eq!(
-			ServerResponse::from(ErrorResponse {
-				error: ErrorResponseType::InvalidFormat,
+			ErrorMessage {
+				error: ErrorMessageType::InvalidFormat,
 				message: "Name was empty or whitespace-only.".to_string()
-			})
-			.with_id(request_id),
+			},
 			response
 		);
 	}
@@ -593,15 +598,14 @@ mod test {
 
 		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_error_message(Some(request_id)).await;
 
 		// Then I expect an error
 		assert_eq!(
-			ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::InvalidOperation,
+			ErrorMessage {
+				error: ErrorMessageType::InvalidOperation,
 				message: "Client name is already in use.".to_string()
-			})
-			.with_id(request_id),
+			},
 			response
 		);
 	}
@@ -621,14 +625,13 @@ mod test {
 
 		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_error_message(Some(request_id)).await;
 
 		assert_eq!(
-			ServerResponse::Error(ErrorResponse {
-				error: ErrorResponseType::InvalidOperation,
+			ErrorMessage {
+				error: ErrorMessageType::InvalidOperation,
 				message: "Can't join, room is already full.".to_string()
-			})
-			.with_id(request_id),
+			},
 			response
 		);
 	}
@@ -649,10 +652,10 @@ mod test {
 
 		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_success_message(request_id).await;
 
 		assert_eq!(
-			ServerResponse::Hello(HelloResponse {
+			SuccessMessage::Hello {
 				id: ClientId::from(0),
 				current_medium: Some(MediumResponse::FixedLength {
 					name: video_name,
@@ -661,8 +664,7 @@ mod test {
 						start_time_in_milliseconds: 0,
 					}
 				})
-			})
-			.with_id(request_id),
+			},
 			response
 		);
 	}
@@ -682,10 +684,10 @@ mod test {
 
 		let request_id = test_client.send_request(register_request).await;
 		register_client(room, message_sender, message_receiver).await;
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_success_message(request_id).await;
 
 		assert_eq!(
-			ServerResponse::Hello(HelloResponse {
+			SuccessMessage::Hello {
 				id: ClientId::from(0),
 				current_medium: Some(MediumResponse::FixedLength {
 					name: video_name,
@@ -694,8 +696,7 @@ mod test {
 						position_in_milliseconds: 0
 					}
 				})
-			})
-			.with_id(request_id),
+			},
 			response
 		);
 	}
@@ -709,30 +710,26 @@ mod test {
 	) -> (Client, MessageReceiver, WebsocketTestClient) {
 		let register_request = RegisterRequest { name: name.into() };
 
-		test_client.send_request(register_request).await;
+		let request_id = test_client.send_request(register_request).await;
 
 		// run server code required for client registration
 		let (client_handle, message_receiver) = register_client(room.clone(), message_sender, message_receiver)
 			.await
 			.unwrap();
 
-		let response = test_client.receive_response().await;
+		let response = test_client.receive_success_message(request_id).await;
 
-		let id = if let ServerResponseWithId {
-			request_id: _,
-			response: ServerResponse::Hello(HelloResponse { id, .. }),
-		} = response
-		{
+		let id = if let SuccessMessage::Hello { id, .. } = response {
 			id
 		} else {
 			panic!("Expected Hello-Response, got '{:?}'", response);
 		};
 		assert_eq!(client_handle.id(), id);
 
-		let joined_response = test_client.receive_broadcast().await;
+		let joined_response = test_client.receive_broadcast_message().await;
 		assert!(matches!(
 			joined_response,
-			Broadcast::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
+			BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
 		));
 		(client_handle, message_receiver, test_client)
 	}

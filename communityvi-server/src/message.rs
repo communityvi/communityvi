@@ -1,9 +1,8 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
-pub mod broadcast;
 pub mod client_request;
-pub mod server_response;
+pub mod outgoing;
 
 pub type WebSocketMessage = tokio_tungstenite::tungstenite::Message;
 

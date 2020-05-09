@@ -1,5 +1,5 @@
 use crate::connection::sender::MessageSender;
-use crate::message::broadcast::Broadcast;
+use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
@@ -113,10 +113,7 @@ impl Room {
 			.is_some()
 	}
 
-	pub async fn broadcast<Response>(&self, response: Response)
-	where
-		Response: Into<Broadcast> + Clone,
-	{
+	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
 		let futures: Vec<_> = self
 			.inner
 			.clients
@@ -125,7 +122,7 @@ impl Room {
 			.map(move |client| {
 				let response = response.clone();
 				async move {
-					client.broadcast(response).await;
+					client.send_broadcast_message(response).await;
 				}
 			})
 			.collect();

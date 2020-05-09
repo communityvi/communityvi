@@ -10,7 +10,7 @@ const referenceTimeDisplay = document.getElementById('reference_time');
 let nextRequestId = 0;
 
 // requestId -> {"resolve": function, "reject": function, "requestType": string}
-let pendingPromises = {}
+let pendingResponses = {}
 
 let playerMode = 'fake';
 let selectedMediumFile = null;
@@ -281,32 +281,70 @@ function registerClient() {
 	};
 }
 
-function handleMessage(message, messageEvent) {
-	const requestID = message.request_id;
-	if (requestID !== undefined) {
-		if (requestID === null) {
-			alert(`Response without request_id. ${JSON.stringify(message)}`)
-			return;
+const requestTypeToExpectedResponseType = {
+	'register': 'hello',
+	'chat': 'success',
+	'insert_medium': 'success',
+	'get_reference_time': 'reference_time',
+	'play': 'success',
+	'pause': 'success',
+};
+
+function handleMessage(websocketMessage, messageEvent) {
+	const message = websocketMessage.message;
+	const requestID = websocketMessage.request_id;
+
+	switch (websocketMessage.type) {
+		case 'broadcast':
+			handleBroadcast(message, messageEvent);
+			break;
+
+		case 'success': {
+			const pendingPromise = pendingResponses[requestID];
+
+			if (requestTypeToExpectedResponseType[pendingPromise.requestType] !== message.type) {
+				pendingPromise.reject(`Invalid response type. Expected ${pendingPromise.requestType} got ${message.type}`);
+				return;
+			}
+
+			switch (message.type) {
+				case 'hello':
+					pendingPromise.resolve({currentMedium: message.current_medium, id: message.id});
+					break;
+
+				case 'reference_time':
+					pendingPromise.resolve({referenceTime: message.milliseconds, timeStamp: messageEvent.timeStamp});
+					break;
+
+				case 'success':
+					pendingPromise.resolve();
+					break;
+
+				default:
+					console.error(`Received invalid message ${JSON.stringify(websocketMessage)}`);
+			}
+			break;
 		}
 
-		// handle singlecast messages
-		const pendingPromise = pendingPromises[requestID];
-		if ((message.type === 'success') && (pendingPromise.requestType !== 'get_reference_time')) {
-			pendingPromise.resolve();
-		} else if ((message.type === 'reference_time') && (pendingPromise.requestType === 'get_reference_time')) {
-			pendingPromise.resolve({referenceTime: message.milliseconds, timeStamp: messageEvent.timeStamp});
-		} else if ((message.type === 'hello') && (pendingPromise.requestType === 'register')) {
-			pendingPromise.resolve({currentMedium: message.current_medium, id: message.id})
-		} else if (message.type === 'error') {
-			pendingPromise.reject(`${message.error}: ${message.message}`)
-		} else {
-			pendingPromise.reject(`Incorrect type ${message.type} in response to ${pendingPromise.type}`);
+		case 'error': {
+			if (requestID == null) {
+				alert(`Error response without request_id. ${JSON.stringify(websocketMessage)}`)
+				return;
+			}
+
+			const pendingPromise = pendingResponses[requestID];
+			const errorMessage = message.message;
+			pendingPromise.reject(`${errorMessage.error}: ${errorMessage.message}`);
+			break;
 		}
-		return;
+
+		default: {
+			console.error(`Received invalid message: ${JSON.stringify(websocketMessage)}`);
+		}
 	}
+}
 
-
-	// handle broadcast messages
+function handleBroadcast(message, messageEvent) {
 	switch (message.type) {
 		case 'client_joined': {
 			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} joined the room.`);
@@ -396,7 +434,7 @@ async function sendChatMessage() {
 async function sendMessage(message) {
 	return new Promise((resolve, reject) => {
 		message['request_id'] = nextRequestId;
-		pendingPromises[nextRequestId] = {
+		pendingResponses[nextRequestId] = {
 			resolve: resolve,
 			reject: reject,
 			requestType: message.type,

@@ -1,4 +1,4 @@
-use crate::message::server_response::PlaybackStateResponse;
+use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use std::convert::TryFrom;
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-pub enum Broadcast {
+pub enum BroadcastMessage {
 	ClientJoined(ClientJoinedBroadcast),
 	ClientLeft(ClientLeftBroadcast),
 	Chat(ChatBroadcast),
@@ -17,9 +17,9 @@ pub enum Broadcast {
 
 macro_rules! broadcast_from_struct {
 	($enum_case: ident, $struct_type: ty) => {
-		impl From<$struct_type> for Broadcast {
-			fn from(broadcast: $struct_type) -> Broadcast {
-				Broadcast::$enum_case(broadcast)
+		impl From<$struct_type> for BroadcastMessage {
+			fn from(broadcast: $struct_type) -> BroadcastMessage {
+				BroadcastMessage::$enum_case(broadcast)
 			}
 		}
 	};
@@ -70,7 +70,7 @@ pub struct PlaybackStateChangedBroadcast {
 
 broadcast_from_struct!(PlaybackStateChanged, PlaybackStateChangedBroadcast);
 
-impl TryFrom<&WebSocketMessage> for Broadcast {
+impl TryFrom<&WebSocketMessage> for BroadcastMessage {
 	type Error = MessageError;
 
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
@@ -86,8 +86,8 @@ impl TryFrom<&WebSocketMessage> for Broadcast {
 	}
 }
 
-impl From<&Broadcast> for WebSocketMessage {
-	fn from(message: &Broadcast) -> Self {
+impl From<&BroadcastMessage> for WebSocketMessage {
+	fn from(message: &BroadcastMessage) -> Self {
 		let json = serde_json::to_string(message).expect("Failed to serialize broadcast message to JSON.");
 		WebSocketMessage::text(json)
 	}
@@ -99,7 +99,7 @@ mod test {
 
 	#[test]
 	fn chat_broadcast_should_serialize_and_deserialize() {
-		let chat_broadcast = Broadcast::Chat(ChatBroadcast {
+		let chat_broadcast = BroadcastMessage::Chat(ChatBroadcast {
 			sender_id: ClientId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
@@ -110,14 +110,14 @@ mod test {
 			json
 		);
 
-		let deserialized_chat_broadcast: Broadcast =
+		let deserialized_chat_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize Chat broadcast from JSON");
 		assert_eq!(chat_broadcast, deserialized_chat_broadcast);
 	}
 
 	#[test]
 	fn client_joined_broadcast_should_serialize_and_deserialize() {
-		let joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
+		let joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: ClientId::from(42),
 			name: "Hedwig".to_string(),
 		});
@@ -125,14 +125,14 @@ mod test {
 			serde_json::to_string(&joined_broadcast).expect("Failed to serialize ClientJoined broadcast to JSON");
 		assert_eq!(r#"{"type":"client_joined","id":42,"name":"Hedwig"}"#, json);
 
-		let deserialized_joined_broadcast: Broadcast =
+		let deserialized_joined_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize ClientJoined broadcast from JSON");
 		assert_eq!(joined_broadcast, deserialized_joined_broadcast);
 	}
 
 	#[test]
 	fn client_left_broadcast_should_serialize_and_deserialize() {
-		let client_left_broadcast = Broadcast::ClientLeft(ClientLeftBroadcast {
+		let client_left_broadcast = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
 			id: ClientId::from(42),
 			name: "Hedwig".to_string(),
 		});
@@ -140,14 +140,14 @@ mod test {
 			serde_json::to_string(&client_left_broadcast).expect("Failed to serialize ClientLeft broadcast to JSON");
 		assert_eq!(r#"{"type":"client_left","id":42,"name":"Hedwig"}"#, json);
 
-		let deserialized_client_left_broadcast: Broadcast =
+		let deserialized_client_left_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize ClientLeft broadcast from JSON");
 		assert_eq!(client_left_broadcast, deserialized_client_left_broadcast);
 	}
 
 	#[test]
 	fn medium_inserted_broadcast_should_serialize_and_deserialize() {
-		let medium_inserted_broadcast = Broadcast::MediumInserted(MediumInsertedBroadcast {
+		let medium_inserted_broadcast = BroadcastMessage::MediumInserted(MediumInsertedBroadcast {
 			inserted_by_name: "Squirrel".to_string(),
 			inserted_by_id: ClientId::from(42),
 			name: "The Acorn".to_string(),
@@ -160,14 +160,14 @@ mod test {
 			json
 		);
 
-		let deserialized_medium_inserted_broadcast: Broadcast =
+		let deserialized_medium_inserted_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize MediumInserted broadcast from JSON");
 		assert_eq!(medium_inserted_broadcast, deserialized_medium_inserted_broadcast);
 	}
 
 	#[test]
 	fn playback_state_changed_broadcast_for_playing_should_serialize_and_deserialize() {
-		let playback_state_changed_broadcast = Broadcast::PlaybackStateChanged(PlaybackStateChangedBroadcast {
+		let playback_state_changed_broadcast = BroadcastMessage::PlaybackStateChanged(PlaybackStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
 			skipped: false,
@@ -182,7 +182,7 @@ mod test {
 			json
 		);
 
-		let deserialized_playback_state_changed_broadcast: Broadcast =
+		let deserialized_playback_state_changed_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged broadcast from JSON");
 		assert_eq!(
 			playback_state_changed_broadcast,
@@ -192,7 +192,7 @@ mod test {
 
 	#[test]
 	fn playback_state_changed_broadcast_for_paused_should_serialize_and_deserialize() {
-		let playback_state_changed_broadcast = Broadcast::PlaybackStateChanged(PlaybackStateChangedBroadcast {
+		let playback_state_changed_broadcast = BroadcastMessage::PlaybackStateChanged(PlaybackStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
 			skipped: false,
@@ -207,7 +207,7 @@ mod test {
 			json
 		);
 
-		let deserialized_playback_state_changed_broadcast: Broadcast =
+		let deserialized_playback_state_changed_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged broadcast from JSON");
 		assert_eq!(
 			playback_state_changed_broadcast,

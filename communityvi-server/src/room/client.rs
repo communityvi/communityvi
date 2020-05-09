@@ -1,6 +1,7 @@
 use crate::connection::sender::MessageSender;
-use crate::message::broadcast::Broadcast;
-use crate::message::server_response::ServerResponseWithId;
+use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::error_message::ErrorMessage;
+use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use log::info;
@@ -38,10 +39,16 @@ impl Client {
 		self.inner.name.as_str()
 	}
 
-	pub async fn send(&self, response: ServerResponseWithId) -> bool {
-		if self.inner.connection.send_response(response).await.is_err() {
+	pub async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> bool {
+		if self
+			.inner
+			.connection
+			.send_success_message(message, request_id)
+			.await
+			.is_err()
+		{
 			info!(
-				"Failed to send message to client with id {} because it went away.",
+				"Failed to send success message to client with id {} because it went away.",
 				self.inner.id
 			);
 			false
@@ -50,14 +57,29 @@ impl Client {
 		}
 	}
 
-	pub async fn broadcast<IntoBroadcast>(&self, broadcast: IntoBroadcast) -> bool
-	where
-		IntoBroadcast: Into<Broadcast>,
-	{
+	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> bool {
 		if self
 			.inner
 			.connection
-			.send_broadcast_message(broadcast.into())
+			.send_error_message(message, request_id)
+			.await
+			.is_err()
+		{
+			info!(
+				"Failed to send error message to client with id {} because it went away.",
+				self.inner.id
+			);
+			false
+		} else {
+			true
+		}
+	}
+
+	pub async fn send_broadcast_message(&self, message: impl Into<BroadcastMessage>) -> bool {
+		if self
+			.inner
+			.connection
+			.send_broadcast_message(message.into())
 			.await
 			.is_err()
 		{

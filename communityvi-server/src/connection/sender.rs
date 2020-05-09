@@ -1,5 +1,7 @@
-use crate::message::broadcast::Broadcast;
-use crate::message::server_response::ServerResponseWithId;
+use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::error_message::ErrorMessage;
+use crate::message::outgoing::success_message::SuccessMessage;
+use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use crate::server::WebSocket;
 use async_trait::async_trait;
@@ -13,8 +15,9 @@ pub type MessageSender = Pin<Arc<dyn MessageSenderTrait + Send + Sync>>;
 
 #[async_trait]
 pub trait MessageSenderTrait {
-	async fn send_response(&self, message: ServerResponseWithId) -> Result<(), ()>;
-	async fn send_broadcast_message(&self, message: Broadcast) -> Result<(), ()>;
+	async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> Result<(), ()>;
+	async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> Result<(), ()>;
+	async fn send_broadcast_message(&self, message: BroadcastMessage) -> Result<(), ()>;
 	async fn close(&self);
 }
 
@@ -33,20 +36,19 @@ impl<ResponseSink> MessageSenderTrait for SinkMessageSender<ResponseSink>
 where
 	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
 {
-	async fn send_response(&self, response: ServerResponseWithId) -> Result<(), ()> {
-		let mut inner = self.inner.lock().await;
-
-		let websocket_message = WebSocketMessage::from(&response);
-
-		inner.response_sink.send(websocket_message).await.map_err(|_| ())
+	async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> Result<(), ()> {
+		let outgoing_message = OutgoingMessage::Success { request_id, message };
+		self.send_message(outgoing_message).await
 	}
 
-	async fn send_broadcast_message(&self, message: Broadcast) -> Result<(), ()> {
-		let mut inner = self.inner.lock().await;
+	async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> Result<(), ()> {
+		let outgoing_message = OutgoingMessage::Error { request_id, message };
+		self.send_message(outgoing_message).await
+	}
 
-		let websocket_message = WebSocketMessage::from(&message);
-
-		inner.response_sink.send(websocket_message).await.map_err(|_| ())
+	async fn send_broadcast_message(&self, message: BroadcastMessage) -> Result<(), ()> {
+		let outgoing_message = OutgoingMessage::Broadcast { message };
+		self.send_message(outgoing_message).await
 	}
 
 	async fn close(&self) {
@@ -57,12 +59,20 @@ where
 
 impl<ResponseSink> SinkMessageSender<ResponseSink>
 where
-	ResponseSink: Sink<WebSocketMessage>,
+	ResponseSink: Sink<WebSocketMessage> + Unpin,
 {
 	pub fn new(response_sink: ResponseSink) -> Self {
 		let inner = SinkMessageSenderInner { response_sink };
 		let connection = Self { inner: inner.into() };
 		connection
+	}
+
+	async fn send_message(&self, message: OutgoingMessage) -> Result<(), ()> {
+		let mut inner = self.inner.lock().await;
+
+		let websocket_message = WebSocketMessage::from(&message);
+
+		inner.response_sink.send(websocket_message).await.map_err(|_| ())
 	}
 }
 

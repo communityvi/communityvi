@@ -18,7 +18,7 @@ pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver)
 
 #[cfg(test)]
 pub mod test {
-	use crate::message::server_response::{ErrorResponse, ErrorResponseType, ServerResponse, ServerResponseWithId};
+	use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 	use crate::message::WebSocketMessage;
 	use crate::utils::test_client::WebsocketTestClient;
 
@@ -40,14 +40,11 @@ pub mod test {
 			test_client.receive_raw().await;
 		}
 
-		let too_many_retries_response = test_client.receive_response().await;
+		let too_many_retries_response = test_client.receive_error_message(None).await;
 		assert_eq!(
-			ServerResponseWithId {
-				request_id: None,
-				response: ServerResponse::Error(ErrorResponse {
-					error: ErrorResponseType::InvalidOperation,
-					message: "Too many retries".to_string(),
-				})
+			ErrorMessage {
+				error: ErrorMessageType::InvalidOperation,
+				message: "Too many retries".to_string(),
 			},
 			too_many_retries_response
 		);

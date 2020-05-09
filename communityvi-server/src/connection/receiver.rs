@@ -1,7 +1,7 @@
 use crate::connection::sender::MessageSender;
 use crate::message::client_request::{ClientRequestWithId, RequestIdOnly};
-use crate::message::server_response::{ErrorResponse, ServerResponseWithId};
-use crate::message::{server_response::ErrorResponseType, MessageError, WebSocketMessage};
+use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
+use crate::message::{MessageError, WebSocketMessage};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use async_trait::async_trait;
@@ -62,14 +62,13 @@ where
 					error!("{}", message);
 					let _ = self
 						.client_connection
-						.send_response(ServerResponseWithId {
-							request_id,
-							response: ErrorResponse {
-								error: ErrorResponseType::InvalidFormat,
+						.send_error_message(
+							ErrorMessage {
+								error: ErrorMessageType::InvalidFormat,
 								message,
-							}
-							.into(),
-						})
+							},
+							request_id,
+						)
 						.await;
 					continue;
 				}
@@ -80,14 +79,13 @@ where
 
 		let _ = self
 			.client_connection
-			.send_response(ServerResponseWithId {
-				request_id: None,
-				response: ErrorResponse {
-					error: ErrorResponseType::InvalidOperation,
+			.send_error_message(
+				ErrorMessage {
+					error: ErrorMessageType::InvalidOperation,
 					message: "Too many retries".to_string(),
-				}
-				.into(),
-			})
+				},
+				None,
+			)
 			.await;
 		let _ = self.client_connection.close().await;
 		None

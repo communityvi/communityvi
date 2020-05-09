@@ -1,9 +1,9 @@
-use crate::message::broadcast::Broadcast;
-use crate::message::broadcast::{ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast};
 use crate::message::client_request::{ChatRequest, RegisterRequest};
-use crate::message::server_response::{
-	ErrorResponse, ErrorResponseType, HelloResponse, ServerResponse, ServerResponseWithId,
+use crate::message::outgoing::broadcast_message::{
+	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast,
 };
+use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
+use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_router;
@@ -44,14 +44,11 @@ fn should_not_allow_invalid_messages_during_registration() {
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
 
-			let response = test_client.receive_response().await;
+			let response = test_client.receive_error_message(None).await;
 
-			let expected_response = ServerResponseWithId {
-				request_id: None,
-				response: ServerResponse::Error(ErrorResponse {
-					error: ErrorResponseType::InvalidFormat,
-					message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-				}),
+			let expected_response = ErrorMessage {
+				error: ErrorMessageType::InvalidFormat,
+				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
 			};
 			assert_eq!(expected_response, response);
 		};
@@ -68,14 +65,11 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 		let future = async move {
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
-			let response = test_client.receive_response().await;
+			let response = test_client.receive_error_message(None).await;
 
-			let expected_response = ServerResponseWithId {
-				request_id: None,
-				response: ServerResponse::Error(ErrorResponse {
-					error: ErrorResponseType::InvalidFormat,
-					message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-				}),
+			let expected_response = ErrorMessage {
+				error: ErrorMessageType::InvalidFormat,
+				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
 			};
 			assert_eq!(expected_response, response);
 		};
@@ -97,14 +91,14 @@ fn should_broadcast_messages() {
 		assert_eq!(ClientId::from(1), bob_client_id);
 
 		let future = async move {
-			let expected_bob_joined_broadcast = Broadcast::ClientJoined(ClientJoinedBroadcast {
+			let expected_bob_joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
 			});
-			let bob_joined_broadcast = alice_test_client.receive_broadcast().await;
+			let bob_joined_broadcast = alice_test_client.receive_broadcast_message().await;
 			assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
 
-			let expected_chat_broadcast = Broadcast::Chat(ChatBroadcast {
+			let expected_chat_broadcast = BroadcastMessage::Chat(ChatBroadcast {
 				sender_id: alice_client_id,
 				sender_name: "Alice".to_string(),
 				message: message.to_string(),
@@ -112,8 +106,14 @@ fn should_broadcast_messages() {
 
 			alice_test_client.send_request(request).await;
 
-			assert_eq!(expected_chat_broadcast, alice_test_client.receive_broadcast().await);
-			assert_eq!(expected_chat_broadcast, bob_test_client.receive_broadcast().await);
+			assert_eq!(
+				expected_chat_broadcast,
+				alice_test_client.receive_broadcast_message().await
+			);
+			assert_eq!(
+				expected_chat_broadcast,
+				bob_test_client.receive_broadcast_message().await
+			);
 		};
 		run_future_on_test_server(future, server);
 	};
@@ -127,14 +127,14 @@ fn should_broadcast_when_client_leaves_the_room() {
 		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 
 		let future = async move {
-			let _ = alice_test_client.receive_broadcast().await; // skip join message for bob
+			let _ = alice_test_client.receive_broadcast_message().await; // skip join message for bob
 			std::mem::drop(bob_test_client);
 
-			let expected_leave_message = Broadcast::ClientLeft(ClientLeftBroadcast {
+			let expected_leave_message = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
 			});
-			let leave_message = alice_test_client.receive_broadcast().await;
+			let leave_message = alice_test_client.receive_broadcast_message().await;
 			assert_eq!(expected_leave_message, leave_message);
 		};
 		run_future_on_test_server(future, server);
@@ -295,24 +295,20 @@ fn registered_websocket_test_client(name: &'static str, server: &TestServer) -> 
 async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
 	let register_request = RegisterRequest { name: name.to_string() };
 
-	test_client.send_request(register_request).await;
+	let request_id = test_client.send_request(register_request).await;
 
-	let response = test_client.receive_response().await;
+	let response = test_client.receive_success_message(request_id).await;
 
-	let id = if let ServerResponseWithId {
-		request_id: _,
-		response: ServerResponse::Hello(HelloResponse { id, .. }),
-	} = response
-	{
+	let id = if let SuccessMessage::Hello { id, .. } = response {
 		id
 	} else {
 		panic!("Expected Hello-Response, got '{:?}'", response);
 	};
 
-	let joined_response = test_client.receive_broadcast().await;
+	let joined_response = test_client.receive_broadcast_message().await;
 	assert!(matches!(
 		joined_response,
-		Broadcast::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
+		BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
 	));
 
 	id
