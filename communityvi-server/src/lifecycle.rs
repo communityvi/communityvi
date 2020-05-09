@@ -7,7 +7,7 @@ use crate::message::outgoing::broadcast_message::{
 	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumInsertedBroadcast, PlaybackStateChangedBroadcast,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
-use crate::message::outgoing::success_message::{MediumResponse, SuccessMessage};
+use crate::message::outgoing::success_message::{ClientResponse, MediumResponse, SuccessMessage};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::state::medium::fixed_length::FixedLengthMedium;
@@ -87,8 +87,14 @@ async fn register_client(
 		}
 	};
 
+	let clients = room
+		.clients()
+		.filter(|(id, _)| *id != client.id())
+		.map(ClientResponse::from)
+		.collect();
 	let hello_response = SuccessMessage::Hello {
 		id: client.id(),
+		clients,
 		current_medium: room.medium().as_ref().map(MediumResponse::from),
 	};
 	if client.send_success_message(hello_response, request.request_id).await {
@@ -657,6 +663,7 @@ mod test {
 		assert_eq!(
 			SuccessMessage::Hello {
 				id: ClientId::from(0),
+				clients: vec![],
 				current_medium: Some(MediumResponse::FixedLength {
 					name: video_name,
 					length_in_milliseconds: video_length.num_milliseconds() as u64,
@@ -664,6 +671,58 @@ mod test {
 						start_time_in_milliseconds: 0,
 					}
 				})
+			},
+			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_list_other_clients_when_joining_a_room() {
+		let room = Room::new(2);
+		let fake_message_sender = FakeClientConnection::default();
+		let stephanie = room
+			.add_client("Stephanie".to_string(), fake_message_sender.into())
+			.unwrap();
+
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
+		let register_request = RegisterRequest {
+			name: "Johnny 5".to_string(),
+		};
+
+		let request_id = test_client.send_request(register_request).await;
+		register_client(room, message_sender, message_receiver).await;
+		let response = test_client.receive_success_message(request_id).await;
+
+		assert_eq!(
+			SuccessMessage::Hello {
+				id: ClientId::from(1),
+				clients: vec![ClientResponse {
+					id: stephanie.id(),
+					name: stephanie.name().to_string(),
+				}],
+				current_medium: None,
+			},
+			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_not_list_any_clients_when_joining_an_empty_room() {
+		let room = Room::new(1);
+		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
+		let register_request = RegisterRequest {
+			name: "Johnny 5".to_string(),
+		};
+
+		let request_id = test_client.send_request(register_request).await;
+		register_client(room, message_sender, message_receiver).await;
+		let response = test_client.receive_success_message(request_id).await;
+
+		assert_eq!(
+			SuccessMessage::Hello {
+				id: ClientId::from(0),
+				clients: vec![],
+				current_medium: None,
 			},
 			response
 		);
@@ -689,6 +748,7 @@ mod test {
 		assert_eq!(
 			SuccessMessage::Hello {
 				id: ClientId::from(0),
+				clients: vec![],
 				current_medium: Some(MediumResponse::FixedLength {
 					name: video_name,
 					length_in_milliseconds: video_length.num_milliseconds() as u64,

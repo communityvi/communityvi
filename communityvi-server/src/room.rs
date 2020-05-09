@@ -50,7 +50,7 @@ impl Room {
 	}
 
 	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, connection: MessageSender) -> Result<Client, RoomError> {
+	pub fn add_client(&self, name: String, message_sender: MessageSender) -> Result<Client, RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
@@ -70,7 +70,7 @@ impl Room {
 		}
 
 		let client_id = self.inner.client_id_sequence.next();
-		let client = Client::new(client_id, name, connection, self.clone());
+		let client = Client::new(client_id, name, message_sender, self.clone());
 
 		if self.inner.clients.insert(client_id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!")
@@ -149,6 +149,13 @@ impl Room {
 
 	pub fn pause_medium(&self, position: Duration) -> Option<PlaybackState> {
 		self.medium().as_mut().map(|medium| medium.pause(position))
+	}
+
+	pub fn clients<'room>(&'room self) -> impl Iterator<Item = (ClientId, String)> + 'room {
+		self.inner
+			.clients
+			.iter()
+			.map(|client| (client.id(), client.name().to_string()))
 	}
 }
 
