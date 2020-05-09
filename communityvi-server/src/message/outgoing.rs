@@ -48,3 +48,87 @@ impl TryFrom<&WebSocketMessage> for OutgoingMessage {
 		}
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::message::outgoing::broadcast_message::ClientJoinedBroadcast;
+	use crate::message::outgoing::error_message::ErrorMessageType;
+	use crate::room::client_id::ClientId;
+
+	#[test]
+	fn success_message_should_serialize_and_deserialize() {
+		let success_message = OutgoingMessage::Success {
+			request_id: 42,
+			message: SuccessMessage::Success,
+		};
+		let json = serde_json::to_string(&success_message).expect("Failed to serialize Success message to JSON");
+		assert_eq!(
+			r#"{"type":"success","request_id":42,"message":{"type":"success"}}"#,
+			json
+		);
+
+		let deserialized_success_message: OutgoingMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize Success message from JSON");
+		assert_eq!(success_message, deserialized_success_message);
+	}
+
+	#[test]
+	fn error_message_with_request_id_should_serialize_and_deserialize() {
+		let error_message = OutgoingMessage::Error {
+			request_id: Some(42),
+			message: ErrorMessage::builder()
+				.error(ErrorMessageType::NoMedium)
+				.message("No medium".to_string())
+				.build(),
+		};
+		let json = serde_json::to_string(&error_message).expect("Failed to serialize error message to JSON");
+		assert_eq!(
+			r#"{"type":"error","request_id":42,"message":{"error":"no_medium","message":"No medium"}}"#,
+			json
+		);
+
+		let deserialized_error_message: OutgoingMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize error message from JSON");
+		assert_eq!(error_message, deserialized_error_message);
+	}
+
+	#[test]
+	fn error_message_without_request_id_should_serialize_and_deserialize() {
+		let error_message = OutgoingMessage::Error {
+			request_id: None,
+			message: ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidFormat)
+				.message("Missing request_id".to_string())
+				.build(),
+		};
+		let json = serde_json::to_string(&error_message).expect("Failed to serialize error message to JSON");
+		assert_eq!(
+			r#"{"type":"error","request_id":null,"message":{"error":"invalid_format","message":"Missing request_id"}}"#,
+			json
+		);
+
+		let deserialized_error_message: OutgoingMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize error message from JSON");
+		assert_eq!(error_message, deserialized_error_message);
+	}
+
+	#[test]
+	fn broadcast_message_should_serialize_and_deserialize() {
+		let broadcast_message = OutgoingMessage::Broadcast {
+			message: BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
+				id: ClientId::from(99),
+				name: "Luftballons".to_string(),
+			}),
+		};
+		let json = serde_json::to_string(&broadcast_message).expect("Failed to serialize broadcast message to JSON");
+		assert_eq!(
+			r#"{"type":"broadcast","message":{"type":"client_joined","id":99,"name":"Luftballons"}}"#,
+			json
+		);
+
+		let deserialized_broadcast_message: OutgoingMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize broadcast message from JSON");
+		assert_eq!(broadcast_message, deserialized_broadcast_message);
+	}
+}
