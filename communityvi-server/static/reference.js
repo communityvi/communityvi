@@ -282,9 +282,13 @@ function registerClient() {
 }
 
 function handleMessage(message, messageEvent) {
-
 	const requestID = message.request_id;
 	if (requestID !== undefined) {
+		if (requestID === null) {
+			alert(`Response without request_id. ${JSON.stringify(message)}`)
+			return;
+		}
+
 		// handle singlecast messages
 		const pendingPromise = pendingPromises[requestID];
 		if ((message.type === 'success') && (pendingPromise.requestType !== 'get_reference_time')) {
