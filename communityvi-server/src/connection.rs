@@ -42,10 +42,10 @@ pub mod test {
 
 		let too_many_retries_response = test_client.receive_error_message(None).await;
 		assert_eq!(
-			ErrorMessage {
-				error: ErrorMessageType::InvalidOperation,
-				message: "Too many retries".to_string(),
-			},
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidOperation)
+				.message("Too many retries".to_string())
+				.build(),
 			too_many_retries_response
 		);
 

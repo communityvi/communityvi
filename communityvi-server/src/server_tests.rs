@@ -46,10 +46,10 @@ fn should_not_allow_invalid_messages_during_registration() {
 
 			let response = test_client.receive_error_message(None).await;
 
-			let expected_response = ErrorMessage {
-				error: ErrorMessageType::InvalidFormat,
-				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-			};
+			let expected_response = ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidFormat)
+				.message("Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string())
+				.build();
 			assert_eq!(expected_response, response);
 		};
 		run_future_on_test_server(future, server);
@@ -67,10 +67,10 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 			test_client.send_raw(invalid_message).await;
 			let response = test_client.receive_error_message(None).await;
 
-			let expected_response = ErrorMessage {
-				error: ErrorMessageType::InvalidFormat,
-				message: "Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string(),
-			};
+			let expected_response = ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidFormat)
+				.message("Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string())
+				.build();
 			assert_eq!(expected_response, response);
 		};
 		run_future_on_test_server(future, server);

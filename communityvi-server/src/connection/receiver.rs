@@ -63,10 +63,10 @@ where
 					let _ = self
 						.client_connection
 						.send_error_message(
-							ErrorMessage {
-								error: ErrorMessageType::InvalidFormat,
-								message,
-							},
+							ErrorMessage::builder()
+								.error(ErrorMessageType::InvalidFormat)
+								.message(message)
+								.build(),
 							request_id,
 						)
 						.await;
@@ -80,10 +80,10 @@ where
 		let _ = self
 			.client_connection
 			.send_error_message(
-				ErrorMessage {
-					error: ErrorMessageType::InvalidOperation,
-					message: "Too many retries".to_string(),
-				},
+				ErrorMessage::builder()
+					.error(ErrorMessageType::InvalidOperation)
+					.message("Too many retries".to_string())
+					.build(),
 				None,
 			)
 			.await;

@@ -44,10 +44,10 @@ async fn register_client(
 
 		let _ = message_sender
 			.send_error_message(
-				ErrorMessage {
-					error: ErrorMessageType::InvalidOperation,
-					message: "Invalid request".to_string(),
-				},
+				ErrorMessage::builder()
+					.error(ErrorMessageType::InvalidOperation)
+					.message("Invalid request".to_string())
+					.build(),
 				Some(request.request_id),
 			)
 			.await;
@@ -75,10 +75,10 @@ async fn register_client(
 
 			let _ = message_sender
 				.send_error_message(
-					ErrorMessage {
-						error: error_response,
-						message: error.to_string(),
-					},
+					ErrorMessage::builder()
+						.error(error_response)
+						.message(error.to_string())
+						.build(),
 					Some(request.request_id),
 				)
 				.await;
@@ -145,11 +145,11 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				"Client: {} tried to register even though it is already registered.",
 				client.id()
 			);
-			Err(ErrorMessage {
-				error: ErrorMessageType::InvalidOperation,
-				message: "Already registered".to_string(),
-			}
-			.into())
+			Err(ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidOperation)
+				.message("Already registered".to_string())
+				.build()
+				.into())
 		}
 		GetReferenceTime => {
 			let reference_time = room.current_reference_time();
@@ -162,11 +162,11 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			length_in_milliseconds,
 		}) => {
 			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
-				Err(ErrorMessage {
-					error: ErrorMessageType::InvalidFormat,
-					message: "Length of a medium must not be larger than one year.".to_string(),
-				}
-				.into())
+				Err(ErrorMessage::builder()
+					.error(ErrorMessageType::InvalidFormat)
+					.message("Length of a medium must not be larger than one year.".to_string())
+					.build()
+					.into())
 			} else {
 				room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
 					name.clone(),
@@ -187,10 +187,10 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			skipped,
 			start_time_in_milliseconds,
 		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
-			None => Err(ErrorMessage {
-				error: ErrorMessageType::NoMedium,
-				message: "Room has no medium.".to_string(),
-			}),
+			None => Err(ErrorMessage::builder()
+				.error(ErrorMessageType::NoMedium)
+				.message("Room has no medium.".to_string())
+				.build()),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -208,10 +208,10 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 		}) => match room.pause_medium(Duration::milliseconds(
 			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
 		)) {
-			None => Err(ErrorMessage {
-				error: ErrorMessageType::NoMedium,
-				message: "Room has no medium.".to_string(),
-			}),
+			None => Err(ErrorMessage::builder()
+				.error(ErrorMessageType::NoMedium)
+				.message("Room has no medium.".to_string())
+				.build()),
 			Some(playback_state) => {
 				room.broadcast(PlaybackStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
@@ -328,10 +328,10 @@ mod test {
 
 		assert_eq!(
 			response,
-			ErrorMessage {
-				error: ErrorMessageType::InvalidFormat,
-				message: "Length of a medium must not be larger than one year.".to_string(),
-			}
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidFormat)
+				.message("Length of a medium must not be larger than one year.".to_string())
+				.build()
 		)
 	}
 
@@ -403,10 +403,10 @@ mod test {
 
 		assert_eq!(
 			response,
-			ErrorMessage {
-				error: ErrorMessageType::NoMedium,
-				message: "Room has no medium.".to_string(),
-			}
+			ErrorMessage::builder()
+				.error(ErrorMessageType::NoMedium)
+				.message("Room has no medium.".to_string())
+				.build()
 		);
 	}
 
@@ -524,10 +524,10 @@ mod test {
 
 		assert_eq!(
 			response,
-			ErrorMessage {
-				error: ErrorMessageType::NoMedium,
-				message: "Room has no medium.".to_string(),
-			}
+			ErrorMessage::builder()
+				.error(ErrorMessageType::NoMedium)
+				.message("Room has no medium.".to_string())
+				.build()
 		);
 	}
 
@@ -555,10 +555,10 @@ mod test {
 		let error = test_client.receive_error_message(Some(request_id)).await;
 		assert_eq!(
 			error,
-			ErrorMessage {
-				error: ErrorMessageType::InvalidOperation,
-				message: "Already registered".to_string()
-			}
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidOperation)
+				.message("Already registered".to_string())
+				.build()
 		);
 	}
 
@@ -573,10 +573,10 @@ mod test {
 		let response = test_client.receive_error_message(Some(request_id)).await;
 
 		assert_eq!(
-			ErrorMessage {
-				error: ErrorMessageType::InvalidFormat,
-				message: "Name was empty or whitespace-only.".to_string()
-			},
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidFormat)
+				.message("Name was empty or whitespace-only.".to_string())
+				.build(),
 			response
 		);
 	}
@@ -602,10 +602,10 @@ mod test {
 
 		// Then I expect an error
 		assert_eq!(
-			ErrorMessage {
-				error: ErrorMessageType::InvalidOperation,
-				message: "Client name is already in use.".to_string()
-			},
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidOperation)
+				.message("Client name is already in use.".to_string())
+				.build(),
 			response
 		);
 	}
@@ -628,10 +628,10 @@ mod test {
 		let response = test_client.receive_error_message(Some(request_id)).await;
 
 		assert_eq!(
-			ErrorMessage {
-				error: ErrorMessageType::InvalidOperation,
-				message: "Can't join, room is already full.".to_string()
-			},
+			ErrorMessage::builder()
+				.error(ErrorMessageType::InvalidOperation)
+				.message("Can't join, room is already full.".to_string())
+				.build(),
 			response
 		);
 	}

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 pub struct ErrorMessage {
 	pub error: ErrorMessageType,
 	pub message: String,
@@ -21,10 +22,10 @@ mod test {
 
 	#[test]
 	fn invalid_format_error_message_should_serialize_and_deserialize() {
-		let invalid_format_error_message = ErrorMessage {
-			error: ErrorMessageType::InvalidFormat,
-			message: "�".to_string(),
-		};
+		let invalid_format_error_message = ErrorMessage::builder()
+			.error(ErrorMessageType::InvalidFormat)
+			.message("�".to_string())
+			.build();
 		let json = serde_json::to_string(&invalid_format_error_message)
 			.expect("Failed to serialize InvalidFormat error message to JSON");
 		assert_eq!(r#"{"error":"invalid_format","message":"�"}"#, json);
@@ -36,10 +37,10 @@ mod test {
 
 	#[test]
 	fn invalid_operation_error_message_should_serialize_and_deserialize() {
-		let invalid_operation_error_message = ErrorMessage {
-			error: ErrorMessageType::InvalidOperation,
-			message: "I'm a teapot.".to_string(),
-		};
+		let invalid_operation_error_message = ErrorMessage::builder()
+			.error(ErrorMessageType::InvalidOperation)
+			.message("I'm a teapot.".to_string())
+			.build();
 		let json = serde_json::to_string(&invalid_operation_error_message)
 			.expect("Failed to serialize InvalidOperation error message to JSON");
 		assert_eq!(r#"{"error":"invalid_operation","message":"I'm a teapot."}"#, json);
@@ -54,10 +55,10 @@ mod test {
 
 	#[test]
 	fn internal_server_error_message_should_serialize_and_deserialize() {
-		let internal_server_error_error_message = ErrorMessage {
-			error: ErrorMessageType::InternalServerError,
-			message: "I've found a bug crawling around my circuits.".to_string(),
-		};
+		let internal_server_error_error_message = ErrorMessage::builder()
+			.error(ErrorMessageType::InternalServerError)
+			.message("I've found a bug crawling around my circuits.".to_string())
+			.build();
 		let json = serde_json::to_string(&internal_server_error_error_message)
 			.expect("Failed to serialize InternalServerError error message to JSON");
 		assert_eq!(
