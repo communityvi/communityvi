@@ -267,6 +267,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "typed-builder",
  "unicode_skeleton",
 ]
 
@@ -1705,6 +1706,17 @@ dependencies = [
  "sha-1",
  "url",
  "utf-8",
+]
+
+[[package]]
+name = "typed-builder"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78cea224ddd4282dfc40d1edabbd0c020a12e946e3a48e2c2b8f6ff167ad29fe"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
