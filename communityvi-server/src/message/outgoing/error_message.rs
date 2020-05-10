@@ -13,6 +13,7 @@ pub enum ErrorMessageType {
 	InvalidFormat,
 	InvalidOperation,
 	InternalServerError,
+	MediumOutdated,
 }
 
 #[cfg(test)]

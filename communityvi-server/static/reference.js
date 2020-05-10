@@ -15,6 +15,7 @@ let pendingResponses = {}
 let playerMode = 'fake';
 let selectedMediumFile = null;
 let mediumLength = null;
+let mediumVersion = null;
 let playbackState = {
 	type: 'paused',
 	startTime: 0,
@@ -68,6 +69,7 @@ insertMediumButton.onclick = function () {
 
 	const message = {
 		type: 'insert_medium',
+		previous_version: mediumVersion,
 		medium: {
 			type: 'fixed_length',
 			name: name,
@@ -87,6 +89,7 @@ ejectMediumButton.onclick = function () {
 
 	const message = {
 		type: 'insert_medium',
+		previous_version: mediumVersion,
 		medium: {
 			type: 'empty',
 		}
@@ -103,6 +106,7 @@ playerReal.addEventListener('loadeddata', function () {
 
 	const message = {
 		type: 'insert_medium',
+		previous_version: mediumVersion,
 		medium: {
 			type: 'fixed_length',
 			name: mediumNameLabel.textContent,
@@ -412,6 +416,8 @@ function handleBroadcast(message, messageEvent) {
 }
 
 function handleMediumStateChange(medium, triggeringClient = null) {
+	mediumVersion = medium.version;
+
 	switch (medium.type) {
 		case 'empty':
 			ejectMediumButton.disabled = true;

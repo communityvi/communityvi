@@ -21,7 +21,7 @@ pub enum ClientRequest {
 	Register(RegisterRequest),
 	Chat(ChatRequest),
 	GetReferenceTime,
-	InsertMedium { medium: InsertMediumRequest },
+	InsertMedium(InsertMediumRequest),
 	Play(PlayRequest),
 	Pause(PauseRequest),
 }
@@ -70,37 +70,27 @@ pub struct ChatRequest {
 client_request_from_struct!(Chat, ChatRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct InsertMediumRequest {
+	pub previous_version: u64,
+	pub medium: MediumRequest,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-pub enum InsertMediumRequest {
+pub enum MediumRequest {
 	FixedLength { name: String, length_in_milliseconds: u64 },
 	Empty,
 }
 
-impl From<Medium> for InsertMediumRequest {
-	fn from(medium: Medium) -> Self {
-		match medium {
-			Medium::FixedLength(medium) => InsertMediumRequest::FixedLength {
-				name: medium.name,
-				length_in_milliseconds: medium.length.num_milliseconds() as u64,
-			},
-			Medium::Empty => InsertMediumRequest::Empty,
-		}
-	}
-}
+client_request_from_struct!(InsertMedium, InsertMediumRequest);
 
-impl From<InsertMediumRequest> for ClientRequest {
-	fn from(medium: InsertMediumRequest) -> Self {
-		ClientRequest::InsertMedium { medium }
-	}
-}
-
-impl TryFrom<InsertMediumRequest> for Medium {
+impl TryFrom<MediumRequest> for Medium {
 	type Error = ErrorMessage;
 
-	fn try_from(request: InsertMediumRequest) -> Result<Self, Self::Error> {
+	fn try_from(request: MediumRequest) -> Result<Self, Self::Error> {
 		match request {
-			InsertMediumRequest::FixedLength {
+			MediumRequest::FixedLength {
 				name,
 				length_in_milliseconds,
 			} => {
@@ -117,7 +107,19 @@ impl TryFrom<InsertMediumRequest> for Medium {
 					)
 				}
 			}
-			InsertMediumRequest::Empty => Ok(Medium::Empty),
+			MediumRequest::Empty => Ok(Medium::Empty),
+		}
+	}
+}
+
+impl From<Medium> for MediumRequest {
+	fn from(medium: Medium) -> Self {
+		match medium {
+			Medium::Empty => MediumRequest::Empty,
+			Medium::FixedLength(fixed_length) => MediumRequest::FixedLength {
+				name: fixed_length.name,
+				length_in_milliseconds: fixed_length.length.num_milliseconds() as u64,
+			},
 		}
 	}
 }
@@ -223,17 +225,18 @@ mod test {
 
 	#[test]
 	fn insert_medium_request_with_fixed_length_medium_should_serialize_and_deserialize() {
-		let insert_medium_request = ClientRequest::InsertMedium {
-			medium: InsertMediumRequest::FixedLength {
+		let insert_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
+			medium: MediumRequest::FixedLength {
 				name: "Blues Brothers".to_string(),
 				length_in_milliseconds: 8520000,
 			},
-		}
+			previous_version: 0,
+		})
 		.with_id(42);
 		let json =
 			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
-			r#"{"request_id":42,"type":"insert_medium","medium":{"type":"fixed_length","name":"Blues Brothers","length_in_milliseconds":8520000}}"#,
+			r#"{"request_id":42,"type":"insert_medium","previous_version":0,"medium":{"type":"fixed_length","name":"Blues Brothers","length_in_milliseconds":8520000}}"#,
 			json
 		);
 
@@ -244,14 +247,15 @@ mod test {
 
 	#[test]
 	fn insert_medium_request_with_empty_medium_should_serialize_and_deserialize() {
-		let eject_medium_request = ClientRequest::InsertMedium {
-			medium: InsertMediumRequest::Empty,
-		}
+		let eject_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
+			previous_version: 0,
+			medium: MediumRequest::Empty,
+		})
 		.with_id(42);
 		let json =
 			serde_json::to_string(&eject_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
-			r#"{"request_id":42,"type":"insert_medium","medium":{"type":"empty"}}"#,
+			r#"{"request_id":42,"type":"insert_medium","previous_version":0,"medium":{"type":"empty"}}"#,
 			json
 		);
 

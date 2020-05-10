@@ -4,7 +4,7 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use crate::room::state::medium::Medium;
+use crate::room::state::medium::{Medium, VersionedMedium};
 use crate::room::state::State;
 use chrono::Duration;
 use futures::FutureExt;
@@ -127,24 +127,23 @@ impl Room {
 		self.inner.state.current_reference_time()
 	}
 
-	pub fn insert_medium(&self, medium: impl Into<Medium>) {
-		self.inner.state.insert_medium(medium.into());
+	#[must_use]
+	pub fn insert_medium(&self, medium: impl Into<Medium>, previous_version: u64) -> Option<VersionedMedium> {
+		self.inner.state.insert_medium(medium.into(), previous_version)
 	}
 
-	pub fn medium(&self) -> Medium {
+	pub fn medium(&self) -> VersionedMedium {
 		self.inner.state.medium().clone()
 	}
 
-	pub fn play_medium(&self, start_time: Duration) -> Medium {
+	pub fn play_medium(&self, start_time: Duration) -> VersionedMedium {
 		let mut medium = self.inner.state.medium();
-		medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap());
-		medium.clone()
+		medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap())
 	}
 
-	pub fn pause_medium(&self, position: Duration) -> Medium {
+	pub fn pause_medium(&self, position: Duration) -> VersionedMedium {
 		let mut medium = self.inner.state.medium();
-		medium.pause(position);
-		medium.clone()
+		medium.pause(position)
 	}
 }
 
@@ -322,10 +321,17 @@ mod test {
 			.add_client_and_return_existing(name.to_string(), message_sender.clone())
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
-		room.insert_medium(medium);
+		room.insert_medium(medium, 0).expect("Failed to insert medium");
 
 		assert!(room.remove_client(makise_kurisu.id()), "Could not remove client!");
-		assert_eq!(room.medium(), Medium::Empty, "A medium was still left in the room!");
+		assert_eq!(
+			room.medium(),
+			VersionedMedium {
+				medium: Medium::Empty,
+				version: 2
+			},
+			"A medium was still left in the room!"
+		);
 	}
 
 	#[test]

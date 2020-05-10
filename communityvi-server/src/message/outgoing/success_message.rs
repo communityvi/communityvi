@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::state::medium::playback_state::PlaybackState;
-use crate::room::state::medium::Medium;
+use crate::room::state::medium::{Medium, VersionedMedium};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
@@ -12,7 +12,7 @@ pub enum SuccessMessage {
 	Hello {
 		id: ClientId,
 		clients: Vec<ClientResponse>,
-		current_medium: MediumResponse,
+		current_medium: VersionedMediumResponse,
 	},
 	ReferenceTime {
 		milliseconds: u64,
@@ -33,6 +33,13 @@ impl From<Client> for ClientResponse {
 			name: client.name().to_string(),
 		}
 	}
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct VersionedMediumResponse {
+	pub version: u64,
+	#[serde(flatten)]
+	pub medium: MediumResponse,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -68,6 +75,15 @@ impl From<PlaybackState> for PlaybackStateResponse {
 	}
 }
 
+impl From<VersionedMedium> for VersionedMediumResponse {
+	fn from(versioned_medium: VersionedMedium) -> Self {
+		Self {
+			medium: versioned_medium.medium.into(),
+			version: versioned_medium.version,
+		}
+	}
+}
+
 impl From<Medium> for MediumResponse {
 	fn from(medium: Medium) -> Self {
 		match medium {
@@ -91,11 +107,11 @@ mod test {
 		let hello_response = SuccessMessage::Hello {
 			id: 42.into(),
 			clients: vec![],
-			current_medium: MediumResponse::Empty,
+			current_medium: VersionedMedium::default().into(),
 		};
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(
-			r#"{"type":"hello","id":42,"clients":[],"current_medium":{"type":"empty"}}"#,
+			r#"{"type":"hello","id":42,"clients":[],"current_medium":{"version":0,"type":"empty"}}"#,
 			json
 		);
 
@@ -112,12 +128,15 @@ mod test {
 				id: ClientId::from(8080),
 				name: "IMSAI".to_string(),
 			}],
-			current_medium: MediumResponse::FixedLength {
-				name: "WarGames".to_string(),
-				length_in_milliseconds: Duration::minutes(114).num_milliseconds() as u64,
-				playback_state: PlaybackStateResponse::Paused {
-					position_in_milliseconds: 0,
+			current_medium: VersionedMediumResponse {
+				medium: MediumResponse::FixedLength {
+					name: "WarGames".to_string(),
+					length_in_milliseconds: Duration::minutes(114).num_milliseconds() as u64,
+					playback_state: PlaybackStateResponse::Paused {
+						position_in_milliseconds: 0,
+					},
 				},
+				version: 0,
 			},
 		};
 		let json = serde_json::to_string_pretty(&hello_response).expect("Failed to serialize Hello response to JSON");
@@ -132,6 +151,7 @@ mod test {
     }
   ],
   "current_medium": {
+    "version": 0,
     "type": "fixed_length",
     "name": "WarGames",
     "length_in_milliseconds": 6840000,

@@ -1,7 +1,7 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
-use crate::room::state::medium::Medium;
+use crate::room::state::medium::{Medium, VersionedMedium};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
@@ -54,7 +54,23 @@ broadcast_from_struct!(Chat, ChatBroadcast);
 pub struct MediumStateChangedBroadcast {
 	pub changed_by_name: String,
 	pub changed_by_id: ClientId,
+	pub medium: VersionedMediumBroadcast,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct VersionedMediumBroadcast {
+	pub version: u64,
+	#[serde(flatten)]
 	pub medium: MediumBroadcast,
+}
+
+impl VersionedMediumBroadcast {
+	pub fn new(versioned_medium: VersionedMedium, skipped: bool) -> Self {
+		Self {
+			medium: MediumBroadcast::new(versioned_medium.medium, skipped),
+			version: versioned_medium.version,
+		}
+	}
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -166,13 +182,16 @@ mod test {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Squirrel".to_string(),
 			changed_by_id: ClientId::from(42),
-			medium: MediumBroadcast::FixedLength {
-				name: "The Acorn".to_string(),
-				length_in_milliseconds: 20 * 60 * 1000,
-				playback_skipped: false,
-				playback_state: PlaybackStateResponse::Paused {
-					position_in_milliseconds: 0,
+			medium: VersionedMediumBroadcast {
+				medium: MediumBroadcast::FixedLength {
+					name: "The Acorn".to_string(),
+					length_in_milliseconds: 20 * 60 * 1000,
+					playback_skipped: false,
+					playback_state: PlaybackStateResponse::Paused {
+						position_in_milliseconds: 0,
+					},
 				},
+				version: 0,
 			},
 		});
 		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)
@@ -183,6 +202,7 @@ mod test {
   "changed_by_name": "Squirrel",
   "changed_by_id": 42,
   "medium": {
+    "version": 0,
     "type": "fixed_length",
     "name": "The Acorn",
     "length_in_milliseconds": 1200000,
@@ -209,13 +229,16 @@ mod test {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
-			medium: MediumBroadcast::FixedLength {
-				name: "Metropolis".to_string(),
-				length_in_milliseconds: 153 * 60 * 1000,
-				playback_skipped: false,
-				playback_state: PlaybackStateResponse::Playing {
-					start_time_in_milliseconds: -1337,
+			medium: VersionedMediumBroadcast {
+				medium: MediumBroadcast::FixedLength {
+					name: "Metropolis".to_string(),
+					length_in_milliseconds: 153 * 60 * 1000,
+					playback_skipped: false,
+					playback_state: PlaybackStateResponse::Playing {
+						start_time_in_milliseconds: -1337,
+					},
 				},
+				version: 0,
 			},
 		});
 		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)
@@ -226,6 +249,7 @@ mod test {
   "changed_by_name": "Alice",
   "changed_by_id": 0,
   "medium": {
+    "version": 0,
     "type": "fixed_length",
     "name": "Metropolis",
     "length_in_milliseconds": 9180000,

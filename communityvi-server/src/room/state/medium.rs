@@ -1,9 +1,21 @@
 use crate::room::state::medium::fixed_length::FixedLengthMedium;
-use crate::room::state::medium::playback_state::PlaybackState;
 use chrono::Duration;
 
 pub mod fixed_length;
 pub mod playback_state;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct VersionedMedium {
+	pub version: u64,
+	pub medium: Medium,
+}
+
+impl VersionedMedium {
+	pub fn update(&mut self, medium: Medium) {
+		self.version += 1;
+		self.medium = medium;
+	}
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Medium {
@@ -17,33 +29,58 @@ impl Default for Medium {
 	}
 }
 
-impl Medium {
-	pub fn playback_state(&self) -> PlaybackState {
-		match self {
-			Medium::Empty => PlaybackState::Paused {
-				at_position: Duration::milliseconds(0),
-			},
-			Medium::FixedLength(medium) => medium.playback,
+impl VersionedMedium {
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn play(&mut self, start_time: Duration, reference_now: Duration) -> VersionedMedium {
+		match &mut self.medium {
+			Medium::Empty => {}
+			Medium::FixedLength(medium) => {
+				medium.play(start_time, reference_now);
+			}
 		}
+		self.version += 1;
+		self.clone()
 	}
 
-	pub fn play(&mut self, start_time: Duration, reference_now: Duration) {
-		match self {
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn pause(&mut self, at_position: Duration) -> VersionedMedium {
+		match &mut self.medium {
 			Medium::Empty => {}
-			Medium::FixedLength(medium) => medium.play(start_time, reference_now),
+			Medium::FixedLength(medium) => {
+				medium.pause(at_position);
+			}
 		}
-	}
-
-	pub fn pause(&mut self, at_position: Duration) {
-		match self {
-			Medium::Empty => {}
-			Medium::FixedLength(medium) => medium.pause(at_position),
-		}
+		self.version += 1;
+		self.clone()
 	}
 }
 
 impl From<FixedLengthMedium> for Medium {
 	fn from(fixed_length_medium: FixedLengthMedium) -> Self {
 		Medium::FixedLength(fixed_length_medium)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::room::state::medium::VersionedMedium;
+	use chrono::Duration;
+
+	#[test]
+	fn play_should_increase_the_version() {
+		let mut versioned_medium = VersionedMedium::default();
+		assert_eq!(versioned_medium.version, 0);
+		let returned_versioned_medium = versioned_medium.play(Duration::milliseconds(0), Duration::milliseconds(0));
+		assert_eq!(versioned_medium.version, 1);
+		assert_eq!(versioned_medium, returned_versioned_medium);
+	}
+
+	#[test]
+	fn pause_should_increase_the_version() {
+		let mut versioned_medium = VersionedMedium::default();
+		assert_eq!(versioned_medium.version, 0);
+		let returned_versioned_medium = versioned_medium.pause(Duration::milliseconds(0));
+		assert_eq!(versioned_medium.version, 1);
+		assert_eq!(versioned_medium, returned_versioned_medium);
 	}
 }
