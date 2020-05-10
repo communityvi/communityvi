@@ -15,6 +15,7 @@ use crate::room::state::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
 use log::{debug, error, info};
+use std::convert::TryFrom;
 
 pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
@@ -160,23 +161,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			})
 		}
 		InsertMedium { medium: medium_request } => {
-			let medium = match medium_request {
-				InsertMediumRequest::FixedLength {
-					name,
-					length_in_milliseconds,
-				} => {
-					if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
-						return Err(ErrorMessage::builder()
-							.error(ErrorMessageType::InvalidFormat)
-							.message("Length of a medium must not be larger than one year.".to_string())
-							.build()
-							.into());
-					}
-					FixedLengthMedium::new(name.clone(), Duration::milliseconds(length_in_milliseconds as i64)).into()
-				}
-				InsertMediumRequest::Empty => Medium::Empty,
-			};
-
+			let medium = Medium::try_from(medium_request)?;
 			room.insert_medium(medium.clone());
 
 			room.broadcast(MediumStateChangedBroadcast {

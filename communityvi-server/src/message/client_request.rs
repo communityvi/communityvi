@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
+use crate::room::state::medium::fixed_length::FixedLengthMedium;
 use crate::room::state::medium::Medium;
+use chrono::Duration;
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -89,6 +92,33 @@ impl From<Medium> for InsertMediumRequest {
 impl From<InsertMediumRequest> for ClientRequest {
 	fn from(medium: InsertMediumRequest) -> Self {
 		ClientRequest::InsertMedium { medium }
+	}
+}
+
+impl TryFrom<InsertMediumRequest> for Medium {
+	type Error = ErrorMessage;
+
+	fn try_from(request: InsertMediumRequest) -> Result<Self, Self::Error> {
+		match request {
+			InsertMediumRequest::FixedLength {
+				name,
+				length_in_milliseconds,
+			} => {
+				if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
+					Err(ErrorMessage::builder()
+						.error(ErrorMessageType::InvalidFormat)
+						.message("Length of a medium must not be larger than one year.".to_string())
+						.build()
+						.into())
+				} else {
+					Ok(
+						FixedLengthMedium::new(name.clone(), Duration::milliseconds(length_in_milliseconds as i64))
+							.into(),
+					)
+				}
+			}
+			InsertMediumRequest::Empty => Ok(Medium::Empty),
+		}
 	}
 }
 
