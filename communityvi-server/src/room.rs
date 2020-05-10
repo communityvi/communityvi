@@ -1,5 +1,5 @@
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
@@ -10,6 +10,8 @@ use chrono::Duration;
 use futures::FutureExt;
 use parking_lot::{RwLock, RwLockWriteGuard};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use unicode_skeleton::UnicodeSkeleton;
 
@@ -29,6 +31,7 @@ struct Inner {
 	client_names: RwLock<HashSet<String>>,
 	clients: RwLock<HashMap<ClientId, Client>>,
 	state: State,
+	chat_message_count: AtomicU64,
 	room_size_limit: usize,
 }
 
@@ -39,6 +42,7 @@ impl Room {
 			client_names: Default::default(),
 			clients: Default::default(),
 			state: Default::default(),
+			chat_message_count: AtomicU64::new(0),
 			room_size_limit,
 		};
 		Self { inner: Arc::new(inner) }
@@ -104,6 +108,17 @@ impl Room {
 				}
 			})
 			.is_some()
+	}
+
+	pub async fn send_chat_message(&self, sender: &Client, message: String) {
+		let incremented_counter = self.inner.chat_message_count.fetch_add(1, SeqCst);
+		let chat_message = ChatBroadcast {
+			sender_id: sender.id(),
+			sender_name: sender.name().to_string(),
+			message,
+			counter: incremented_counter,
+		};
+		self.broadcast(chat_message).await;
 	}
 
 	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {

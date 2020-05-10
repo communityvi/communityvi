@@ -46,6 +46,7 @@ pub struct ChatBroadcast {
 	pub sender_id: ClientId,
 	pub sender_name: String,
 	pub message: String,
+	pub counter: u64,
 }
 
 broadcast_from_struct!(Chat, ChatBroadcast);
@@ -135,10 +136,11 @@ mod test {
 			sender_id: ClientId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
+			counter: 1337,
 		});
 		let json = serde_json::to_string(&chat_broadcast).expect("Failed to serialize Chat broadcast to JSON");
 		assert_eq!(
-			r#"{"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello"}"#,
+			r#"{"type":"chat","sender_id":42,"sender_name":"Hedwig","message":"hello","counter":1337}"#,
 			json
 		);
 

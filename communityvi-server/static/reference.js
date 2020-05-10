@@ -393,7 +393,7 @@ function handleBroadcast(message, messageEvent) {
 		}
 
 		case 'chat': {
-			displayChatMessage(message.sender_id, message.sender_name, message.message);
+			displayChatMessage(message.sender_id, message.sender_name, message.message, message.counter);
 			break;
 		}
 
@@ -510,9 +510,10 @@ async function sendMessage(message) {
 	})
 }
 
-function displayChatMessage(id, name, message) {
+function displayChatMessage(id, name, message, counter = 'n/a') {
 	const chat = document.getElementById('chat');
 	const row = chat.insertRow();
+	row.insertCell().appendChild(document.createTextNode(counter));
 	row.insertCell().appendChild(document.createTextNode(id));
 	row.insertCell().appendChild(document.createTextNode(name));
 	row.insertCell().appendChild(document.createTextNode(message));

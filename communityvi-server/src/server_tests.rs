@@ -102,6 +102,7 @@ fn should_broadcast_messages() {
 				sender_id: alice_client_id,
 				sender_name: "Alice".to_string(),
 				message: message.to_string(),
+				counter: 0,
 			});
 
 			alice_test_client.send_request(request).await;

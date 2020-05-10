@@ -4,7 +4,7 @@ use crate::message::client_request::{
 	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
 };
 use crate::message::outgoing::broadcast_message::{
-	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumStateChangedBroadcast, VersionedMediumBroadcast,
+	ClientJoinedBroadcast, ClientLeftBroadcast, MediumStateChangedBroadcast, VersionedMediumBroadcast,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
@@ -134,12 +134,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 	use ClientRequest::*;
 	match request {
 		Chat(ChatRequest { message }) => {
-			room.broadcast(ChatBroadcast {
-				sender_id: client.id(),
-				sender_name: client.name().to_string(),
-				message,
-			})
-			.await;
+			room.send_chat_message(client, message).await;
 			Ok(SuccessMessage::Success)
 		}
 		Register { .. } => {
