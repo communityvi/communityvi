@@ -60,7 +60,7 @@ impl Room {
 			return Err(RoomError::ClientNameTooLong);
 		}
 
-		let (mut clients, mut names) = self.write_lock_clients_and_names();
+		let (mut clients, mut names) = self.lock_clients_and_names_for_writing();
 		if clients.len() >= self.inner.room_size_limit {
 			return Err(RoomError::RoomFull);
 		}
@@ -82,7 +82,7 @@ impl Room {
 
 	/// Get a lock of the client and client names.
 	/// Use this method to ensure the locks are always taken in the same order to prevent deadlock.
-	fn write_lock_clients_and_names(
+	fn lock_clients_and_names_for_writing(
 		&self,
 	) -> (
 		RwLockWriteGuard<HashMap<ClientId, Client>>,
@@ -94,7 +94,7 @@ impl Room {
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) -> bool {
-		let (mut clients, mut names) = self.write_lock_clients_and_names();
+		let (mut clients, mut names) = self.lock_clients_and_names_for_writing();
 		clients
 			.remove(&client_id)
 			.map(|client| names.remove(&normalized_name(client.name())))
