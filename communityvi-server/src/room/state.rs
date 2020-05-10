@@ -28,7 +28,7 @@ impl State {
 	/// and `None` is returned. This is similar to compare and swap.
 	pub fn insert_medium(&self, medium: Medium, previous_version: u64) -> Option<VersionedMedium> {
 		let mut versioned_medium = self.medium();
-		if previous_version < versioned_medium.version {
+		if previous_version != versioned_medium.version {
 			return None;
 		}
 
@@ -43,5 +43,33 @@ impl State {
 
 	pub fn eject_medium(&self) {
 		self.medium().update(Medium::Empty);
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn should_not_insert_medium_with_smaller_previous_version() {
+		let state = State::default();
+		state.insert_medium(Medium::Empty, 0).expect("Failed to insert medium"); // increase the version
+		assert_eq!(state.medium().version, 1);
+
+		assert!(
+			state.insert_medium(Medium::Empty, 0).is_none(),
+			"Must not be able to insert"
+		);
+		assert_eq!(state.medium().version, 1);
+	}
+
+	#[test]
+	fn should_not_insert_medium_with_larger_previous_version() {
+		let state = State::default();
+		assert!(
+			state.insert_medium(Medium::Empty, 1).is_none(),
+			"Must not be able to insert"
+		);
+		assert_eq!(state.medium().version, 0);
 	}
 }

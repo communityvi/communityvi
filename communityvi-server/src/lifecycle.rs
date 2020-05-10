@@ -188,10 +188,24 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			Ok(SuccessMessage::Success)
 		}
 		Play(PlayRequest {
+			previous_version,
 			skipped,
 			start_time_in_milliseconds,
 		}) => {
-			let versioned_medium = room.play_medium(Duration::milliseconds(start_time_in_milliseconds));
+			let versioned_medium =
+				match room.play_medium(Duration::milliseconds(start_time_in_milliseconds), previous_version) {
+					None => {
+						return Err(ErrorMessage {
+							error: ErrorMessageType::MediumOutdated,
+							message: format!(
+								"Medium is outdated. Requested version {} was {}",
+								previous_version,
+								room.medium().version
+							),
+						})
+					}
+					Some(versioned_medium) => versioned_medium,
+				};
 			room.broadcast(MediumStateChangedBroadcast {
 				changed_by_name: client.name().to_string(),
 				changed_by_id: client.id(),
@@ -201,12 +215,26 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			Ok(SuccessMessage::Success)
 		}
 		Pause(PauseRequest {
+			previous_version,
 			skipped,
 			position_in_milliseconds,
 		}) => {
-			let versioned_medium = room.pause_medium(Duration::milliseconds(
-				position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
-			));
+			let versioned_medium = match room.pause_medium(
+				Duration::milliseconds(position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64),
+				previous_version,
+			) {
+				None => {
+					return Err(ErrorMessage {
+						error: ErrorMessageType::MediumOutdated,
+						message: format!(
+							"Medium is outdated. Requested version {} was {}",
+							previous_version,
+							room.medium().version
+						),
+					})
+				}
+				Some(versioned_medium) => versioned_medium,
+			};
 			room.broadcast(MediumStateChangedBroadcast {
 				changed_by_name: client.name().to_string(),
 				changed_by_id: client.id(),
@@ -347,12 +375,13 @@ mod test {
 		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
 			&alice,
 			PlayRequest {
+				previous_version: inserted_medium.version,
 				skipped: true,
 				start_time_in_milliseconds: -1024,
 			}
@@ -397,13 +426,16 @@ mod test {
 			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(medium.clone(), 0).unwrap();
-		room.play_medium(Duration::milliseconds(-1024));
+		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let played_medium = room
+			.play_medium(Duration::milliseconds(-1024), inserted_medium.version)
+			.expect("Failed to play medium.");
 
 		let response = handle_request(
 			&room,
 			&bob,
 			PauseRequest {
+				previous_version: played_medium.version,
 				skipped: false,
 				position_in_milliseconds: 1027,
 			}
@@ -449,12 +481,13 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(medium.clone(), 0).unwrap();
+		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
 			&bob,
 			PauseRequest {
+				previous_version: inserted_medium.version,
 				skipped: true,
 				position_in_milliseconds: 1000,
 			}
@@ -599,8 +632,8 @@ mod test {
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
-		room.insert_medium(short_circuit, 0).unwrap();
-		room.play_medium(Duration::milliseconds(0));
+		let inserted_medium = room.insert_medium(short_circuit, 0).expect("Failed to insert medium");
+		room.play_medium(Duration::milliseconds(0), inserted_medium.version);
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {

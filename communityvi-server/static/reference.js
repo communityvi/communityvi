@@ -127,7 +127,7 @@ playPauseButton.onclick = function () {
 		case 'playing': {
 			playbackState.type = 'paused';
 			playbackState.position = calculateReferenceTime() - playbackState.startTime;
-			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: false})
+			sendMessage({type: 'pause', previous_version: mediumVersion, position_in_milliseconds: Math.round(playbackState.position), skipped: false})
 				.catch((error) => {
 					// TODO: Use this information to pause again?
 					console.log(`Failed to pause video. ${error}`);
@@ -139,7 +139,7 @@ playPauseButton.onclick = function () {
 		case 'paused': {
 			playbackState.type = 'playing';
 			playbackState.startTime = calculateReferenceTime() - playbackState.position;
-			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false})
+			sendMessage({type: 'play', previous_version: mediumVersion, start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: false})
 				.catch((error) => {
 					// TODO: Use this information to play again?
 					console.log(`Failed to play video. ${error}`);
@@ -188,7 +188,7 @@ function skip(position) {
 				playbackState.startTime = startTime;
 			}
 
-			sendMessage({type: 'play', start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true})
+			sendMessage({type: 'play', previous_version: mediumVersion, start_time_in_milliseconds: Math.round(playbackState.startTime), skipped: true})
 				.catch((error) => {
 					console.error(`Failed to skip in playing video. ${error}`);
 				});
@@ -204,7 +204,7 @@ function skip(position) {
 				playbackState.position = position;
 			}
 
-			sendMessage({type: 'pause', position_in_milliseconds: Math.round(playbackState.position), skipped: true})
+			sendMessage({type: 'pause', previous_version: mediumVersion, position_in_milliseconds: Math.round(playbackState.position), skipped: true})
 				.catch((error) => {
 					console.error(`Failed to skip in paused video. ${error}`)
 				});
@@ -530,7 +530,7 @@ function updateApplicationState() {
 	    const currentPosition = referenceTime - playbackState.startTime;
 
 		if (currentPosition >= mediumLength) {
-			sendMessage({type: 'pause', position_in_milliseconds: mediumLength, skipped: false})
+			sendMessage({type: 'pause', previous_version: mediumVersion, position_in_milliseconds: mediumLength, skipped: false})
 				.catch((error) => {
 					console.error(`Failed to pause at the end of the video. ${error}`)
 				});

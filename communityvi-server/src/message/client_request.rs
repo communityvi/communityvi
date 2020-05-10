@@ -126,6 +126,7 @@ impl From<Medium> for MediumRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PlayRequest {
+	pub previous_version: u64,
 	pub skipped: bool,
 	pub start_time_in_milliseconds: i64,
 }
@@ -134,6 +135,7 @@ client_request_from_struct!(Play, PlayRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PauseRequest {
+	pub previous_version: u64,
 	pub skipped: bool,
 	pub position_in_milliseconds: u64,
 }
@@ -267,13 +269,14 @@ mod test {
 	#[test]
 	fn play_request_should_serialize_and_deserialize() {
 		let play_request = ClientRequest::Play(PlayRequest {
+			previous_version: 0,
 			skipped: false,
 			start_time_in_milliseconds: -1337,
 		})
 		.with_id(42);
 		let json = serde_json::to_string(&play_request).expect("Failed to serialize Play request to JSON");
 		assert_eq!(
-			r#"{"request_id":42,"type":"play","skipped":false,"start_time_in_milliseconds":-1337}"#,
+			r#"{"request_id":42,"type":"play","previous_version":0,"skipped":false,"start_time_in_milliseconds":-1337}"#,
 			json
 		);
 
@@ -285,13 +288,14 @@ mod test {
 	#[test]
 	fn pause_request_should_serialize_and_deserialize() {
 		let pause_request = ClientRequest::Pause(PauseRequest {
+			previous_version: 0,
 			skipped: false,
 			position_in_milliseconds: 42,
 		})
 		.with_id(42);
 		let json = serde_json::to_string(&pause_request).expect("Failed to serialize Pause request to JSON");
 		assert_eq!(
-			r#"{"request_id":42,"type":"pause","skipped":false,"position_in_milliseconds":42}"#,
+			r#"{"request_id":42,"type":"pause","previous_version":0,"skipped":false,"position_in_milliseconds":42}"#,
 			json
 		);
 

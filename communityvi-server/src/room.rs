@@ -136,14 +136,18 @@ impl Room {
 		self.inner.state.medium().clone()
 	}
 
-	pub fn play_medium(&self, start_time: Duration) -> VersionedMedium {
+	pub fn play_medium(&self, start_time: Duration, previous_version: u64) -> Option<VersionedMedium> {
 		let mut medium = self.inner.state.medium();
-		medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap())
+		medium.play(
+			start_time,
+			Duration::from_std(self.current_reference_time()).unwrap(),
+			previous_version,
+		)
 	}
 
-	pub fn pause_medium(&self, position: Duration) -> VersionedMedium {
+	pub fn pause_medium(&self, position: Duration, previous_version: u64) -> Option<VersionedMedium> {
 		let mut medium = self.inner.state.medium();
-		medium.pause(position)
+		medium.pause(position, previous_version)
 	}
 }
 
