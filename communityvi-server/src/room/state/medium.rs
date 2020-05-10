@@ -17,7 +17,7 @@ pub trait Medium {
 	fn name(&self) -> &str;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SomeMedium {
 	FixedLength(FixedLengthMedium),
 }

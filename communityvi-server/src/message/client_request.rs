@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::message::{MessageError, WebSocketMessage};
+use crate::room::state::medium::SomeMedium;
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -69,6 +70,17 @@ client_request_from_struct!(Chat, ChatRequest);
 pub struct InsertMediumRequest {
 	pub name: String,
 	pub length_in_milliseconds: u64,
+}
+
+impl From<SomeMedium> for InsertMediumRequest {
+	fn from(medium: SomeMedium) -> Self {
+		match medium {
+			SomeMedium::FixedLength(medium) => Self {
+				name: medium.name,
+				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+			},
+		}
+	}
 }
 
 client_request_from_struct!(InsertMedium, InsertMediumRequest);

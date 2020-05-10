@@ -4,7 +4,7 @@ use crate::message::client_request::{
 	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
 };
 use crate::message::outgoing::broadcast_message::{
-	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumInsertedBroadcast, PlaybackStateChangedBroadcast,
+	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumBroadcast, MediumStateChangedBroadcast,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, MediumResponse, SuccessMessage};
@@ -174,16 +174,16 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 					.build()
 					.into())
 			} else {
-				room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
+				let medium = SomeMedium::FixedLength(FixedLengthMedium::new(
 					name.clone(),
 					Duration::milliseconds(length_in_milliseconds as i64),
-				)));
+				));
+				room.insert_medium(medium.clone());
 
-				room.broadcast(MediumInsertedBroadcast {
-					inserted_by_name: client.name().to_string(),
-					inserted_by_id: client.id(),
-					name,
-					length_in_milliseconds,
+				room.broadcast(MediumStateChangedBroadcast {
+					changed_by_name: client.name().to_string(),
+					changed_by_id: client.id(),
+					medium: MediumBroadcast::new(medium, false),
 				})
 				.await;
 				Ok(SuccessMessage::Success)
@@ -197,12 +197,11 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				.error(ErrorMessageType::NoMedium)
 				.message("Room has no medium.".to_string())
 				.build()),
-			Some(playback_state) => {
-				room.broadcast(PlaybackStateChangedBroadcast {
+			Some(medium) => {
+				room.broadcast(MediumStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
 					changed_by_id: client.id(),
-					skipped,
-					playback_state: playback_state.into(),
+					medium: MediumBroadcast::new(medium, skipped),
 				})
 				.await;
 				Ok(SuccessMessage::Success)
@@ -218,12 +217,11 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				.error(ErrorMessageType::NoMedium)
 				.message("Room has no medium.".to_string())
 				.build()),
-			Some(playback_state) => {
-				room.broadcast(PlaybackStateChangedBroadcast {
+			Some(medium) => {
+				room.broadcast(MediumStateChangedBroadcast {
 					changed_by_name: client.name().to_string(),
 					changed_by_id: client.id(),
-					skipped,
-					playback_state: playback_state.into(),
+					medium: MediumBroadcast::new(medium, skipped),
 				})
 				.await;
 				Ok(SuccessMessage::Success)
@@ -284,27 +282,23 @@ mod test {
 		room.add_client("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 
-		let response = handle_request(
-			&room,
-			&alice,
-			InsertMediumRequest {
-				name: "Metropolis".to_string(),
-				length_in_milliseconds: 153 * 60 * 1000,
-			}
-			.into(),
-		)
-		.await
-		.expect("Failed to get successful response");
+		let medium = SomeMedium::FixedLength(FixedLengthMedium {
+			length: Duration::minutes(153),
+			name: "Metropolis".to_string(),
+			playback: Default::default(),
+		});
+		let response = handle_request(&room, &alice, InsertMediumRequest::from(medium.clone()).into())
+			.await
+			.expect("Failed to get successful response");
 		assert_eq!(response, SuccessMessage::Success);
 
 		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
 		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
-		let expected_broadcast = MediumInsertedBroadcast {
-			inserted_by_name: alice.name().to_string(),
-			inserted_by_id: alice.id(),
-			name: "Metropolis".to_string(),
-			length_in_milliseconds: 153 * 60 * 1000,
+		let expected_broadcast = MediumStateChangedBroadcast {
+			changed_by_name: alice.name().to_string(),
+			changed_by_id: alice.id(),
+			medium: MediumBroadcast::new(medium, false),
 		};
 
 		assert_eq!(alice_broadcast, expected_broadcast.clone().into());
@@ -352,10 +346,8 @@ mod test {
 			.expect("Did not get client handle!");
 		room.add_client("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
-		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
-			"Metropolis".to_string(),
-			Duration::minutes(153),
-		)));
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
 
 		let response = handle_request(
 			&room,
@@ -373,12 +365,16 @@ mod test {
 		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
 		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
-		let expected_broadcast = PlaybackStateChangedBroadcast {
+		let expected_broadcast = MediumStateChangedBroadcast {
 			changed_by_name: alice.name().to_string(),
 			changed_by_id: alice.id(),
-			skipped: true,
-			playback_state: PlaybackStateResponse::Playing {
-				start_time_in_milliseconds: -1024,
+			medium: MediumBroadcast::FixedLength {
+				name: medium.name,
+				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+				playback_skipped: true,
+				playback_state: PlaybackStateResponse::Playing {
+					start_time_in_milliseconds: -1024,
+				},
 			},
 		};
 
@@ -427,10 +423,8 @@ mod test {
 		let bob = room
 			.add_client("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
-		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
-			"Metropolis".to_string(),
-			Duration::minutes(153),
-		)));
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
 		room.play_medium(Duration::milliseconds(-1024));
 
 		let response = handle_request(
@@ -449,12 +443,16 @@ mod test {
 		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
 		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
-		let expected_broadcast = PlaybackStateChangedBroadcast {
+		let expected_broadcast = MediumStateChangedBroadcast {
 			changed_by_name: bob.name().to_string(),
 			changed_by_id: bob.id(),
-			skipped: false,
-			playback_state: PlaybackStateResponse::Paused {
-				position_in_milliseconds: 1027,
+			medium: MediumBroadcast::FixedLength {
+				name: medium.name,
+				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+				playback_skipped: false,
+				playback_state: PlaybackStateResponse::Paused {
+					position_in_milliseconds: 1027,
+				},
 			},
 		};
 
@@ -473,10 +471,9 @@ mod test {
 		let bob = room
 			.add_client("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
-		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
-			"Metropolis".to_string(),
-			Duration::minutes(153),
-		)));
+
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
 
 		let response = handle_request(
 			&room,
@@ -494,12 +491,16 @@ mod test {
 		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
 		let bob_broadcast = bob_test_client.receive_broadcast_message().await;
 
-		let expected_broadcast = PlaybackStateChangedBroadcast {
+		let expected_broadcast = MediumStateChangedBroadcast {
 			changed_by_name: bob.name().to_string(),
 			changed_by_id: bob.id(),
-			skipped: true,
-			playback_state: PlaybackStateResponse::Paused {
-				position_in_milliseconds: 1000,
+			medium: MediumBroadcast::FixedLength {
+				name: medium.name,
+				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+				playback_skipped: true,
+				playback_state: PlaybackStateResponse::Paused {
+					position_in_milliseconds: 1000,
+				},
 			},
 		};
 

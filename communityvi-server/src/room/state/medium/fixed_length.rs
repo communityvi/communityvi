@@ -3,11 +3,11 @@ use crate::room::state::medium::Medium;
 use chrono::Duration;
 
 /// A medium with a fixed length. e.g. Video file or online video.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FixedLengthMedium {
 	pub length: Duration,
-	name: String,
-	playback: PlaybackState,
+	pub name: String,
+	pub playback: PlaybackState,
 }
 
 impl FixedLengthMedium {

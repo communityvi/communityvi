@@ -361,31 +361,22 @@ function handleBroadcast(message, messageEvent) {
 			break;
 		}
 
-		case 'medium_inserted': {
-		    mediumNameLabel.textContent = message.name;
-		    mediumLengthLabel.textContent = Math.round(message.length_in_milliseconds / 1000 / 60).toString();
+		case 'medium_state_changed': {
+			if (mediumNameLabel.textContent !== message.medium.name) {
+				displayChatMessage(message.changed_by_id, message.changed_by_name, `<<< inserted "${message.medium.name}" >>>`);
+			}
 
-		    playbackState.type = 'paused';
-		    playbackState.position = 0;
+			mediumNameLabel.textContent = message.medium.name;
+			mediumLengthLabel.textContent = Math.round(message.medium.length_in_milliseconds / 1000 / 60).toString();
+			mediumLength = message.medium.length_in_milliseconds;
+			playerPositionSlider.max = mediumLength;
 
-		    playerPositionSlider.max = message.length_in_milliseconds;
-
-		    displayChatMessage(message.inserted_by_id, message.inserted_by_name, `<< inserted "${message.name}" >>`);
-
-			mediumLength = message.length_in_milliseconds;
-
-			updatePlayer();
-
-			break;
-		}
-
-		case 'playback_state_changed': {
-		    playbackState.type = message.playback_state.type;
-		    switch (message.playback_state.type) {
+			playbackState.type = message.medium.playback_state.type;
+			switch (playbackState.type) {
 				case 'playing': {
-					playbackState.startTime = message.playback_state.start_time_in_milliseconds;
+					playbackState.startTime = message.medium.playback_state.start_time_in_milliseconds;
 
-					if (message.skipped === true) {
+					if (message.medium.playback_skipped === true) {
 						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
 					} else {
 						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) started playback.`);
@@ -394,9 +385,9 @@ function handleBroadcast(message, messageEvent) {
 					break;
 				}
 				case 'paused': {
-					playbackState.position = message.playback_state.position_in_milliseconds;
+					playbackState.position = message.medium.playback_state.position_in_milliseconds;
 
-					if (message.skipped === true) {
+					if (message.medium.playback_skipped === true) {
 						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
 					} else {
 						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) paused playback.`);

@@ -4,7 +4,6 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use crate::room::state::medium::playback_state::PlaybackState;
 use crate::room::state::medium::SomeMedium;
 use crate::room::state::State;
 use chrono::Duration;
@@ -141,14 +140,18 @@ impl Room {
 		self.inner.state.medium()
 	}
 
-	pub fn play_medium(&self, start_time: Duration) -> Option<PlaybackState> {
-		self.medium()
-			.as_mut()
-			.map(|medium| medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap()))
+	pub fn play_medium(&self, start_time: Duration) -> Option<SomeMedium> {
+		self.medium().as_mut().map(|medium| {
+			medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap());
+			medium.clone()
+		})
 	}
 
-	pub fn pause_medium(&self, position: Duration) -> Option<PlaybackState> {
-		self.medium().as_mut().map(|medium| medium.pause(position))
+	pub fn pause_medium(&self, position: Duration) -> Option<SomeMedium> {
+		self.medium().as_mut().map(|medium| {
+			medium.pause(position);
+			medium.clone()
+		})
 	}
 
 	pub fn clients<'room>(&'room self) -> impl Iterator<Item = (ClientId, String)> + 'room {

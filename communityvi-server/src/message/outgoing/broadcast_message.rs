@@ -1,6 +1,7 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
+use crate::room::state::medium::SomeMedium;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
@@ -11,8 +12,7 @@ pub enum BroadcastMessage {
 	ClientJoined(ClientJoinedBroadcast),
 	ClientLeft(ClientLeftBroadcast),
 	Chat(ChatBroadcast),
-	MediumInserted(MediumInsertedBroadcast),
-	PlaybackStateChanged(PlaybackStateChangedBroadcast),
+	MediumStateChanged(MediumStateChangedBroadcast),
 }
 
 macro_rules! broadcast_from_struct {
@@ -51,24 +51,38 @@ pub struct ChatBroadcast {
 broadcast_from_struct!(Chat, ChatBroadcast);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct MediumInsertedBroadcast {
-	pub inserted_by_name: String,
-	pub inserted_by_id: ClientId,
-	pub name: String,
-	pub length_in_milliseconds: u64,
-}
-
-broadcast_from_struct!(MediumInserted, MediumInsertedBroadcast);
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct PlaybackStateChangedBroadcast {
+pub struct MediumStateChangedBroadcast {
 	pub changed_by_name: String,
 	pub changed_by_id: ClientId,
-	pub skipped: bool,
-	pub playback_state: PlaybackStateResponse,
+	pub medium: MediumBroadcast,
 }
 
-broadcast_from_struct!(PlaybackStateChanged, PlaybackStateChangedBroadcast);
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type")]
+pub enum MediumBroadcast {
+	FixedLength {
+		name: String,
+		length_in_milliseconds: u64,
+		playback_skipped: bool,
+		playback_state: PlaybackStateResponse,
+	},
+}
+
+impl MediumBroadcast {
+	pub fn new(medium: SomeMedium, skipped: bool) -> Self {
+		match medium {
+			SomeMedium::FixedLength(medium) => MediumBroadcast::FixedLength {
+				name: medium.name,
+				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+				playback_skipped: skipped,
+				playback_state: medium.playback.into(),
+			},
+		}
+	}
+}
+
+broadcast_from_struct!(MediumStateChanged, MediumStateChangedBroadcast);
 
 impl TryFrom<&WebSocketMessage> for BroadcastMessage {
 	type Error = MessageError;
@@ -146,72 +160,88 @@ mod test {
 	}
 
 	#[test]
-	fn medium_inserted_broadcast_should_serialize_and_deserialize() {
-		let medium_inserted_broadcast = BroadcastMessage::MediumInserted(MediumInsertedBroadcast {
-			inserted_by_name: "Squirrel".to_string(),
-			inserted_by_id: ClientId::from(42),
-			name: "The Acorn".to_string(),
-			length_in_milliseconds: 20 * 60 * 1000,
+	fn medium_state_changed_broadcast_for_paused_should_serialize_and_deserialize() {
+		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
+			changed_by_name: "Squirrel".to_string(),
+			changed_by_id: ClientId::from(42),
+			medium: MediumBroadcast::FixedLength {
+				name: "The Acorn".to_string(),
+				length_in_milliseconds: 20 * 60 * 1000,
+				playback_skipped: false,
+				playback_state: PlaybackStateResponse::Paused {
+					position_in_milliseconds: 0,
+				},
+			},
 		});
-		let json = serde_json::to_string(&medium_inserted_broadcast)
-			.expect("Failed to serialize MediumInserted broadcast to JSON");
+		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)
+			.expect("Failed to serialize MediumStateChanged broadcast to JSON");
 		assert_eq!(
-			r#"{"type":"medium_inserted","inserted_by_name":"Squirrel","inserted_by_id":42,"name":"The Acorn","length_in_milliseconds":1200000}"#,
+			r#"{
+  "type": "medium_state_changed",
+  "changed_by_name": "Squirrel",
+  "changed_by_id": 42,
+  "medium": {
+    "type": "fixed_length",
+    "name": "The Acorn",
+    "length_in_milliseconds": 1200000,
+    "playback_skipped": false,
+    "playback_state": {
+      "type": "paused",
+      "position_in_milliseconds": 0
+    }
+  }
+}"#,
 			json
 		);
 
-		let deserialized_medium_inserted_broadcast: BroadcastMessage =
+		let deserialized_medium_state_changed_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize MediumInserted broadcast from JSON");
-		assert_eq!(medium_inserted_broadcast, deserialized_medium_inserted_broadcast);
-	}
-
-	#[test]
-	fn playback_state_changed_broadcast_for_playing_should_serialize_and_deserialize() {
-		let playback_state_changed_broadcast = BroadcastMessage::PlaybackStateChanged(PlaybackStateChangedBroadcast {
-			changed_by_name: "Alice".to_string(),
-			changed_by_id: ClientId::from(0),
-			skipped: false,
-			playback_state: PlaybackStateResponse::Playing {
-				start_time_in_milliseconds: -1337,
-			},
-		});
-		let json = serde_json::to_string(&playback_state_changed_broadcast)
-			.expect("Failed to serialize PlaybackStateChanged broadcast to JSON");
 		assert_eq!(
-			r#"{"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"playing","start_time_in_milliseconds":-1337}}"#,
-			json
-		);
-
-		let deserialized_playback_state_changed_broadcast: BroadcastMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged broadcast from JSON");
-		assert_eq!(
-			playback_state_changed_broadcast,
-			deserialized_playback_state_changed_broadcast
+			medium_state_changed_broadcast,
+			deserialized_medium_state_changed_broadcast
 		);
 	}
 
 	#[test]
-	fn playback_state_changed_broadcast_for_paused_should_serialize_and_deserialize() {
-		let playback_state_changed_broadcast = BroadcastMessage::PlaybackStateChanged(PlaybackStateChangedBroadcast {
+	fn medium_state_changed_broadcast_for_playing_should_serialize_and_deserialize() {
+		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
 			changed_by_id: ClientId::from(0),
-			skipped: false,
-			playback_state: PlaybackStateResponse::Paused {
-				position_in_milliseconds: 42,
+			medium: MediumBroadcast::FixedLength {
+				name: "Metropolis".to_string(),
+				length_in_milliseconds: 153 * 60 * 1000,
+				playback_skipped: false,
+				playback_state: PlaybackStateResponse::Playing {
+					start_time_in_milliseconds: -1337,
+				},
 			},
 		});
-		let json = serde_json::to_string(&playback_state_changed_broadcast)
+		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)
 			.expect("Failed to serialize PlaybackStateChanged broadcast to JSON");
 		assert_eq!(
-			r#"{"type":"playback_state_changed","changed_by_name":"Alice","changed_by_id":0,"skipped":false,"playback_state":{"type":"paused","position_in_milliseconds":42}}"#,
+			r#"{
+  "type": "medium_state_changed",
+  "changed_by_name": "Alice",
+  "changed_by_id": 0,
+  "medium": {
+    "type": "fixed_length",
+    "name": "Metropolis",
+    "length_in_milliseconds": 9180000,
+    "playback_skipped": false,
+    "playback_state": {
+      "type": "playing",
+      "start_time_in_milliseconds": -1337
+    }
+  }
+}"#,
 			json
 		);
 
-		let deserialized_playback_state_changed_broadcast: BroadcastMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize PlaybackStateChanged broadcast from JSON");
+		let deserialized_medium_state_changed_broadcast: BroadcastMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize MediumStateChanged broadcast from JSON");
 		assert_eq!(
-			playback_state_changed_broadcast,
-			deserialized_playback_state_changed_broadcast
+			medium_state_changed_broadcast,
+			deserialized_medium_state_changed_broadcast
 		);
 	}
 }
