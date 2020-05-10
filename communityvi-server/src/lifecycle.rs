@@ -54,8 +54,8 @@ async fn register_client(
 		return None;
 	};
 
-	let client = match room.add_client(name, message_sender.clone()) {
-		Ok(client) => client,
+	let (client, existing_clients) = match room.add_client_and_return_existing(name, message_sender.clone()) {
+		Ok(success) => success,
 		Err(error) => {
 			use RoomError::*;
 			let error_response = match error {
@@ -87,12 +87,7 @@ async fn register_client(
 		}
 	};
 
-	let clients = room
-		.clients()
-		.into_iter()
-		.filter(|iterated_client| iterated_client.id() != client.id())
-		.map(ClientResponse::from)
-		.collect();
+	let clients = existing_clients.into_iter().map(ClientResponse::from).collect();
 	let hello_response = SuccessMessage::Hello {
 		id: client.id(),
 		clients,
@@ -250,12 +245,12 @@ mod test {
 
 		let (message_sender, _message_receiver, _test_client) = WebsocketTestClient::new();
 		let room = Room::new(10);
-		let client_handle = room
-			.add_client("Alice".to_string(), message_sender)
+		let (client, _) = room
+			.add_client_and_return_existing("Alice".to_string(), message_sender)
 			.expect("Did not get client handle!");
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
-		let response = handle_request(&room, &client_handle, ClientRequest::GetReferenceTime)
+		let response = handle_request(&room, &client, ClientRequest::GetReferenceTime)
 			.await
 			.expect("Failed to get reference time message");
 
@@ -277,10 +272,10 @@ mod test {
 		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
-		let alice = room
-			.add_client("Alice".to_string(), alice_message_sender)
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
-		room.add_client("Bob".to_string(), bob_message_sender)
+		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 
 		let medium = SomeMedium::FixedLength(FixedLengthMedium {
@@ -311,8 +306,8 @@ mod test {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
-		let alice = room
-			.add_client("Alice".to_string(), alice_message_sender)
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
 		let response = handle_request(
@@ -342,10 +337,10 @@ mod test {
 		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
-		let alice = room
-			.add_client("Alice".to_string(), alice_message_sender)
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
-		room.add_client("Bob".to_string(), bob_message_sender)
+		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
@@ -388,8 +383,8 @@ mod test {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
-		let alice = room
-			.add_client("Alice".to_string(), alice_message_sender)
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
 		let response = handle_request(
@@ -419,10 +414,10 @@ mod test {
 		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
-		room.add_client("Alice".to_string(), alice_message_sender)
+		room.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
-		let bob = room
-			.add_client("Bob".to_string(), bob_message_sender)
+		let (bob, _) = room
+			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
@@ -467,10 +462,10 @@ mod test {
 		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(2);
-		room.add_client("Alice".to_string(), alice_message_sender)
+		room.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
-		let bob = room
-			.add_client("Bob".to_string(), bob_message_sender)
+		let (bob, _) = room
+			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
@@ -514,8 +509,8 @@ mod test {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
 		let room = Room::new(1);
-		let alice = room
-			.add_client("Alice".to_string(), alice_message_sender)
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
 		let response = handle_request(
@@ -595,7 +590,7 @@ mod test {
 
 		// "Ferris" is already a registered client
 		let fake_message_sender = FakeMessageSender::default().into();
-		room.add_client("Ferris".to_string(), fake_message_sender)
+		room.add_client_and_return_existing("Ferris".to_string(), fake_message_sender)
 			.expect("Could not register 'Ferris'!");
 
 		// And I register another client with the same name
@@ -623,7 +618,8 @@ mod test {
 		let room = Room::new(1);
 		{
 			let message_sender = MessageSender::from(FakeMessageSender::default());
-			room.add_client("Fake".to_string(), message_sender).unwrap();
+			room.add_client_and_return_existing("Fake".to_string(), message_sender)
+				.unwrap();
 		}
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
@@ -682,8 +678,8 @@ mod test {
 	async fn should_list_other_clients_when_joining_a_room() {
 		let room = Room::new(2);
 		let fake_message_sender = FakeMessageSender::default();
-		let stephanie = room
-			.add_client("Stephanie".to_string(), fake_message_sender.into())
+		let (stephanie, _) = room
+			.add_client_and_return_existing("Stephanie".to_string(), fake_message_sender.into())
 			.unwrap();
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();

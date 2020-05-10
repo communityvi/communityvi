@@ -44,8 +44,13 @@ impl Room {
 		Self { inner: Arc::new(inner) }
 	}
 
-	/// Add a new client to the room, passing in a sender for sending messages to it. Returns it's id
-	pub fn add_client(&self, name: String, message_sender: MessageSender) -> Result<Client, RoomError> {
+	/// Add a new client to the room, passing in a sender for sending messages to it.
+	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
+	pub fn add_client_and_return_existing(
+		&self,
+		name: String,
+		message_sender: MessageSender,
+	) -> Result<(Client, Vec<Client>), RoomError> {
 		if name.trim().is_empty() {
 			return Err(RoomError::EmptyClientName);
 		}
@@ -67,11 +72,12 @@ impl Room {
 		let client_id = self.inner.client_id_sequence.next();
 		let client = Client::new(client_id, name, message_sender, self.clone());
 
+		let existing_clients = clients.iter().map(|(_id, client)| client.clone()).collect();
 		if clients.insert(client_id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
-		Ok(client)
+		Ok((client, existing_clients))
 	}
 
 	/// Get a lock of the client and client names.
@@ -142,15 +148,6 @@ impl Room {
 			medium.clone()
 		})
 	}
-
-	pub fn clients(&self) -> Vec<Client> {
-		self.inner
-			.clients
-			.read()
-			.iter()
-			.map(|(_id, client)| client.clone())
-			.collect()
-	}
 }
 
 /// This function makes sure that unicode characters get correctly decomposed,
@@ -173,7 +170,7 @@ mod test {
 		let room = Room::new(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = room.add_client("".to_string(), message_sender.clone());
+		let result = room.add_client_and_return_existing("".to_string(), message_sender.clone());
 
 		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
@@ -183,7 +180,7 @@ mod test {
 		let room = Room::new(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = room.add_client("  	 ".to_string(), message_sender.clone());
+		let result = room.add_client_and_return_existing("  	 ".to_string(), message_sender.clone());
 
 		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
@@ -225,9 +222,9 @@ mod test {
 		let room = Room::new(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		room.add_client("Anorak  ".to_string(), message_sender.clone())
+		room.add_client_and_return_existing("Anorak  ".to_string(), message_sender.clone())
 			.expect("First add did not succeed!");
-		let result = room.add_client("   Anorak".to_string(), message_sender.clone());
+		let result = room.add_client_and_return_existing("   Anorak".to_string(), message_sender.clone());
 
 		assert!(matches!(result, Err(RoomError::ClientNameAlreadyInUse)));
 	}
@@ -239,14 +236,14 @@ mod test {
 
 		{
 			let message_sender = MessageSender::from(FakeMessageSender::default());
-			let client = room
-				.add_client(name.to_string(), message_sender.clone())
+			let (client, _) = room
+				.add_client_and_return_existing(name.to_string(), message_sender.clone())
 				.expect("Failed to add client");
 			room.remove_client(client.id());
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		room.add_client(name.to_string(), message_sender.clone())
+		room.add_client_and_return_existing(name.to_string(), message_sender.clone())
 			.expect("Failed to add client with same name after first is gone");
 	}
 
@@ -256,7 +253,7 @@ mod test {
 		let room = Room::new(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		room.add_client(long_name.to_string(), message_sender.clone())
+		room.add_client_and_return_existing(long_name.to_string(), message_sender.clone())
 			.expect("Failed to add client with name that is not too long");
 	}
 
@@ -266,7 +263,7 @@ mod test {
 		let room = Room::new(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = room.add_client(long_name.to_string(), message_sender.clone());
+		let result = room.add_client_and_return_existing(long_name.to_string(), message_sender.clone());
 
 		assert!(matches!(result, Err(RoomError::ClientNameTooLong)));
 	}
@@ -277,7 +274,7 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client(format!("{}", count), message_sender.clone()) {
+			if let Err(error) = room.add_client_and_return_existing(format!("{}", count), message_sender.clone()) {
 				panic!("Failed to add client {}: {}", count, error);
 			}
 		}
@@ -289,13 +286,13 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client(format!("{}", count), message_sender.clone()) {
+			if let Err(error) = room.add_client_and_return_existing(format!("{}", count), message_sender.clone()) {
 				panic!("Failed to add client {}: {}", count, error);
 			}
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client("elephant".to_string(), message_sender.clone());
+		let result = room.add_client_and_return_existing("elephant".to_string(), message_sender.clone());
 		assert!(matches!(result, Err(RoomError::RoomFull)))
 	}
 
@@ -306,14 +303,14 @@ mod test {
 
 		// Expect an initial add- and remove work
 		let ferris_connection = MessageSender::from(FakeMessageSender::default());
-		let ferris = room
-			.add_client("Ferris".to_string(), ferris_connection)
+		let (ferris, _) = room
+			.add_client_and_return_existing("Ferris".to_string(), ferris_connection)
 			.expect("Could not add client!");
 		assert!(room.remove_client(ferris.id()), "Could not remove client!");
 
 		// And a subsequent add also works
 		let crab_connection = MessageSender::from(FakeMessageSender::default());
-		room.add_client("Crab".to_string(), crab_connection)
+		room.add_client_and_return_existing("Crab".to_string(), crab_connection)
 			.expect("Could not add client!");
 	}
 
@@ -323,8 +320,8 @@ mod test {
 		let name = "牧瀬 紅莉栖";
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let makise_kurisu = room
-			.add_client(name.to_string(), message_sender.clone())
+		let (makise_kurisu, _) = room
+			.add_client_and_return_existing(name.to_string(), message_sender.clone())
 			.expect("Failed to add client with same name after first is gone");
 		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
 			"愛のむきだし".to_string(),
@@ -333,5 +330,34 @@ mod test {
 
 		assert!(room.remove_client(makise_kurisu.id()), "Could not remove client!");
 		assert!(room.medium().is_none(), "A medium was still left in the room!");
+	}
+
+	#[test]
+	fn add_client_should_return_empty_list_when_adding_to_an_empty_room() {
+		let room = Room::new(10);
+		let jake_sender = FakeMessageSender::default();
+		let (_, existing_clients) = room
+			.add_client_and_return_existing("Jake".to_string(), jake_sender.into())
+			.unwrap();
+		assert!(existing_clients.is_empty());
+	}
+
+	#[test]
+	fn add_client_should_return_list_of_existing_clients() {
+		let room = Room::new(10);
+		let jake_sender = FakeMessageSender::default();
+		let (jake, existing_clients) = room
+			.add_client_and_return_existing("Jake".to_string(), jake_sender.into())
+			.unwrap();
+		assert!(existing_clients.is_empty());
+
+		let elwood_sender = FakeMessageSender::default();
+		let (_, existing_clients) = room
+			.add_client_and_return_existing("Elwood".to_string(), elwood_sender.into())
+			.unwrap();
+		assert_eq!(existing_clients.len(), 1);
+		let existing_jake = &existing_clients[0];
+		assert_eq!(jake.id(), existing_jake.id());
+		assert_eq!(jake.name(), existing_jake.name());
 	}
 }
