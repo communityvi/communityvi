@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::state::medium::playback_state::PlaybackState;
 use crate::room::state::medium::{Medium, SomeMedium};
@@ -25,9 +26,12 @@ pub struct ClientResponse {
 	pub name: String,
 }
 
-impl From<(ClientId, String)> for ClientResponse {
-	fn from((id, name): (ClientId, String)) -> Self {
-		Self { id, name }
+impl From<Client> for ClientResponse {
+	fn from(client: Client) -> Self {
+		Self {
+			id: client.id(),
+			name: client.name().to_string(),
+		}
 	}
 }
 

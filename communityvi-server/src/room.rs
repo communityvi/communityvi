@@ -7,11 +7,9 @@ use crate::room::error::RoomError;
 use crate::room::state::medium::SomeMedium;
 use crate::room::state::State;
 use chrono::Duration;
-use dashmap::{DashMap, DashSet};
 use futures::FutureExt;
-use parking_lot::MutexGuard;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
+use parking_lot::{MutexGuard, RwLock, RwLockWriteGuard};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use unicode_skeleton::UnicodeSkeleton;
 
@@ -28,9 +26,8 @@ pub struct Room {
 
 struct Inner {
 	client_id_sequence: ClientIdSequence,
-	client_names: DashSet<String>,
-	clients: DashMap<ClientId, Client>,
-	client_count: AtomicUsize,
+	client_names: RwLock<HashSet<String>>,
+	clients: RwLock<HashMap<ClientId, Client>>,
 	state: State,
 	room_size_limit: usize,
 }
@@ -41,7 +38,6 @@ impl Room {
 			client_id_sequence: Default::default(),
 			client_names: Default::default(),
 			clients: Default::default(),
-			client_count: AtomicUsize::new(0),
 			state: Default::default(),
 			room_size_limit,
 		};
@@ -59,53 +55,45 @@ impl Room {
 			return Err(RoomError::ClientNameTooLong);
 		}
 
-		if !self.try_incrementing_client_count() {
+		let (mut clients, mut names) = self.write_lock_clients_and_names();
+		if clients.len() >= self.inner.room_size_limit {
 			return Err(RoomError::RoomFull);
 		}
 
-		if !self.inner.client_names.insert(normalized_name(name.as_str())) {
-			self.inner.client_count.fetch_sub(1, SeqCst);
+		if !names.insert(normalized_name(name.as_str())) {
 			return Err(RoomError::ClientNameAlreadyInUse);
 		}
 
 		let client_id = self.inner.client_id_sequence.next();
 		let client = Client::new(client_id, name, message_sender, self.clone());
 
-		if self.inner.clients.insert(client_id, client.clone()).is_some() {
+		if clients.insert(client_id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!")
 		}
 
 		Ok(client)
 	}
 
-	// Does a compare and swap until the room count has been incremented (true) or is `room_size_limit` (false).
-	fn try_incrementing_client_count(&self) -> bool {
-		let mut current_count = self.inner.client_count.load(SeqCst);
-		loop {
-			if current_count == self.inner.room_size_limit {
-				return false;
-			}
-
-			match self
-				.inner
-				.client_count
-				.compare_exchange(current_count, current_count + 1, SeqCst, SeqCst)
-			{
-				Ok(_) => return true,
-				Err(previous_count) => current_count = previous_count,
-			}
-		}
+	/// Get a lock of the client and client names.
+	/// Use this method to ensure the locks are always taken in the same order to prevent deadlock.
+	fn write_lock_clients_and_names(
+		&self,
+	) -> (
+		RwLockWriteGuard<HashMap<ClientId, Client>>,
+		RwLockWriteGuard<HashSet<String>>,
+	) {
+		let clients = self.inner.clients.write();
+		let names = self.inner.client_names.write();
+		(clients, names)
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) -> bool {
-		self.inner
-			.clients
+		let (mut clients, mut names) = self.write_lock_clients_and_names();
+		clients
 			.remove(&client_id)
-			.map(|(_, client)| self.inner.client_names.remove(&normalized_name(client.name())))
+			.map(|client| names.remove(&normalized_name(client.name())))
 			.map(|_client_name| {
-				let last_client_was_removed = self.inner.client_count.fetch_sub(1, SeqCst) == 1;
-				if last_client_was_removed {
-					// RISK: This is a race between the last client leaving and a new one joining!
+				if clients.is_empty() {
 					self.inner.state.eject_medium();
 				}
 			})
@@ -116,8 +104,9 @@ impl Room {
 		let futures: Vec<_> = self
 			.inner
 			.clients
+			.read()
 			.iter()
-			.map(|entry| entry.value().clone())
+			.map(|(_id, client)| client.clone())
 			.map(move |client| {
 				let response = response.clone();
 				async move {
@@ -154,11 +143,13 @@ impl Room {
 		})
 	}
 
-	pub fn clients<'room>(&'room self) -> impl Iterator<Item = (ClientId, String)> + 'room {
+	pub fn clients(&self) -> Vec<Client> {
 		self.inner
 			.clients
+			.read()
 			.iter()
-			.map(|client| (client.id(), client.name().to_string()))
+			.map(|(_id, client)| client.clone())
+			.collect()
 	}
 }
 

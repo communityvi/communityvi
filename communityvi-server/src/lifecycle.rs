@@ -89,7 +89,8 @@ async fn register_client(
 
 	let clients = room
 		.clients()
-		.filter(|(id, _)| *id != client.id())
+		.into_iter()
+		.filter(|iterated_client| iterated_client.id() != client.id())
 		.map(ClientResponse::from)
 		.collect();
 	let hello_response = SuccessMessage::Hello {
