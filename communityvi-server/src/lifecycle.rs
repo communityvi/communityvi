@@ -168,9 +168,9 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				Some(versioned_medium) => versioned_medium,
 				None => {
 					return Err(ErrorMessage {
-						error: ErrorMessageType::MediumOutdated,
+						error: ErrorMessageType::IncorrectMediumVersion,
 						message: format!(
-							"Medium is outdated. Requested version {} was {}",
+							"Medium version is incorrect. Request had {} but current version is {}.",
 							previous_version,
 							room.medium().version
 						),
@@ -196,9 +196,9 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				match room.play_medium(Duration::milliseconds(start_time_in_milliseconds), previous_version) {
 					None => {
 						return Err(ErrorMessage {
-							error: ErrorMessageType::MediumOutdated,
+							error: ErrorMessageType::IncorrectMediumVersion,
 							message: format!(
-								"Medium is outdated. Requested version {} was {}",
+								"Medium version is incorrect. Request had {} but current version is {}.",
 								previous_version,
 								room.medium().version
 							),
@@ -225,9 +225,9 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			) {
 				None => {
 					return Err(ErrorMessage {
-						error: ErrorMessageType::MediumOutdated,
+						error: ErrorMessageType::IncorrectMediumVersion,
 						message: format!(
-							"Medium is outdated. Requested version {} was {}",
+							"Medium version is incorrect. Request had {} but current version is {}.",
 							previous_version,
 							room.medium().version
 						),
@@ -518,6 +518,101 @@ mod test {
 
 		assert_eq!(alice_broadcast, expected_broadcast.clone().into());
 		assert_eq!(bob_broadcast, expected_broadcast.into());
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_play_with_incorrect_version() {
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
+
+		let room = Room::new(1);
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
+			.expect("Did not get client handle!");
+
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+
+		let response = handle_request(
+			&room,
+			&alice,
+			PlayRequest {
+				previous_version: inserted_medium.version + 1,
+				skipped: true,
+				start_time_in_milliseconds: 0,
+			}
+			.into(),
+		)
+		.await
+		.expect_err("Failed to get error response");
+		assert_eq!(
+			response,
+			ErrorMessage::builder()
+				.error(ErrorMessageType::IncorrectMediumVersion)
+				.message("Medium version is incorrect. Request had 2 but current version is 1.".to_string())
+				.build()
+		);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_pause_with_incorrect_version() {
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
+
+		let room = Room::new(1);
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
+			.expect("Did not get client handle!");
+
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+
+		let response = handle_request(
+			&room,
+			&alice,
+			PauseRequest {
+				previous_version: inserted_medium.version + 1,
+				skipped: true,
+				position_in_milliseconds: 0,
+			}
+			.into(),
+		)
+		.await
+		.expect_err("Failed to get error response");
+		assert_eq!(
+			response,
+			ErrorMessage::builder()
+				.error(ErrorMessageType::IncorrectMediumVersion)
+				.message("Medium version is incorrect. Request had 2 but current version is 1.".to_string())
+				.build()
+		);
+	}
+
+	#[tokio::test]
+	async fn the_client_should_not_be_able_to_insert_medium_with_incorrect_version() {
+		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
+
+		let room = Room::new(1);
+		let (alice, _) = room
+			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
+			.expect("Did not get client handle!");
+
+		let response = handle_request(
+			&room,
+			&alice,
+			InsertMediumRequest {
+				previous_version: 1,
+				medium: MediumRequest::Empty,
+			}
+			.into(),
+		)
+		.await
+		.expect_err("Failed to get error response");
+		assert_eq!(
+			response,
+			ErrorMessage::builder()
+				.error(ErrorMessageType::IncorrectMediumVersion)
+				.message("Medium version is incorrect. Request had 1 but current version is 0.".to_string())
+				.build()
+		);
 	}
 
 	#[tokio::test]

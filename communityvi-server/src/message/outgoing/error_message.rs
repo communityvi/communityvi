@@ -13,7 +13,7 @@ pub enum ErrorMessageType {
 	InvalidFormat,
 	InvalidOperation,
 	InternalServerError,
-	MediumOutdated,
+	IncorrectMediumVersion,
 }
 
 #[cfg(test)]
@@ -68,6 +68,27 @@ mod test {
 
 		let deserialized_internal_server_error_error_message: ErrorMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize InternalServerError error message from JSON");
+		assert_eq!(
+			internal_server_error_error_message,
+			deserialized_internal_server_error_error_message
+		);
+	}
+
+	#[test]
+	fn incorrect_medium_version_error_message_should_serialize_and_deserialize() {
+		let internal_server_error_error_message = ErrorMessage::builder()
+			.error(ErrorMessageType::IncorrectMediumVersion)
+			.message("Medium version was 0 instead of 1.".to_string())
+			.build();
+		let json = serde_json::to_string(&internal_server_error_error_message)
+			.expect("Failed to serialize InternalServerError error message to JSON");
+		assert_eq!(
+			r#"{"error":"incorrect_medium_version","message":"Medium version was 0 instead of 1."}"#,
+			json
+		);
+
+		let deserialized_internal_server_error_error_message: ErrorMessage =
+			serde_json::from_str(&json).expect("Failed to deserialize IncorrectMediumVersion error message from JSON");
 		assert_eq!(
 			internal_server_error_error_message,
 			deserialized_internal_server_error_error_message
