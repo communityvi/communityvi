@@ -4,11 +4,11 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use crate::room::state::medium::SomeMedium;
+use crate::room::state::medium::Medium;
 use crate::room::state::State;
 use chrono::Duration;
 use futures::FutureExt;
-use parking_lot::{MutexGuard, RwLock, RwLockWriteGuard};
+use parking_lot::{RwLock, RwLockWriteGuard};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use unicode_skeleton::UnicodeSkeleton;
@@ -127,26 +127,24 @@ impl Room {
 		self.inner.state.current_reference_time()
 	}
 
-	pub fn insert_medium(&self, medium: SomeMedium) {
-		self.inner.state.insert_medium(medium);
+	pub fn insert_medium(&self, medium: impl Into<Medium>) {
+		self.inner.state.insert_medium(medium.into());
 	}
 
-	pub fn medium(&self) -> MutexGuard<Option<SomeMedium>> {
-		self.inner.state.medium()
+	pub fn medium(&self) -> Medium {
+		self.inner.state.medium().clone()
 	}
 
-	pub fn play_medium(&self, start_time: Duration) -> Option<SomeMedium> {
-		self.medium().as_mut().map(|medium| {
-			medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap());
-			medium.clone()
-		})
+	pub fn play_medium(&self, start_time: Duration) -> Medium {
+		let mut medium = self.inner.state.medium();
+		medium.play(start_time, Duration::from_std(self.current_reference_time()).unwrap());
+		medium.clone()
 	}
 
-	pub fn pause_medium(&self, position: Duration) -> Option<SomeMedium> {
-		self.medium().as_mut().map(|medium| {
-			medium.pause(position);
-			medium.clone()
-		})
+	pub fn pause_medium(&self, position: Duration) -> Medium {
+		let mut medium = self.inner.state.medium();
+		medium.pause(position);
+		medium.clone()
 	}
 }
 
@@ -323,13 +321,11 @@ mod test {
 		let (makise_kurisu, _) = room
 			.add_client_and_return_existing(name.to_string(), message_sender.clone())
 			.expect("Failed to add client with same name after first is gone");
-		room.insert_medium(SomeMedium::FixedLength(FixedLengthMedium::new(
-			"愛のむきだし".to_string(),
-			Duration::minutes(237),
-		)));
+		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
+		room.insert_medium(medium);
 
 		assert!(room.remove_client(makise_kurisu.id()), "Could not remove client!");
-		assert!(room.medium().is_none(), "A medium was still left in the room!");
+		assert_eq!(room.medium(), Medium::Empty, "A medium was still left in the room!");
 	}
 
 	#[test]

@@ -68,7 +68,15 @@ insertMediumButton.onclick = function () {
 		return;
 	}
 
-	sendMessage({type: 'insert_medium', name: name, length_in_milliseconds: length})
+	const message = {
+		type: 'insert_medium',
+		medium: {
+			type: 'fixed_length',
+			name: name,
+			length_in_milliseconds: length,
+		}
+	}
+	sendMessage(message)
 		.catch((error) => {
 			console.error(`Failed to insert fake medium. ${error}`);
 		});
@@ -78,7 +86,15 @@ playerReal.addEventListener('loadeddata', function () {
 	playingMedium.style.width = `${this.videoWidth}px`;
 	playerPositionSlider.style.width = `${this.videoWidth}px`;
 
-	sendMessage({type: 'insert_medium', name: mediumNameLabel.textContent, length_in_milliseconds: Math.round(this.duration * 1000)}).catch((error) => {
+	const message = {
+		type: 'insert_medium',
+		medium: {
+			type: 'fixed_length',
+			name: mediumNameLabel.textContent,
+			length_in_milliseconds: Math.round(this.duration * 1000)
+		}
+	};
+	sendMessage(message).catch((error) => {
 		console.error(`Failed to insert medium. ${error}`);
 	});
 });
@@ -232,30 +248,8 @@ function registerClient() {
 				const idField = document.getElementById('client_id');
 				idField.innerText = response.id;
 
-				const currentMedium = response.currentMedium;
-				if (currentMedium !== null) {
-					mediumLength = currentMedium.length_in_milliseconds;
-
-					mediumNameLabel.textContent = currentMedium.name;
-					mediumLengthLabel.textContent = Math.round(currentMedium.length_in_milliseconds / 1000 / 60).toString();
-
-					playerPositionSlider.max = currentMedium.length_in_milliseconds;
-
-					playbackState.type = currentMedium.playback_state.type;
-					switch (currentMedium.playback_state.type) {
-						case 'playing': {
-							playbackState.startTime = currentMedium.playback_state.start_time_in_milliseconds;
-							break;
-						}
-
-						case 'paused': {
-							playbackState.position = currentMedium.playback_state.position_in_milliseconds;
-							break;
-						}
-					}
-
-					updatePlayer();
-				}
+				const medium = response.currentMedium;
+				handleMediumStateChange(medium);
 
 				// start counter management
 				setInterval(updateApplicationState, 16);
@@ -362,42 +356,12 @@ function handleBroadcast(message, messageEvent) {
 		}
 
 		case 'medium_state_changed': {
-			if (mediumNameLabel.textContent !== message.medium.name) {
-				displayChatMessage(message.changed_by_id, message.changed_by_name, `<<< inserted "${message.medium.name}" >>>`);
-			}
-
-			mediumNameLabel.textContent = message.medium.name;
-			mediumLengthLabel.textContent = Math.round(message.medium.length_in_milliseconds / 1000 / 60).toString();
-			mediumLength = message.medium.length_in_milliseconds;
-			playerPositionSlider.max = mediumLength;
-
-			playbackState.type = message.medium.playback_state.type;
-			switch (playbackState.type) {
-				case 'playing': {
-					playbackState.startTime = message.medium.playback_state.start_time_in_milliseconds;
-
-					if (message.medium.playback_skipped === true) {
-						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
-					} else {
-						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) started playback.`);
-					}
-
-					break;
-				}
-				case 'paused': {
-					playbackState.position = message.medium.playback_state.position_in_milliseconds;
-
-					if (message.medium.playback_skipped === true) {
-						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) skipped.`);
-					} else {
-						displayChatMessage('', 'Server', `${message.changed_by_name} (Client ID: ${message.changed_by_id}) paused playback.`);
-					}
-
-					break;
-				}
-			}
-
-			updatePlayer();
+			const medium = message.medium;
+			const triggeringClient = {
+				id: message.changed_by_id,
+				name: message.changed_by_name,
+			};
+			handleMediumStateChange(medium, triggeringClient);
 
 			break;
 		}
@@ -407,6 +371,67 @@ function handleBroadcast(message, messageEvent) {
 			break;
 		}
 	}
+}
+
+function handleMediumStateChange(medium, triggeringClient = null) {
+	switch (medium.type) {
+		case 'empty':
+			mediumNameLabel.textContent = 'n/a';
+			mediumLengthLabel.textContent = 'n/a';
+			mediumLength = null;
+			playerPositionLabel.textContent = 'NaN';
+			playerPositionSlider.max = 0;
+			playbackState = {
+				type: 'paused',
+				startTime: 0,
+				position: 0,
+			};
+			break;
+
+		case 'fixed_length': {
+			if ((mediumNameLabel.textContent !== medium.name) && (triggeringClient !== null)) {
+				displayChatMessage(triggeringClient.id, triggeringClient.name, `<<< inserted "${medium.name}" >>>`);
+			}
+
+			mediumNameLabel.textContent = medium.name;
+			mediumLengthLabel.textContent = Math.round(medium.length_in_milliseconds / 1000 / 60).toString();
+			mediumLength = medium.length_in_milliseconds;
+			playerPositionSlider.max = mediumLength;
+
+			playbackState.type = medium.playback_state.type;
+			switch (playbackState.type) {
+				case 'playing': {
+					playbackState.startTime = medium.playback_state.start_time_in_milliseconds;
+
+					if (triggeringClient !== null) {
+						if (medium.playback_skipped === true) {
+							displayChatMessage('', 'Server', `${triggeringClient.name} (Client ID: ${triggeringClient.id}) skipped.`);
+						} else {
+							displayChatMessage('', 'Server', `${triggeringClient.name} (Client ID: ${triggeringClient.id}) started playback.`);
+						}
+					}
+
+					break;
+				}
+				case 'paused': {
+					playbackState.position = medium.playback_state.position_in_milliseconds;
+
+					if (triggeringClient !== null) {
+						if (medium.playback_skipped === true) {
+							displayChatMessage('', 'Server', `${triggeringClient.name} (Client ID: ${triggeringClient.id}) skipped.`);
+						} else {
+							displayChatMessage('', 'Server', `${triggeringClient.name} (Client ID: ${triggeringClient.id}) paused playback.`);
+						}
+					}
+
+					break;
+				}
+			}
+			break;
+		}
+	}
+
+	updatePlayer();
 }
 
 async function sendChatMessage() {

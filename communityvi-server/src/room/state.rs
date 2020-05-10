@@ -1,4 +1,4 @@
-use crate::room::state::medium::SomeMedium;
+use crate::room::state::medium::Medium;
 use parking_lot::MutexGuard;
 use std::time::{Duration, Instant};
 
@@ -7,7 +7,7 @@ pub mod medium;
 #[derive(Debug)]
 pub struct State {
 	start_of_reference_time: Instant,
-	medium: parking_lot::Mutex<Option<SomeMedium>>,
+	medium: parking_lot::Mutex<Medium>,
 }
 
 impl Default for State {
@@ -24,15 +24,15 @@ impl State {
 		self.start_of_reference_time.elapsed()
 	}
 
-	pub fn insert_medium(&self, some_medium: SomeMedium) {
-		*self.medium.lock() = Some(some_medium);
+	pub fn insert_medium(&self, medium: Medium) {
+		*self.medium.lock() = medium;
 	}
 
-	pub fn medium(&self) -> MutexGuard<Option<SomeMedium>> {
+	pub fn medium(&self) -> MutexGuard<Medium> {
 		self.medium.lock()
 	}
 
-	pub fn eject_medium(&self) -> bool {
-		self.medium.lock().take().is_some()
+	pub fn eject_medium(&self) {
+		self.insert_medium(Medium::Empty)
 	}
 }

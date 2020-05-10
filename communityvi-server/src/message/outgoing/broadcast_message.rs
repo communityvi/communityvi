@@ -1,7 +1,7 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
-use crate::room::state::medium::SomeMedium;
+use crate::room::state::medium::Medium;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
@@ -67,17 +67,19 @@ pub enum MediumBroadcast {
 		playback_skipped: bool,
 		playback_state: PlaybackStateResponse,
 	},
+	Empty,
 }
 
 impl MediumBroadcast {
-	pub fn new(medium: SomeMedium, skipped: bool) -> Self {
-		match medium {
-			SomeMedium::FixedLength(medium) => MediumBroadcast::FixedLength {
+	pub fn new(medium: impl Into<Medium>, skipped: bool) -> Self {
+		match medium.into() {
+			Medium::FixedLength(medium) => MediumBroadcast::FixedLength {
 				name: medium.name,
 				length_in_milliseconds: medium.length.num_milliseconds() as u64,
 				playback_skipped: skipped,
 				playback_state: medium.playback.into(),
 			},
+			Medium::Empty => MediumBroadcast::Empty,
 		}
 	}
 }

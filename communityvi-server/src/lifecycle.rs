@@ -7,11 +7,11 @@ use crate::message::outgoing::broadcast_message::{
 	ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumBroadcast, MediumStateChangedBroadcast,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
-use crate::message::outgoing::success_message::{ClientResponse, MediumResponse, SuccessMessage};
+use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::state::medium::fixed_length::FixedLengthMedium;
-use crate::room::state::medium::SomeMedium;
+use crate::room::state::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
 use log::{debug, error, info};
@@ -91,7 +91,7 @@ async fn register_client(
 	let hello_response = SuccessMessage::Hello {
 		id: client.id(),
 		clients,
-		current_medium: room.medium().as_ref().map(MediumResponse::from),
+		current_medium: room.medium().into(),
 	};
 	if client.send_success_message(hello_response, request.request_id).await {
 		let id = client.id();
@@ -159,70 +159,63 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				milliseconds: reference_time.as_millis() as u64,
 			})
 		}
-		InsertMedium(InsertMediumRequest {
-			name,
-			length_in_milliseconds,
-		}) => {
-			if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
-				Err(ErrorMessage::builder()
-					.error(ErrorMessageType::InvalidFormat)
-					.message("Length of a medium must not be larger than one year.".to_string())
-					.build()
-					.into())
-			} else {
-				let medium = SomeMedium::FixedLength(FixedLengthMedium::new(
-					name.clone(),
-					Duration::milliseconds(length_in_milliseconds as i64),
-				));
-				room.insert_medium(medium.clone());
+		InsertMedium { medium: medium_request } => {
+			let medium = match medium_request {
+				InsertMediumRequest::FixedLength {
+					name,
+					length_in_milliseconds,
+				} => {
+					if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
+						return Err(ErrorMessage::builder()
+							.error(ErrorMessageType::InvalidFormat)
+							.message("Length of a medium must not be larger than one year.".to_string())
+							.build()
+							.into());
+					}
+					FixedLengthMedium::new(name.clone(), Duration::milliseconds(length_in_milliseconds as i64)).into()
+				}
+				InsertMediumRequest::Empty => Medium::Empty,
+			};
 
-				room.broadcast(MediumStateChangedBroadcast {
-					changed_by_name: client.name().to_string(),
-					changed_by_id: client.id(),
-					medium: MediumBroadcast::new(medium, false),
-				})
-				.await;
-				Ok(SuccessMessage::Success)
-			}
+			room.insert_medium(medium.clone());
+
+			room.broadcast(MediumStateChangedBroadcast {
+				changed_by_name: client.name().to_string(),
+				changed_by_id: client.id(),
+				medium: MediumBroadcast::new(medium, false),
+			})
+			.await;
+
+			Ok(SuccessMessage::Success)
 		}
 		Play(PlayRequest {
 			skipped,
 			start_time_in_milliseconds,
-		}) => match room.play_medium(Duration::milliseconds(start_time_in_milliseconds)) {
-			None => Err(ErrorMessage::builder()
-				.error(ErrorMessageType::NoMedium)
-				.message("Room has no medium.".to_string())
-				.build()),
-			Some(medium) => {
-				room.broadcast(MediumStateChangedBroadcast {
-					changed_by_name: client.name().to_string(),
-					changed_by_id: client.id(),
-					medium: MediumBroadcast::new(medium, skipped),
-				})
-				.await;
-				Ok(SuccessMessage::Success)
-			}
-		},
+		}) => {
+			let medium = room.play_medium(Duration::milliseconds(start_time_in_milliseconds));
+			room.broadcast(MediumStateChangedBroadcast {
+				changed_by_name: client.name().to_string(),
+				changed_by_id: client.id(),
+				medium: MediumBroadcast::new(medium, skipped),
+			})
+			.await;
+			Ok(SuccessMessage::Success)
+		}
 		Pause(PauseRequest {
 			skipped,
 			position_in_milliseconds,
-		}) => match room.pause_medium(Duration::milliseconds(
-			position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
-		)) {
-			None => Err(ErrorMessage::builder()
-				.error(ErrorMessageType::NoMedium)
-				.message("Room has no medium.".to_string())
-				.build()),
-			Some(medium) => {
-				room.broadcast(MediumStateChangedBroadcast {
-					changed_by_name: client.name().to_string(),
-					changed_by_id: client.id(),
-					medium: MediumBroadcast::new(medium, skipped),
-				})
-				.await;
-				Ok(SuccessMessage::Success)
-			}
-		},
+		}) => {
+			let medium = room.pause_medium(Duration::milliseconds(
+				position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64,
+			));
+			room.broadcast(MediumStateChangedBroadcast {
+				changed_by_name: client.name().to_string(),
+				changed_by_id: client.id(),
+				medium: MediumBroadcast::new(medium, skipped),
+			})
+			.await;
+			Ok(SuccessMessage::Success)
+		}
 	}
 }
 
@@ -233,7 +226,7 @@ mod test {
 	use crate::message::client_request::PauseRequest;
 	use crate::message::outgoing::broadcast_message::BroadcastMessage;
 	use crate::message::outgoing::error_message::ErrorMessageType;
-	use crate::message::outgoing::success_message::PlaybackStateResponse;
+	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse};
 	use crate::room::client_id::ClientId;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
@@ -278,14 +271,14 @@ mod test {
 		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 
-		let medium = SomeMedium::FixedLength(FixedLengthMedium {
-			length: Duration::minutes(153),
-			name: "Metropolis".to_string(),
-			playback: Default::default(),
-		});
-		let response = handle_request(&room, &alice, InsertMediumRequest::from(medium.clone()).into())
-			.await
-			.expect("Failed to get successful response");
+		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
+		let response = handle_request(
+			&room,
+			&alice,
+			InsertMediumRequest::from(Medium::from(medium.clone())).into(),
+		)
+		.await
+		.expect("Failed to get successful response");
 		assert_eq!(response, SuccessMessage::Success);
 
 		let alice_broadcast = alice_test_client.receive_broadcast_message().await;
@@ -313,7 +306,7 @@ mod test {
 		let response = handle_request(
 			&room,
 			&alice,
-			InsertMediumRequest {
+			InsertMediumRequest::FixedLength {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
 			}
@@ -343,7 +336,7 @@ mod test {
 		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
+		room.insert_medium(medium.clone());
 
 		let response = handle_request(
 			&room,
@@ -379,36 +372,6 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn the_client_should_not_be_able_to_play_something_without_medium() {
-		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
-
-		let room = Room::new(1);
-		let (alice, _) = room
-			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-
-		let response = handle_request(
-			&room,
-			&alice,
-			PlayRequest {
-				skipped: true,
-				start_time_in_milliseconds: -1024,
-			}
-			.into(),
-		)
-		.await
-		.expect_err("Failed to get error response");
-
-		assert_eq!(
-			response,
-			ErrorMessage::builder()
-				.error(ErrorMessageType::NoMedium)
-				.message("Room has no medium.".to_string())
-				.build()
-		);
-	}
-
-	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
 		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
 		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
@@ -420,7 +383,7 @@ mod test {
 			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
 			.expect("Did not get client handle!");
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
+		room.insert_medium(medium.clone());
 		room.play_medium(Duration::milliseconds(-1024));
 
 		let response = handle_request(
@@ -469,7 +432,7 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		room.insert_medium(SomeMedium::FixedLength(medium.clone()));
+		room.insert_medium(medium.clone());
 
 		let response = handle_request(
 			&room,
@@ -502,36 +465,6 @@ mod test {
 
 		assert_eq!(alice_broadcast, expected_broadcast.clone().into());
 		assert_eq!(bob_broadcast, expected_broadcast.into());
-	}
-
-	#[tokio::test]
-	async fn the_client_should_not_be_able_to_pause_something_without_medium() {
-		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
-
-		let room = Room::new(1);
-		let (alice, _) = room
-			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-
-		let response = handle_request(
-			&room,
-			&alice,
-			PauseRequest {
-				skipped: false,
-				position_in_milliseconds: 1000,
-			}
-			.into(),
-		)
-		.await
-		.expect_err("Failed to get error response");
-
-		assert_eq!(
-			response,
-			ErrorMessage::builder()
-				.error(ErrorMessageType::NoMedium)
-				.message("Room has no medium.".to_string())
-				.build()
-		);
 	}
 
 	#[tokio::test]
@@ -645,7 +578,7 @@ mod test {
 		let room = Room::new(1);
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
-		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(video_name.clone(), video_length));
+		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
 		room.insert_medium(short_circuit);
 		room.play_medium(Duration::milliseconds(0));
 
@@ -662,13 +595,13 @@ mod test {
 			SuccessMessage::Hello {
 				id: ClientId::from(0),
 				clients: vec![],
-				current_medium: Some(MediumResponse::FixedLength {
+				current_medium: MediumResponse::FixedLength {
 					name: video_name,
 					length_in_milliseconds: video_length.num_milliseconds() as u64,
 					playback_state: PlaybackStateResponse::Playing {
 						start_time_in_milliseconds: 0,
 					}
-				})
+				}
 			},
 			response
 		);
@@ -698,7 +631,7 @@ mod test {
 					id: stephanie.id(),
 					name: stephanie.name().to_string(),
 				}],
-				current_medium: None,
+				current_medium: MediumResponse::Empty,
 			},
 			response
 		);
@@ -720,7 +653,7 @@ mod test {
 			SuccessMessage::Hello {
 				id: ClientId::from(0),
 				clients: vec![],
-				current_medium: None,
+				current_medium: MediumResponse::Empty,
 			},
 			response
 		);
@@ -731,7 +664,7 @@ mod test {
 		let room = Room::new(1);
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
-		let short_circuit = SomeMedium::FixedLength(FixedLengthMedium::new(video_name.clone(), video_length));
+		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
 		room.insert_medium(short_circuit);
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
@@ -747,13 +680,13 @@ mod test {
 			SuccessMessage::Hello {
 				id: ClientId::from(0),
 				clients: vec![],
-				current_medium: Some(MediumResponse::FixedLength {
+				current_medium: MediumResponse::FixedLength {
 					name: video_name,
 					length_in_milliseconds: video_length.num_milliseconds() as u64,
 					playback_state: PlaybackStateResponse::Paused {
 						position_in_milliseconds: 0
 					}
-				})
+				}
 			},
 			response
 		);

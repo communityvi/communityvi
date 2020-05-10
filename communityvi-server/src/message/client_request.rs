@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::message::{MessageError, WebSocketMessage};
-use crate::room::state::medium::SomeMedium;
+use crate::room::state::medium::Medium;
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -18,7 +18,7 @@ pub enum ClientRequest {
 	Register(RegisterRequest),
 	Chat(ChatRequest),
 	GetReferenceTime,
-	InsertMedium(InsertMediumRequest),
+	InsertMedium { medium: InsertMediumRequest },
 	Play(PlayRequest),
 	Pause(PauseRequest),
 }
@@ -67,23 +67,30 @@ pub struct ChatRequest {
 client_request_from_struct!(Chat, ChatRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct InsertMediumRequest {
-	pub name: String,
-	pub length_in_milliseconds: u64,
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+pub enum InsertMediumRequest {
+	FixedLength { name: String, length_in_milliseconds: u64 },
+	Empty,
 }
 
-impl From<SomeMedium> for InsertMediumRequest {
-	fn from(medium: SomeMedium) -> Self {
+impl From<Medium> for InsertMediumRequest {
+	fn from(medium: Medium) -> Self {
 		match medium {
-			SomeMedium::FixedLength(medium) => Self {
+			Medium::FixedLength(medium) => InsertMediumRequest::FixedLength {
 				name: medium.name,
 				length_in_milliseconds: medium.length.num_milliseconds() as u64,
 			},
+			Medium::Empty => InsertMediumRequest::Empty,
 		}
 	}
 }
 
-client_request_from_struct!(InsertMedium, InsertMediumRequest);
+impl From<InsertMediumRequest> for ClientRequest {
+	fn from(medium: InsertMediumRequest) -> Self {
+		ClientRequest::InsertMedium { medium }
+	}
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PlayRequest {
@@ -186,15 +193,17 @@ mod test {
 
 	#[test]
 	fn insert_medium_request_should_serialize_and_deserialize() {
-		let insert_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
-			name: "Blues Brothers".to_string(),
-			length_in_milliseconds: 8520000,
-		})
+		let insert_medium_request = ClientRequest::InsertMedium {
+			medium: InsertMediumRequest::FixedLength {
+				name: "Blues Brothers".to_string(),
+				length_in_milliseconds: 8520000,
+			},
+		}
 		.with_id(42);
 		let json =
 			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
-			r#"{"request_id":42,"type":"insert_medium","name":"Blues Brothers","length_in_milliseconds":8520000}"#,
+			r#"{"request_id":42,"type":"insert_medium","medium":{"type":"fixed_length","name":"Blues Brothers","length_in_milliseconds":8520000}}"#,
 			json
 		);
 

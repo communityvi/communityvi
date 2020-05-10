@@ -78,13 +78,13 @@ mod test {
 		let error_message = OutgoingMessage::Error {
 			request_id: Some(42),
 			message: ErrorMessage::builder()
-				.error(ErrorMessageType::NoMedium)
+				.error(ErrorMessageType::InternalServerError)
 				.message("No medium".to_string())
 				.build(),
 		};
 		let json = serde_json::to_string(&error_message).expect("Failed to serialize error message to JSON");
 		assert_eq!(
-			r#"{"type":"error","request_id":42,"message":{"error":"no_medium","message":"No medium"}}"#,
+			r#"{"type":"error","request_id":42,"message":{"error":"internal_server_error","message":"No medium"}}"#,
 			json
 		);
 

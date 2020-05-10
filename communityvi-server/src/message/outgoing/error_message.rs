@@ -12,7 +12,6 @@ pub struct ErrorMessage {
 pub enum ErrorMessageType {
 	InvalidFormat,
 	InvalidOperation,
-	NoMedium,
 	InternalServerError,
 }
 

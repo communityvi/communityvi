@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::state::medium::playback_state::PlaybackState;
-use crate::room::state::medium::{Medium, SomeMedium};
+use crate::room::state::medium::Medium;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
@@ -12,7 +12,7 @@ pub enum SuccessMessage {
 	Hello {
 		id: ClientId,
 		clients: Vec<ClientResponse>,
-		current_medium: Option<MediumResponse>,
+		current_medium: MediumResponse,
 	},
 	ReferenceTime {
 		milliseconds: u64,
@@ -44,6 +44,7 @@ pub enum MediumResponse {
 		length_in_milliseconds: u64,
 		playback_state: PlaybackStateResponse,
 	},
+	Empty,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -67,14 +68,15 @@ impl From<PlaybackState> for PlaybackStateResponse {
 	}
 }
 
-impl From<&SomeMedium> for MediumResponse {
-	fn from(some_medium: &SomeMedium) -> Self {
-		match some_medium {
-			SomeMedium::FixedLength(fixed_length) => Self::FixedLength {
-				name: fixed_length.name().to_string(),
+impl From<Medium> for MediumResponse {
+	fn from(medium: Medium) -> Self {
+		match medium {
+			Medium::FixedLength(fixed_length) => MediumResponse::FixedLength {
+				name: fixed_length.name,
 				length_in_milliseconds: fixed_length.length.num_milliseconds() as u64,
-				playback_state: fixed_length.playback_state().into(),
+				playback_state: fixed_length.playback.into(),
 			},
+			Medium::Empty => MediumResponse::Empty,
 		}
 	}
 }
@@ -89,10 +91,13 @@ mod test {
 		let hello_response = SuccessMessage::Hello {
 			id: 42.into(),
 			clients: vec![],
-			current_medium: None,
+			current_medium: MediumResponse::Empty,
 		};
 		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
-		assert_eq!(r#"{"type":"hello","id":42,"clients":[],"current_medium":null}"#, json);
+		assert_eq!(
+			r#"{"type":"hello","id":42,"clients":[],"current_medium":{"type":"empty"}}"#,
+			json
+		);
 
 		let deserialized_hello_response: SuccessMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
@@ -107,13 +112,13 @@ mod test {
 				id: ClientId::from(8080),
 				name: "IMSAI".to_string(),
 			}],
-			current_medium: Some(MediumResponse::FixedLength {
+			current_medium: MediumResponse::FixedLength {
 				name: "WarGames".to_string(),
 				length_in_milliseconds: Duration::minutes(114).num_milliseconds() as u64,
 				playback_state: PlaybackStateResponse::Paused {
 					position_in_milliseconds: 0,
 				},
-			}),
+			},
 		};
 		let json = serde_json::to_string_pretty(&hello_response).expect("Failed to serialize Hello response to JSON");
 		assert_eq!(
