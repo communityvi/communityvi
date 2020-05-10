@@ -48,12 +48,10 @@ insertMediumButton.onclick = function () {
 		return;
 	}
 
+	displayPlayerMode()
+
 	if (playerMode === 'real') {
-		playerPositionLabel.hidden = true;
-		playerReal.hidden = false;
-
 		insertMediumInput.click();
-
 		return;
 	}
 
@@ -81,6 +79,23 @@ insertMediumButton.onclick = function () {
 			console.error(`Failed to insert fake medium. ${error}`);
 		});
 };
+const ejectMediumButton = document.getElementById('eject_medium');
+ejectMediumButton.onclick = function () {
+	if (webSocket === null) {
+		return;
+	}
+
+	const message = {
+		type: 'insert_medium',
+		medium: {
+			type: 'empty',
+		}
+	}
+	sendMessage(message)
+		.catch((error) => {
+			console.error(`Failed to eject medium. ${error}`);
+		});
+}
 playerReal.addEventListener('loadeddata', function () {
 	playingMedium.style.height = `${this.videoHeight}px`;
 	playingMedium.style.width = `${this.videoWidth}px`;
@@ -195,6 +210,29 @@ function skip(position) {
 
 	updatePlayer();
 }
+
+function displayPlayerMode() {
+	playerSelect.value = playerMode;
+
+	switch (playerMode) {
+		case 'fake': {
+			playerPositionLabel.hidden = false;
+			playerReal.hidden = true;
+
+			playingMedium.style.width = '640px';
+			playingMedium.style.height = '480px';
+			playerPositionSlider.style.width = '640px';
+			break;
+		}
+
+		case 'real': {
+			playerPositionLabel.hidden = true;
+			playerReal.hidden = false;
+			break;
+		}
+	}
+}
+
 
 setupButtonPressOnEnter();
 
@@ -376,6 +414,9 @@ function handleBroadcast(message, messageEvent) {
 function handleMediumStateChange(medium, triggeringClient = null) {
 	switch (medium.type) {
 		case 'empty':
+			ejectMediumButton.disabled = true;
+			playerMode = 'fake';
+
 			mediumNameLabel.textContent = 'n/a';
 			mediumLengthLabel.textContent = 'n/a';
 			mediumLength = null;
@@ -389,6 +430,8 @@ function handleMediumStateChange(medium, triggeringClient = null) {
 			break;
 
 		case 'fixed_length': {
+			ejectMediumButton.disabled = false;
+
 			if ((mediumNameLabel.textContent !== medium.name) && (triggeringClient !== null)) {
 				displayChatMessage(triggeringClient.id, triggeringClient.name, `<<< inserted "${medium.name}" >>>`);
 			}
@@ -431,6 +474,7 @@ function handleMediumStateChange(medium, triggeringClient = null) {
 		}
 	}
 
+	displayPlayerMode();
 	updatePlayer();
 }
 
