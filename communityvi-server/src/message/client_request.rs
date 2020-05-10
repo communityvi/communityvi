@@ -192,7 +192,7 @@ mod test {
 	}
 
 	#[test]
-	fn insert_medium_request_should_serialize_and_deserialize() {
+	fn insert_medium_request_with_fixed_length_medium_should_serialize_and_deserialize() {
 		let insert_medium_request = ClientRequest::InsertMedium {
 			medium: InsertMediumRequest::FixedLength {
 				name: "Blues Brothers".to_string(),
@@ -210,6 +210,24 @@ mod test {
 		let deserialized_insert_medium_request: ClientRequestWithId =
 			serde_json::from_str(&json).expect("Failed to deserialize InsertMedium request from JSON");
 		assert_eq!(insert_medium_request, deserialized_insert_medium_request);
+	}
+
+	#[test]
+	fn insert_medium_request_with_empty_medium_should_serialize_and_deserialize() {
+		let eject_medium_request = ClientRequest::InsertMedium {
+			medium: InsertMediumRequest::Empty,
+		}
+		.with_id(42);
+		let json =
+			serde_json::to_string(&eject_medium_request).expect("Failed to serialize InsertMedium request to JSON");
+		assert_eq!(
+			r#"{"request_id":42,"type":"insert_medium","medium":{"type":"empty"}}"#,
+			json
+		);
+
+		let deserialized_eject_medium_request: ClientRequestWithId =
+			serde_json::from_str(&json).expect("Failed to deserialize InsertMedium request from JSON");
+		assert_eq!(eject_medium_request, deserialized_eject_medium_request);
 	}
 
 	#[test]
