@@ -8,7 +8,6 @@ edition = "2018"
 async-trait = "0.1.30"
 base64 = "0.12"
 chrono = {version = "0.4", features = ["serde"]}
-dashmap = "3.11"
 env_logger = "0.7"
 futures = "0.3"
 gotham = {git = "https://github.com/communityvi/gotham", branch = "feature/fix-websockets", default-features = false}
