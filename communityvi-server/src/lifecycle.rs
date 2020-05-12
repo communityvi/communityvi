@@ -215,7 +215,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 			position_in_milliseconds,
 		}) => {
 			let versioned_medium = match room.pause_medium(
-				Duration::milliseconds(position_in_milliseconds.max(0).min(std::i64::MAX as u64) as i64),
+				Duration::milliseconds(position_in_milliseconds.max(0).min(i64::MAX as u64) as i64),
 				previous_version,
 			) {
 				None => {

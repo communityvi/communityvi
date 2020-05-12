@@ -1,18 +1,23 @@
 use crate::room::client_id::ClientId;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering::Relaxed;
+use std::ops::Range;
 
-#[derive(Default)]
 pub struct ClientIdSequence {
-	next_id: AtomicU64,
+	next_id: Range<u64>,
+}
+
+impl Default for ClientIdSequence {
+	fn default() -> Self {
+		Self { next_id: 0..u64::MAX }
+	}
 }
 
 impl ClientIdSequence {
-	pub fn next(&self) -> ClientId {
-		// Using Relaxed memory ordering is ok because we only care about
-		// the ordering of the value in the atomic and not any surrounding
-		// loads or stores.
-		self.next_id.fetch_add(1, Relaxed).into()
+	pub fn next(&mut self) -> ClientId {
+		ClientId::from(
+			self.next_id
+				.next()
+				.expect("This only happens if 18446744073709551615 ClientIDs are created."),
+		)
 	}
 }
 
@@ -22,7 +27,7 @@ mod test {
 
 	#[test]
 	fn client_id_sequence_should_count() {
-		let sequence = ClientIdSequence::default();
+		let mut sequence = ClientIdSequence::default();
 		assert_eq!(ClientId::from(0), sequence.next());
 		assert_eq!(ClientId::from(1), sequence.next());
 		assert_eq!(ClientId::from(2), sequence.next());
