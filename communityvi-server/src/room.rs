@@ -76,7 +76,7 @@ impl Room {
 		}
 
 		let client_id = self.inner.client_id_sequence.next();
-		let client = Client::new(client_id, name, message_sender, self.clone());
+		let client = Client::new(client_id, name, message_sender);
 
 		let existing_clients = clients.iter().map(|(_id, client)| client.clone()).collect();
 		if clients.insert(client_id, client.clone()).is_some() {

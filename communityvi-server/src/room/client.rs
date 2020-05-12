@@ -3,7 +3,6 @@ use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::client_id::ClientId;
-use crate::room::Room;
 use log::info;
 use std::sync::Arc;
 
@@ -16,18 +15,12 @@ struct Inner {
 	pub id: ClientId,
 	pub name: String,
 	pub connection: MessageSender,
-	pub room: Room,
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, connection: MessageSender, room: Room) -> Self {
+	pub fn new(id: ClientId, name: String, connection: MessageSender) -> Self {
 		Self {
-			inner: Arc::new(Inner {
-				id,
-				name,
-				connection,
-				room,
-			}),
+			inner: Arc::new(Inner { id, name, connection }),
 		}
 	}
 
