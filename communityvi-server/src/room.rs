@@ -60,7 +60,7 @@ impl Room {
 	}
 
 	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
-		let future = self.inner.clients.write().broadcast(response.into());
+		let future = self.inner.clients.read().broadcast(response.into());
 		future.await;
 	}
 
