@@ -1,15 +1,12 @@
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
+use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use chrono::Duration;
-use futures::FutureExt;
 use parking_lot::{Mutex, RwLock};
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -29,7 +26,6 @@ struct Inner {
 	clients: RwLock<Clients>,
 	medium: Mutex<VersionedMedium>,
 	start_of_reference_time: Instant,
-	chat_message_count: AtomicU64,
 }
 
 impl Room {
@@ -38,7 +34,6 @@ impl Room {
 			clients: RwLock::new(Clients::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			start_of_reference_time: std::time::Instant::now(),
-			chat_message_count: AtomicU64::new(0),
 		};
 		Self { inner: Arc::new(inner) }
 	}
@@ -60,31 +55,13 @@ impl Room {
 	}
 
 	pub async fn send_chat_message(&self, sender: &Client, message: String) {
-		let incremented_counter = self.inner.chat_message_count.fetch_add(1, SeqCst);
-		let chat_message = ChatBroadcast {
-			sender_id: sender.id(),
-			sender_name: sender.name().to_string(),
-			message,
-			counter: incremented_counter,
-		};
-		self.broadcast(chat_message).await;
+		let future = self.inner.clients.write().send_chat_message(sender, message);
+		future.await;
 	}
 
 	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
-		let futures: Vec<_> = self
-			.inner
-			.clients
-			.read()
-			.iter()
-			.map(|(_id, client)| client.clone())
-			.map(move |client| {
-				let response = response.clone();
-				async move {
-					client.send_broadcast_message(response).await;
-				}
-			})
-			.collect();
-		futures::future::join_all(futures).map(|_: Vec<()>| ()).await
+		let future = self.inner.clients.write().broadcast(response.into());
+		future.await;
 	}
 
 	pub fn current_reference_time(&self) -> std::time::Duration {

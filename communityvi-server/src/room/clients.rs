@@ -1,9 +1,12 @@
 use crate::connection::sender::MessageSender;
+use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
+use futures::FutureExt;
 use std::collections::{BTreeMap, BTreeSet};
+use std::future::Future;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub struct Clients {
@@ -11,6 +14,7 @@ pub struct Clients {
 	names: BTreeSet<String>,
 	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
+	chat_message_counter: u64,
 }
 
 impl Clients {
@@ -20,6 +24,7 @@ impl Clients {
 			names: Default::default(),
 			clients_by_id: Default::default(),
 			maximum_size: limit,
+			chat_message_counter: 0,
 		}
 	}
 
@@ -65,10 +70,31 @@ impl Clients {
 		self.clients_by_id.len()
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (ClientId, &Client)> {
-		self.clients_by_id
+	pub fn send_chat_message(&mut self, sender: &Client, message: String) -> impl Future<Output = ()> {
+		let counter = self.chat_message_counter;
+		self.chat_message_counter += 1;
+		let chat_message = ChatBroadcast {
+			sender_id: sender.id(),
+			sender_name: sender.name().to_string(),
+			message,
+			counter,
+		};
+		self.broadcast(chat_message.into())
+	}
+
+	pub fn broadcast(&self, response: BroadcastMessage) -> impl Future<Output = ()> {
+		let futures: Vec<_> = self
+			.clients_by_id
 			.iter()
-			.map(|(&client_id, client)| (client_id, client))
+			.map(|(_id, client)| client.clone())
+			.map(move |client| {
+				let response = response.clone();
+				async move {
+					client.send_broadcast_message(response).await;
+				}
+			})
+			.collect();
+		futures::future::join_all(futures).map(|_: Vec<()>| ())
 	}
 }
 
