@@ -10,7 +10,7 @@ use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
 use crate::room::client::Client;
 use crate::room::error::RoomError;
-use crate::room::state::medium::Medium;
+use crate::room::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
 use log::{debug, error, info};
@@ -250,8 +250,8 @@ mod test {
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse, VersionedMediumResponse};
 	use crate::room::client_id::ClientId;
-	use crate::room::state::medium::fixed_length::FixedLengthMedium;
-	use crate::room::state::medium::VersionedMedium;
+	use crate::room::medium::fixed_length::FixedLengthMedium;
+	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
 	use tokio::time::delay_for;
@@ -723,7 +723,8 @@ mod test {
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
 		let inserted_medium = room.insert_medium(short_circuit, 0).expect("Failed to insert medium");
-		room.play_medium(Duration::milliseconds(0), inserted_medium.version);
+		room.play_medium(Duration::milliseconds(0), inserted_medium.version)
+			.expect("Must successfully start playing");
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {

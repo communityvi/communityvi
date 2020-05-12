@@ -1,4 +1,4 @@
-use crate::room::state::medium::fixed_length::FixedLengthMedium;
+use crate::room::medium::fixed_length::FixedLengthMedium;
 use chrono::Duration;
 
 pub mod fixed_length;
@@ -75,7 +75,7 @@ impl From<FixedLengthMedium> for Medium {
 
 #[cfg(test)]
 mod test {
-	use crate::room::state::medium::VersionedMedium;
+	use crate::room::medium::VersionedMedium;
 	use chrono::Duration;
 
 	#[test]

@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
-use crate::room::state::medium::fixed_length::FixedLengthMedium;
-use crate::room::state::medium::Medium;
+use crate::room::medium::fixed_length::FixedLengthMedium;
+use crate::room::medium::Medium;
 use chrono::Duration;
 use std::convert::TryFrom;
 

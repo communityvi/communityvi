@@ -4,22 +4,22 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use crate::room::state::medium::{Medium, VersionedMedium};
-use crate::room::state::State;
+use crate::room::medium::{Medium, VersionedMedium};
 use chrono::Duration;
 use futures::FutureExt;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::{Mutex, RwLock, RwLockWriteGuard};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
+use std::time::Instant;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub mod client;
 pub mod client_id;
 mod client_id_sequence;
 pub mod error;
-pub mod state;
+pub mod medium;
 
 #[derive(Clone)]
 pub struct Room {
@@ -30,7 +30,8 @@ struct Inner {
 	client_id_sequence: ClientIdSequence,
 	client_names: RwLock<HashSet<String>>,
 	clients: RwLock<HashMap<ClientId, Client>>,
-	state: State,
+	medium: Mutex<VersionedMedium>,
+	start_of_reference_time: Instant,
 	chat_message_count: AtomicU64,
 	room_size_limit: usize,
 }
@@ -41,7 +42,8 @@ impl Room {
 			client_id_sequence: Default::default(),
 			client_names: Default::default(),
 			clients: Default::default(),
-			state: Default::default(),
+			medium: Mutex::default(),
+			start_of_reference_time: std::time::Instant::now(),
 			chat_message_count: AtomicU64::new(0),
 			room_size_limit,
 		};
@@ -104,7 +106,7 @@ impl Room {
 			.map(|client| names.remove(&normalized_name(client.name())))
 			.map(|_client_name| {
 				if clients.is_empty() {
-					self.inner.state.eject_medium();
+					self.eject_medium();
 				}
 			})
 			.is_some()
@@ -139,24 +141,44 @@ impl Room {
 	}
 
 	pub fn current_reference_time(&self) -> std::time::Duration {
-		self.inner.state.current_reference_time()
+		self.inner.start_of_reference_time.elapsed()
 	}
 
+	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
+	/// and `None` is returned. This is similar to compare and swap.
 	#[must_use]
 	pub fn insert_medium(&self, medium: impl Into<Medium>, previous_version: u64) -> Option<VersionedMedium> {
-		self.inner.state.insert_medium(medium.into(), previous_version)
+		let mut versioned_medium = self.inner.medium.lock();
+		if previous_version != versioned_medium.version {
+			return None;
+		}
+
+		versioned_medium.update(medium.into());
+
+		Some(versioned_medium.clone())
+	}
+
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn play_medium(&self, start_time: Duration, previous_version: u64) -> Option<VersionedMedium> {
+		let reference_now = Duration::from_std(self.current_reference_time())
+			.expect("This won't happen unless you run the server for more than 9_223_372_036_854_775_807 seconds :)");
+		self.inner
+			.medium
+			.lock()
+			.play(start_time, reference_now, previous_version)
+	}
+
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn pause_medium(&self, at_position: Duration, previous_version: u64) -> Option<VersionedMedium> {
+		self.inner.medium.lock().pause(at_position, previous_version)
+	}
+
+	fn eject_medium(&self) {
+		self.inner.medium.lock().update(Medium::Empty)
 	}
 
 	pub fn medium(&self) -> VersionedMedium {
-		self.inner.state.medium().clone()
-	}
-
-	pub fn play_medium(&self, start_time: Duration, previous_version: u64) -> Option<VersionedMedium> {
-		self.inner.state.play_medium(start_time, previous_version)
-	}
-
-	pub fn pause_medium(&self, position: Duration, previous_version: u64) -> Option<VersionedMedium> {
-		self.inner.state.pause_medium(position, previous_version)
+		self.inner.medium.lock().clone()
 	}
 }
 
@@ -171,7 +193,7 @@ fn normalized_name(name: &str) -> String {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::room::state::medium::fixed_length::FixedLengthMedium;
+	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use chrono::Duration;
 
@@ -345,6 +367,29 @@ mod test {
 			},
 			"A medium was still left in the room!"
 		);
+	}
+
+	#[test]
+	fn should_not_insert_medium_with_smaller_previous_version() {
+		let room = Room::new(1);
+		room.insert_medium(Medium::Empty, 0).expect("Failed to insert medium"); // increase the version
+		assert_eq!(room.medium().version, 1);
+
+		assert!(
+			room.insert_medium(Medium::Empty, 0).is_none(),
+			"Must not be able to insert"
+		);
+		assert_eq!(room.medium().version, 1);
+	}
+
+	#[test]
+	fn should_not_insert_medium_with_larger_previous_version() {
+		let room = Room::new(1);
+		assert!(
+			room.insert_medium(Medium::Empty, 1).is_none(),
+			"Must not be able to insert"
+		);
+		assert_eq!(room.medium().version, 0);
 	}
 
 	#[test]

@@ -1,7 +1,7 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
-use crate::room::state::medium::{Medium, VersionedMedium};
+use crate::room::medium::{Medium, VersionedMedium};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 

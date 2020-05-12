@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
-use crate::room::state::medium::playback_state::PlaybackState;
-use crate::room::state::medium::{Medium, VersionedMedium};
+use crate::room::medium::playback_state::PlaybackState;
+use crate::room::medium::{Medium, VersionedMedium};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]

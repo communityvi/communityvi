@@ -1,4 +1,4 @@
-use crate::room::state::medium::playback_state::PlaybackState;
+use crate::room::medium::playback_state::PlaybackState;
 use chrono::Duration;
 
 /// A medium with a fixed length. e.g. Video file or online video.
