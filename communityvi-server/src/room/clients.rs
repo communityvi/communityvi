@@ -3,13 +3,13 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use unicode_skeleton::UnicodeSkeleton;
 
 pub struct Clients {
 	client_id_sequence: ClientIdSequence,
-	names: HashSet<String>,
-	clients_by_id: HashMap<ClientId, Client>,
+	names: BTreeSet<String>,
+	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
 }
 
