@@ -1,6 +1,6 @@
 use crate::room::state::medium::{Medium, VersionedMedium};
-use parking_lot::MutexGuard;
-use std::time::{Duration, Instant};
+use chrono::Duration;
+use std::time::Instant;
 
 pub mod medium;
 
@@ -20,14 +20,14 @@ impl Default for State {
 }
 
 impl State {
-	pub fn current_reference_time(&self) -> Duration {
+	pub fn current_reference_time(&self) -> std::time::Duration {
 		self.start_of_reference_time.elapsed()
 	}
 
 	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
 	/// and `None` is returned. This is similar to compare and swap.
 	pub fn insert_medium(&self, medium: Medium, previous_version: u64) -> Option<VersionedMedium> {
-		let mut versioned_medium = self.medium();
+		let mut versioned_medium = self.medium.lock();
 		if previous_version != versioned_medium.version {
 			return None;
 		}
@@ -37,12 +37,24 @@ impl State {
 		Some(versioned_medium.clone())
 	}
 
-	pub fn medium(&self) -> MutexGuard<VersionedMedium> {
-		self.medium.lock()
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn play_medium(&self, start_time: Duration, previous_version: u64) -> Option<VersionedMedium> {
+		let reference_now = Duration::from_std(self.current_reference_time())
+			.expect("This won't happen unless you run the server for more than 9_223_372_036_854_775_807 seconds :)");
+		self.medium.lock().play(start_time, reference_now, previous_version)
+	}
+
+	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
+	pub fn pause_medium(&self, at_position: Duration, previous_version: u64) -> Option<VersionedMedium> {
+		self.medium.lock().pause(at_position, previous_version)
+	}
+
+	pub fn medium(&self) -> VersionedMedium {
+		self.medium.lock().clone()
 	}
 
 	pub fn eject_medium(&self) {
-		self.medium().update(Medium::Empty);
+		self.medium.lock().update(Medium::Empty);
 	}
 }
 

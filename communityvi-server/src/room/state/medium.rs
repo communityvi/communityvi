@@ -31,7 +31,7 @@ impl Default for Medium {
 
 impl VersionedMedium {
 	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
-	pub fn play(
+	pub(super) fn play(
 		&mut self,
 		start_time: Duration,
 		reference_now: Duration,
@@ -51,7 +51,7 @@ impl VersionedMedium {
 	}
 
 	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
-	pub fn pause(&mut self, at_position: Duration, previous_version: u64) -> Option<VersionedMedium> {
+	pub(super) fn pause(&mut self, at_position: Duration, previous_version: u64) -> Option<VersionedMedium> {
 		if self.version != previous_version {
 			return None;
 		}

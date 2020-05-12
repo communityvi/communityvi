@@ -18,7 +18,7 @@ impl FixedLengthMedium {
 		}
 	}
 
-	pub fn play(&mut self, start_time: Duration, reference_now: Duration) {
+	pub(super) fn play(&mut self, start_time: Duration, reference_now: Duration) {
 		let medium_has_ended = (start_time + self.length) < reference_now;
 
 		self.playback = if medium_has_ended {
@@ -30,7 +30,7 @@ impl FixedLengthMedium {
 		};
 	}
 
-	pub fn pause(&mut self, at_position: Duration) {
+	pub(super) fn pause(&mut self, at_position: Duration) {
 		let new_position = at_position
 			.max(Duration::seconds(0)) // Don't pause before 0
 			.min(self.length); // Don't pause after the end
