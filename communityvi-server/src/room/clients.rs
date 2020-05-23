@@ -14,7 +14,27 @@ pub struct Clients {
 	names: BTreeSet<String>,
 	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
+	counters: parking_lot::Mutex<Counters>,
+}
+
+#[derive(Default)]
+struct Counters {
 	chat_message_counter: u64,
+	broadcast_counter: usize,
+}
+
+impl Counters {
+	pub fn fetch_and_increment_chat_counter(&mut self) -> u64 {
+		let count = self.chat_message_counter;
+		self.chat_message_counter += 1;
+		count
+	}
+
+	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
+		let count = self.broadcast_counter;
+		self.broadcast_counter += 1;
+		count
+	}
 }
 
 impl Clients {
@@ -24,7 +44,7 @@ impl Clients {
 			names: Default::default(),
 			clients_by_id: Default::default(),
 			maximum_size: limit,
-			chat_message_counter: 0,
+			counters: Default::default(),
 		}
 	}
 
@@ -70,27 +90,37 @@ impl Clients {
 		self.clients_by_id.len()
 	}
 
-	pub fn send_chat_message(&mut self, sender: &Client, message: String) -> impl Future<Output = ()> {
-		let counter = self.chat_message_counter;
-		self.chat_message_counter += 1;
+	pub fn send_chat_message(&self, sender: &Client, message: String) -> impl Future<Output = ()> {
+		let (chat_counter, broadcast_counter) = {
+			let mut counters = self.counters.lock();
+			let chat_counter = counters.fetch_and_increment_chat_counter();
+			let broadcast_counter = counters.fetch_and_increment_broadcast_counter();
+			(chat_counter, broadcast_counter)
+		};
 		let chat_message = ChatBroadcast {
 			sender_id: sender.id(),
 			sender_name: sender.name().to_string(),
 			message,
-			counter,
+			counter: chat_counter,
 		};
-		self.broadcast(chat_message.into())
+		self.broadcast_with_count(chat_message.into(), broadcast_counter)
 	}
 
-	pub fn broadcast(&self, response: BroadcastMessage) -> impl Future<Output = ()> {
+	pub fn broadcast(&self, message: BroadcastMessage) -> impl Future<Output = ()> {
+		let count = self.counters.lock().fetch_and_increment_broadcast_counter();
+		self.broadcast_with_count(message, count)
+	}
+
+	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) -> impl Future<Output = ()> {
 		let futures: Vec<_> = self
 			.clients_by_id
 			.iter()
 			.map(|(_id, client)| client.clone())
 			.map(move |client| {
-				let response = response.clone();
+				client.enqueue_broadcast(message.clone(), count);
+				let message = message.clone();
 				async move {
-					client.send_broadcast_message(response).await;
+					client.send_broadcast_message(message).await;
 				}
 			})
 			.collect();

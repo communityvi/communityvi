@@ -55,7 +55,7 @@ impl Room {
 	}
 
 	pub async fn send_chat_message(&self, sender: &Client, message: String) {
-		let future = self.inner.clients.write().send_chat_message(sender, message);
+		let future = self.inner.clients.read().send_chat_message(sender, message);
 		future.await;
 	}
 

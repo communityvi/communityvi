@@ -1,3 +1,4 @@
+use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
@@ -15,12 +16,18 @@ struct Inner {
 	pub id: ClientId,
 	pub name: String,
 	pub connection: MessageSender,
+	pub broadcast_buffer: parking_lot::Mutex<BroadcastBuffer>,
 }
 
 impl Client {
 	pub fn new(id: ClientId, name: String, connection: MessageSender) -> Self {
 		Self {
-			inner: Arc::new(Inner { id, name, connection }),
+			inner: Arc::new(Inner {
+				id,
+				name,
+				connection,
+				broadcast_buffer: Default::default(),
+			}),
 		}
 	}
 
@@ -84,5 +91,9 @@ impl Client {
 		} else {
 			true
 		}
+	}
+
+	pub fn enqueue_broadcast(&self, message: impl Into<BroadcastMessage>, count: usize) {
+		self.inner.broadcast_buffer.lock().enqueue(message.into(), count);
 	}
 }
