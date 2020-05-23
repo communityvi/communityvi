@@ -5,10 +5,10 @@ use crate::message::outgoing::broadcast_message::{
 use std::collections::{BTreeSet, VecDeque};
 use tokio::sync::Notify;
 
-#[derive(Default)]
 pub struct BroadcastBuffer {
 	inner: parking_lot::Mutex<Inner>,
 	new_broadcast_available_notification_channel: Notify,
+	maximum_client_count: usize,
 }
 
 const CHAT_MESSAGE_BUFFER_LIMIT: usize = 10;
@@ -22,6 +22,14 @@ pub struct Inner {
 }
 
 impl BroadcastBuffer {
+	pub fn new(maximum_client_count: usize) -> Self {
+		Self {
+			inner: Default::default(),
+			new_broadcast_available_notification_channel: Default::default(),
+			maximum_client_count,
+		}
+	}
+
 	pub fn enqueue(&self, message: BroadcastMessage, broadcast_number: usize) {
 		let mut inner = self.inner.lock();
 		if let Some(next_broadcast_number) = inner.next_broadcast_number {
@@ -51,11 +59,25 @@ impl BroadcastBuffer {
 		}
 
 		inner.messages.push_back(message);
-		inner.collect_garbage(); // TODO: Decide when to actually collect.
+
+		let worst_count_to_keep_alive = self.worst_count_of_messages_to_keep_alive();
+		if inner.length() > (worst_count_to_keep_alive + (worst_count_to_keep_alive / 2)) {
+			inner.collect_garbage();
+		}
 
 		if !inner.is_empty() {
 			self.new_broadcast_available_notification_channel.notify();
 		}
+	}
+
+	fn worst_count_of_messages_to_keep_alive(&self) -> usize {
+		(self.maximum_client_count - 1) // join/leave messages for all clients except the one we're currently sending to
+			+ (CHAT_MESSAGE_BUFFER_LIMIT * 3) // Join + Chat + Leave if a client Joins, sends a message and leaves again
+			+ 3 // Join + medium state + Leave if a client joins, changes the state and leaves again
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.inner.lock().is_empty()
 	}
 
 	pub fn dequeue(&self) -> Option<BroadcastMessage> {
@@ -70,10 +92,6 @@ impl BroadcastBuffer {
 			}
 		}
 	}
-
-	pub fn is_empty(&self) -> bool {
-		self.inner.lock().is_empty()
-	}
 }
 
 impl Inner {
@@ -83,14 +101,12 @@ impl Inner {
 	/// * Only ever keep at most the last CHAT_MESSAGE_BUFFER_LIMIT chat messages.
 	/// * Remove Join and Left messages for the same client as long as we don't still have any chat messages from them.
 	///
-	/// This means we can calculate the maximum count of messages by taking the worst case scenario:
-	/// * (room_size_limit - 1) regular client join messages (not including the client this buffer is for)
-	/// * (CHAT_MESSAGE_BUFFER_LIMIT * 2) Join/Leave messages (if they join, then send one message, then leave again)
-	/// * 1 medium state message (with the highest version)
+	/// This means we can calculate the maximum count of messages by taking the worst case scenario
+	/// (see worst_count_of_messages_to_keep_alive())
 	fn collect_garbage(&mut self) {
 		let mut seen_chat_messages = 0;
 		let mut last_seen_medium_index = None;
-		let mut seen_chatters = BTreeSet::new();
+		let mut clients_to_keep_alive = BTreeSet::new();
 		let mut joined_clients = BTreeSet::new();
 		let mut left_clients = BTreeSet::new();
 
@@ -106,10 +122,11 @@ impl Inner {
 				}
 				Chat(ChatBroadcast { sender_id, .. }) => {
 					seen_chat_messages += 1;
-					seen_chatters.insert(*sender_id);
+					clients_to_keep_alive.insert(*sender_id);
 				}
-				MediumStateChanged(_) => {
+				MediumStateChanged(MediumStateChangedBroadcast { changed_by_id, .. }) => {
 					last_seen_medium_index = Some(index);
+					clients_to_keep_alive.insert(*changed_by_id);
 				}
 			}
 		}
@@ -123,10 +140,10 @@ impl Inner {
 				use BroadcastMessage::*;
 				match message {
 					ClientJoined(ClientJoinedBroadcast { id, .. }) => {
-						!left_clients.contains(id) || seen_chatters.contains(id)
+						!left_clients.contains(id) || clients_to_keep_alive.contains(id)
 					}
 					ClientLeft(ClientLeftBroadcast { id, .. }) => {
-						!joined_clients.contains(id) || seen_chatters.contains(id)
+						!joined_clients.contains(id) || clients_to_keep_alive.contains(id)
 					}
 					Chat(_) => {
 						let keep = seen_chat_messages <= CHAT_MESSAGE_BUFFER_LIMIT;
@@ -143,6 +160,10 @@ impl Inner {
 	fn is_empty(&self) -> bool {
 		self.messages.is_empty()
 	}
+
+	fn length(&self) -> usize {
+		self.messages.len()
+	}
 }
 
 #[cfg(test)]
@@ -153,13 +174,21 @@ mod test {
 	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
 
-	#[derive(Default)]
-	struct BroadCastBufferWithTestHelpers {
+	struct BroadcastBufferWithTestHelpers {
 		pub broadcast_buffer: BroadcastBuffer,
 		pub broadcast_number: usize,
 	}
 
-	impl Deref for BroadCastBufferWithTestHelpers {
+	impl Default for BroadcastBufferWithTestHelpers {
+		fn default() -> Self {
+			Self {
+				broadcast_buffer: BroadcastBuffer::new(50),
+				broadcast_number: 0,
+			}
+		}
+	}
+
+	impl Deref for BroadcastBufferWithTestHelpers {
 		type Target = BroadcastBuffer;
 
 		fn deref(&self) -> &Self::Target {
@@ -167,7 +196,7 @@ mod test {
 		}
 	}
 
-	impl BroadCastBufferWithTestHelpers {
+	impl BroadcastBufferWithTestHelpers {
 		fn enqueue_next(&mut self, broadcast: BroadcastMessage) {
 			let broadcast_number = self.broadcast_number;
 			self.broadcast_number += 1;
@@ -247,13 +276,15 @@ mod test {
 
 	#[test]
 	fn collect_garbage_should_remove_pairs_of_client_messages() {
-		let mut broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		broadcast_buffer.enqueue_client_joined(0);
 		broadcast_buffer.enqueue_client_left(0);
 		broadcast_buffer.enqueue_client_joined(1);
 		broadcast_buffer.enqueue_client_joined(2);
 		broadcast_buffer.enqueue_client_left(99);
 		broadcast_buffer.enqueue_client_left(1);
+
+		broadcast_buffer.inner.lock().collect_garbage();
 
 		assert_eq!(broadcast_buffer.dequeue_client_joined(), 2);
 		assert_eq!(broadcast_buffer.dequeue_client_left(), 99);
@@ -262,10 +293,12 @@ mod test {
 
 	#[test]
 	fn collect_garbage_should_only_produce_latest_medium_state() {
-		let mut broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		broadcast_buffer.enqueue_medium_state(ClientId::from(42), 13);
 		broadcast_buffer.enqueue_medium_state(ClientId::from(12), 14);
 		broadcast_buffer.enqueue_medium_state(ClientId::from(1), 1);
+
+		broadcast_buffer.inner.lock().collect_garbage();
 
 		let (id, version) = broadcast_buffer.dequeue_medium_state();
 		assert_eq!(id, ClientId::from(12));
@@ -274,10 +307,12 @@ mod test {
 
 	#[test]
 	fn should_not_store_more_than_limit_chat_messages() {
-		let mut broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT as u64 + 3) {
 			broadcast_buffer.enqueue_chat_message(ClientId::from(number), number);
 		}
+
+		broadcast_buffer.inner.lock().collect_garbage();
 
 		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT as u64 + 3) {
 			let (id, count) = broadcast_buffer.dequeue_chat_message();
@@ -288,10 +323,12 @@ mod test {
 
 	#[test]
 	fn chat_messages_should_keep_clients_alive() {
-		let mut broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		broadcast_buffer.enqueue_client_joined(42);
 		broadcast_buffer.enqueue_chat_message(ClientId::from(42), 1337);
 		broadcast_buffer.enqueue_client_left(42);
+
+		broadcast_buffer.inner.lock().collect_garbage();
 
 		assert_eq!(broadcast_buffer.dequeue_client_joined(), 42);
 		let (id, count) = broadcast_buffer.dequeue_chat_message();
@@ -301,10 +338,26 @@ mod test {
 	}
 
 	#[test]
+	fn medium_state_messages_should_keep_clients_alive() {
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
+		broadcast_buffer.enqueue_client_joined(42);
+		broadcast_buffer.enqueue_medium_state(ClientId::from(42), 2);
+		broadcast_buffer.enqueue_client_left(42);
+
+		broadcast_buffer.inner.lock().collect_garbage();
+
+		assert_eq!(broadcast_buffer.dequeue_client_joined(), 42);
+		let (id, version) = broadcast_buffer.dequeue_medium_state();
+		assert_eq!(id, ClientId::from(42));
+		assert_eq!(version, 2);
+		assert_eq!(broadcast_buffer.dequeue_client_left(), 42);
+	}
+
+	#[test]
 	#[should_panic]
 	fn broadcast_number_must_not_stay_the_same() {
 		let _backtrace_disabler = BacktraceDisabler::default();
-		let broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
@@ -318,7 +371,7 @@ mod test {
 	#[should_panic]
 	fn broadcast_number_must_not_skip() {
 		let _backtrace_disabler = BacktraceDisabler::default();
-		let broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
@@ -332,7 +385,7 @@ mod test {
 	#[should_panic]
 	fn broadcast_number_must_not_decrease() {
 		let _backtrace_disabler = BacktraceDisabler::default();
-		let broadcast_buffer = BroadCastBufferWithTestHelpers::default();
+		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
@@ -340,5 +393,23 @@ mod test {
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 41);
+	}
+
+	#[test]
+	fn should_trigger_garbage_collection_after_one_and_a_half_time_worst_count_is_exceeded() {
+		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
+
+		let worst_count_to_keep_alive = broadcast_buffer.worst_count_of_messages_to_keep_alive() as u64;
+		for number in 0..(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2)) {
+			broadcast_buffer.enqueue_medium_state(ClientId::from(number), number);
+		}
+
+		assert_eq!(
+			broadcast_buffer.inner.lock().length() as u64,
+			(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2))
+		);
+
+		broadcast_buffer.enqueue_medium_state(ClientId::from(1337), 1337);
+		assert_eq!(broadcast_buffer.inner.lock().length(), 1); // garbage collection should have been triggered
 	}
 }

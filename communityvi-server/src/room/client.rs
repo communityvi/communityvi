@@ -20,13 +20,13 @@ struct Inner {
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, connection: MessageSender) -> Self {
+	pub fn new(id: ClientId, name: String, broadcast_buffer: BroadcastBuffer, connection: MessageSender) -> Self {
 		Self {
 			inner: Arc::new(Inner {
 				id,
 				name,
 				connection,
-				broadcast_buffer: Default::default(),
+				broadcast_buffer,
 			}),
 		}
 	}

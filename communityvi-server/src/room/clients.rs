@@ -1,3 +1,4 @@
+use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::room::client::Client;
@@ -71,7 +72,8 @@ impl Clients {
 		}
 
 		let client_id = self.client_id_sequence.next();
-		let client = Client::new(client_id, name, message_sender);
+		let broadcast_buffer = BroadcastBuffer::new(self.maximum_size);
+		let client = Client::new(client_id, name, broadcast_buffer, message_sender);
 
 		let existing_clients = self.clients_by_id.iter().map(|(_id, client)| client.clone()).collect();
 		if self.clients_by_id.insert(client_id, client.clone()).is_some() {
