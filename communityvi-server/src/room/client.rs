@@ -16,7 +16,7 @@ struct Inner {
 	pub id: ClientId,
 	pub name: String,
 	pub connection: MessageSender,
-	pub broadcast_buffer: parking_lot::Mutex<BroadcastBuffer>,
+	pub broadcast_buffer: BroadcastBuffer,
 }
 
 impl Client {
@@ -94,6 +94,6 @@ impl Client {
 	}
 
 	pub fn enqueue_broadcast(&self, message: impl Into<BroadcastMessage>, count: usize) {
-		self.inner.broadcast_buffer.lock().enqueue(message.into(), count);
+		self.inner.broadcast_buffer.enqueue(message.into(), count);
 	}
 }
