@@ -4,9 +4,7 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use futures::FutureExt;
 use std::collections::{BTreeMap, BTreeSet};
-use std::future::Future;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub struct Clients {
@@ -90,7 +88,7 @@ impl Clients {
 		self.clients_by_id.len()
 	}
 
-	pub fn send_chat_message(&self, sender: &Client, message: String) -> impl Future<Output = ()> {
+	pub fn send_chat_message(&self, sender: &Client, message: String) {
 		let (chat_counter, broadcast_counter) = {
 			let mut counters = self.counters.lock();
 			let chat_counter = counters.fetch_and_increment_chat_counter();
@@ -103,28 +101,18 @@ impl Clients {
 			message,
 			counter: chat_counter,
 		};
-		self.broadcast_with_count(chat_message.into(), broadcast_counter)
+		self.broadcast_with_count(chat_message.into(), broadcast_counter);
 	}
 
-	pub fn broadcast(&self, message: BroadcastMessage) -> impl Future<Output = ()> {
+	pub fn broadcast(&self, message: BroadcastMessage) {
 		let count = self.counters.lock().fetch_and_increment_broadcast_counter();
-		self.broadcast_with_count(message, count)
+		self.broadcast_with_count(message, count);
 	}
 
-	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) -> impl Future<Output = ()> {
-		let futures: Vec<_> = self
-			.clients_by_id
-			.iter()
-			.map(|(_id, client)| client.clone())
-			.map(move |client| {
-				client.enqueue_broadcast(message.clone(), count);
-				let message = message.clone();
-				async move {
-					client.send_broadcast_message(message).await;
-				}
-			})
-			.collect();
-		futures::future::join_all(futures).map(|_: Vec<()>| ())
+	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) {
+		for (_, client) in self.clients_by_id.iter() {
+			client.enqueue_broadcast(message.clone(), count);
+		}
 	}
 }
 

@@ -3,10 +3,12 @@ use crate::message::outgoing::broadcast_message::{
 	VersionedMediumBroadcast,
 };
 use std::collections::{BTreeSet, VecDeque};
+use tokio::sync::Notify;
 
 #[derive(Default)]
 pub struct BroadcastBuffer {
 	inner: parking_lot::Mutex<Inner>,
+	new_broadcast_available_notification_channel: Notify,
 }
 
 const CHAT_MESSAGE_BUFFER_LIMIT: usize = 10;
@@ -50,14 +52,27 @@ impl BroadcastBuffer {
 
 		inner.messages.push_back(message);
 		inner.collect_garbage(); // TODO: Decide when to actually collect.
+
+		if !inner.is_empty() {
+			self.new_broadcast_available_notification_channel.notify();
+		}
 	}
 
 	pub fn dequeue(&self) -> Option<BroadcastMessage> {
 		self.inner.lock().messages.pop_front()
 	}
 
-	fn is_empty(&self) -> bool {
-		self.inner.lock().messages.is_empty()
+	pub async fn wait_for_broadcast(&self) -> BroadcastMessage {
+		loop {
+			self.new_broadcast_available_notification_channel.notified().await;
+			if let Some(broadcast) = self.dequeue() {
+				return broadcast;
+			}
+		}
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.inner.lock().is_empty()
 	}
 }
 
@@ -123,6 +138,10 @@ impl Inner {
 			})
 			.map(|(_index, message)| message)
 			.collect();
+	}
+
+	fn is_empty(&self) -> bool {
+		self.messages.is_empty()
 	}
 }
 

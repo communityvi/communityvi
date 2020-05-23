@@ -19,7 +19,10 @@ use std::convert::TryFrom;
 pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
-		handle_messages(&room, client, message_receiver).await;
+		tokio::select! {
+			_ = handle_messages(&room, client.clone(), message_receiver) => {},
+			_ = send_broadcasts(client) => {}
+		};
 		room.remove_client(client_id);
 	}
 }
@@ -99,10 +102,19 @@ async fn register_client(
 
 		info!("Registered client: {} {}", id, name);
 
-		room.broadcast(ClientJoinedBroadcast { id, name }).await;
+		room.broadcast(ClientJoinedBroadcast { id, name });
 		Some((client, message_receiver))
 	} else {
 		None
+	}
+}
+
+pub async fn send_broadcasts(client: Client) {
+	loop {
+		let broadcast = client.wait_for_broadcast().await;
+		if !client.send_broadcast_message(broadcast).await {
+			break;
+		}
 	}
 }
 
@@ -118,7 +130,7 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 			client.id(),
 		);
 
-		match handle_request(room, &client, message.request).await {
+		match handle_request(room, &client, message.request) {
 			Ok(success_message) => client.send_success_message(success_message, message.request_id).await,
 			Err(error_message) => client.send_error_message(error_message, Some(message.request_id)).await,
 		};
@@ -127,14 +139,14 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 	let id = client.id();
 	let name = client.name().to_string();
 	info!("Client '{}' with id {} has left.", name, id);
-	room.broadcast(ClientLeftBroadcast { id, name }).await;
+	room.broadcast(ClientLeftBroadcast { id, name });
 }
 
-async fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
+fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
 	use ClientRequest::*;
 	match request {
 		Chat(ChatRequest { message }) => {
-			room.send_chat_message(client, message).await;
+			room.send_chat_message(client, message);
 			Ok(SuccessMessage::Success)
 		}
 		Register { .. } => {
@@ -177,8 +189,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				changed_by_name: client.name().to_string(),
 				changed_by_id: client.id(),
 				medium: VersionedMediumBroadcast::new(versioned_medium, false),
-			})
-			.await;
+			});
 
 			Ok(SuccessMessage::Success)
 		}
@@ -205,8 +216,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				changed_by_name: client.name().to_string(),
 				changed_by_id: client.id(),
 				medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-			})
-			.await;
+			});
 			Ok(SuccessMessage::Success)
 		}
 		Pause(PauseRequest {
@@ -234,8 +244,7 @@ async fn handle_request(room: &Room, client: &Client, request: ClientRequest) ->
 				changed_by_name: client.name().to_string(),
 				changed_by_id: client.id(),
 				medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-			})
-			.await;
+			});
 			Ok(SuccessMessage::Success)
 		}
 	}
@@ -268,7 +277,6 @@ mod test {
 
 		delay_for(TEST_DELAY).await; // ensure that some time has passed
 		let response = handle_request(&room, &client, ClientRequest::GetReferenceTime)
-			.await
 			.expect("Failed to get reference time message");
 
 		match response {
@@ -285,15 +293,9 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
-
 		let room = Room::new(2);
-		let (alice, _) = room
-			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
-			.expect("Did not get client handle!");
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let response = handle_request(
@@ -305,7 +307,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect("Failed to get successful response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -345,9 +346,7 @@ mod test {
 			.into(),
 			previous_version: 0,
 		};
-		let response = handle_request(&room, &alice, request.into())
-			.await
-			.expect_err("Failed to ger error response");
+		let response = handle_request(&room, &alice, request.into()).expect_err("Failed to ger error response");
 
 		assert_eq!(
 			response,
@@ -360,15 +359,10 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
-
 		let room = Room::new(2);
-		let (alice, _) = room
-			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-		room.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
-			.expect("Did not get client handle!");
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
 
@@ -382,7 +376,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -411,15 +404,10 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
-
 		let room = Room::new(2);
-		room.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-		let (bob, _) = room
-			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
-			.expect("Did not get client handle!");
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
 		let played_medium = room
@@ -436,7 +424,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -465,15 +452,9 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
-		let (alice_message_sender, _message_receiver, mut alice_test_client) = WebsocketTestClient::new();
-		let (bob_message_sender, _message_receiver, mut bob_test_client) = WebsocketTestClient::new();
-
 		let room = Room::new(2);
-		room.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
-			.expect("Did not get client handle!");
-		let (bob, _) = room
-			.add_client_and_return_existing("Bob".to_string(), bob_message_sender)
-			.expect("Did not get client handle!");
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
@@ -488,7 +469,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -537,7 +517,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -570,7 +549,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -599,7 +577,6 @@ mod test {
 			}
 			.into(),
 		)
-		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -854,7 +831,7 @@ mod test {
 		let request_id = test_client.send_request(register_request).await;
 
 		// run server code required for client registration
-		let (client_handle, message_receiver) = register_client(room.clone(), message_sender, message_receiver)
+		let (client, message_receiver) = register_client(room.clone(), message_sender, message_receiver)
 			.await
 			.unwrap();
 
@@ -865,13 +842,13 @@ mod test {
 		} else {
 			panic!("Expected Hello-Response, got '{:?}'", response);
 		};
-		assert_eq!(client_handle.id(), id);
+		assert_eq!(client.id(), id);
 
-		let joined_response = test_client.receive_broadcast_message().await;
+		let joined_response = client.wait_for_broadcast().await;
 		assert!(matches!(
 			joined_response,
 			BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
 		));
-		(client_handle, message_receiver, test_client)
+		(client, message_receiver, test_client)
 	}
 }

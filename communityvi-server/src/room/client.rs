@@ -75,7 +75,7 @@ impl Client {
 		}
 	}
 
-	pub async fn send_broadcast_message(&self, message: impl Into<BroadcastMessage>) -> bool {
+	pub async fn send_broadcast_message(&self, message: impl Into<BroadcastMessage> + Unpin) -> bool {
 		if self
 			.inner
 			.connection
@@ -93,7 +93,11 @@ impl Client {
 		}
 	}
 
-	pub fn enqueue_broadcast(&self, message: impl Into<BroadcastMessage>, count: usize) {
+	pub fn enqueue_broadcast(&self, message: impl Into<BroadcastMessage> + Unpin, count: usize) {
 		self.inner.broadcast_buffer.enqueue(message.into(), count);
+	}
+
+	pub async fn wait_for_broadcast(&self) -> BroadcastMessage {
+		self.inner.broadcast_buffer.wait_for_broadcast().await
 	}
 }

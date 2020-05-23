@@ -1,20 +1,29 @@
 use crate::connection::receiver::{MessageReceiver, StreamMessageReceiver};
 use crate::connection::sender::{MessageSender, SinkMessageSender};
+use crate::lifecycle::send_broadcasts;
 use crate::message::client_request::{ClientRequest, ClientRequestWithId};
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
+use crate::room::client::Client;
+use crate::room::Room;
 use futures::{Sink, SinkExt, Stream, StreamExt};
+use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
 use std::pin::Pin;
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
 
 pub struct WebsocketTestClient {
 	sender: Pin<Box<dyn Sink<WebSocketMessage, Error = ()> + Unpin + Send>>,
 	receiver: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
+	success_messages: BTreeMap<u64, SuccessMessage>,
+	error_messages: BTreeMap<Option<u64>, ErrorMessage>,
+	broadcast_messages: VecDeque<BroadcastMessage>,
 }
 
 impl WebsocketTestClient {
@@ -32,9 +41,22 @@ impl WebsocketTestClient {
 		let test_client = Self {
 			sender: Box::pin(client_sender),
 			receiver: Box::pin(client_receiver),
+			success_messages: Default::default(),
+			error_messages: Default::default(),
+			broadcast_messages: Default::default(),
 		};
 
 		(message_sender, message_receiver, test_client)
+	}
+
+	// async because it uses tokio::spawn. This make it clear that this should not be run outside of a runtime.
+	pub async fn in_room(name: &'static str, room: &Room) -> (Client, Self) {
+		let (sender, _, test_client) = Self::new();
+		let (client, _) = room
+			.add_client_and_return_existing(name.to_string(), sender)
+			.expect("Failed to add client to room");
+		tokio::spawn(send_broadcasts(client.clone()));
+		(client, test_client)
 	}
 
 	pub async fn send_raw(&mut self, message: WebSocketMessage) {
@@ -45,9 +67,9 @@ impl WebsocketTestClient {
 	}
 
 	pub async fn receive_raw(&mut self) -> WebSocketMessage {
-		self.receiver
-			.next()
+		timeout(Duration::from_secs(1), self.receiver.next())
 			.await
+			.expect("Timed out waiting for raw message.")
 			.expect("Failed to receive message via TestClient")
 	}
 
@@ -67,32 +89,48 @@ impl WebsocketTestClient {
 	}
 
 	pub async fn receive_success_message(&mut self, expected_request_id: u64) -> SuccessMessage {
-		let websocket_message = self.receive_raw().await;
-		match OutgoingMessage::try_from(&websocket_message).expect("Failed to deserialize OutgoingMessage") {
-			OutgoingMessage::Success { request_id, message } => {
-				assert_eq!(request_id, expected_request_id);
-				message
+		loop {
+			self.receive_outgoing_message().await;
+			if let Some(success) = self.success_messages.remove(&expected_request_id) {
+				return success;
 			}
-			message @ _ => panic!("Received message with incorrect type: {:?}", message),
 		}
 	}
 
 	pub async fn receive_error_message(&mut self, expected_request_id: Option<u64>) -> ErrorMessage {
-		let websocket_message = self.receive_raw().await;
-		match OutgoingMessage::try_from(&websocket_message).expect("Failed to deserialize OutgoingMessage") {
-			OutgoingMessage::Error { request_id, message } => {
-				assert_eq!(request_id, expected_request_id);
-				message
+		loop {
+			self.receive_outgoing_message().await;
+			if let Some(error) = self.error_messages.remove(&expected_request_id) {
+				return error;
 			}
-			message @ _ => panic!("Received message with incorrect type: {:?}", message),
 		}
 	}
 
 	pub async fn receive_broadcast_message(&mut self) -> BroadcastMessage {
-		let websocket_message = self.receive_raw().await;
+		loop {
+			self.receive_outgoing_message().await;
+			if let Some(message) = self.broadcast_messages.pop_front() {
+				return message;
+			}
+		}
+	}
+
+	async fn receive_outgoing_message(&mut self) {
+		let websocket_message = timeout(Duration::from_secs(1), self.receive_raw())
+			.await
+			.expect("Timeout while waiting for message.");
+		use OutgoingMessage::*;
 		match OutgoingMessage::try_from(&websocket_message).expect("Failed to deserialize OutgoingMessage") {
-			OutgoingMessage::Broadcast { message } => message,
-			message @ _ => panic!("Received message with incorrect type: {:?}", message),
+			Success { request_id, message } => {
+				self.success_messages.insert(request_id, message);
+			}
+			Error { request_id, message } => assert!(
+				self.error_messages.insert(request_id, message).is_none(),
+				"Tried to queue more than one error message without request id"
+			),
+			Broadcast { message } => {
+				self.broadcast_messages.push_back(message);
+			}
 		}
 	}
 }
@@ -108,6 +146,9 @@ where
 		Self {
 			sender: Box::pin(sender),
 			receiver: Box::pin(receiver),
+			success_messages: Default::default(),
+			error_messages: Default::default(),
+			broadcast_messages: Default::default(),
 		}
 	}
 }
