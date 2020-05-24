@@ -21,11 +21,18 @@ use std::convert::TryFrom;
 pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
+		let client_name = client.name().to_string();
 		tokio::select! {
 			_ = handle_messages(&room, client.clone(), message_receiver) => {},
 			_ = send_broadcasts(client) => {}
 		};
 		room.remove_client(client_id);
+
+		info!("Client '{}' with id {} has left.", client_name, client_id);
+		room.broadcast(ClientLeftBroadcast {
+			id: client_id,
+			name: client_name,
+		});
 	}
 }
 
@@ -142,11 +149,6 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 			Err(error_message) => client.send_error_message(error_message, Some(message.request_id)).await,
 		};
 	}
-
-	let id = client.id();
-	let name = client.name().to_string();
-	info!("Client '{}' with id {} has left.", name, id);
-	room.broadcast(ClientLeftBroadcast { id, name });
 }
 
 fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
