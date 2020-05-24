@@ -1,12 +1,11 @@
+use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use futures::FutureExt;
 use std::collections::{BTreeMap, BTreeSet};
-use std::future::Future;
 use unicode_skeleton::UnicodeSkeleton;
 
 pub struct Clients {
@@ -14,7 +13,27 @@ pub struct Clients {
 	names: BTreeSet<String>,
 	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
+	counters: parking_lot::Mutex<Counters>,
+}
+
+#[derive(Default)]
+struct Counters {
 	chat_message_counter: u64,
+	broadcast_counter: usize,
+}
+
+impl Counters {
+	pub fn fetch_and_increment_chat_counter(&mut self) -> u64 {
+		let count = self.chat_message_counter;
+		self.chat_message_counter += 1;
+		count
+	}
+
+	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
+		let count = self.broadcast_counter;
+		self.broadcast_counter += 1;
+		count
+	}
 }
 
 impl Clients {
@@ -24,7 +43,7 @@ impl Clients {
 			names: Default::default(),
 			clients_by_id: Default::default(),
 			maximum_size: limit,
-			chat_message_counter: 0,
+			counters: Default::default(),
 		}
 	}
 
@@ -53,7 +72,8 @@ impl Clients {
 		}
 
 		let client_id = self.client_id_sequence.next();
-		let client = Client::new(client_id, name, message_sender);
+		let broadcast_buffer = BroadcastBuffer::new(self.maximum_size);
+		let client = Client::new(client_id, name, broadcast_buffer, message_sender);
 
 		let existing_clients = self.clients_by_id.iter().map(|(_id, client)| client.clone()).collect();
 		if self.clients_by_id.insert(client_id, client.clone()).is_some() {
@@ -70,31 +90,31 @@ impl Clients {
 		self.clients_by_id.len()
 	}
 
-	pub fn send_chat_message(&mut self, sender: &Client, message: String) -> impl Future<Output = ()> {
-		let counter = self.chat_message_counter;
-		self.chat_message_counter += 1;
+	pub fn send_chat_message(&self, sender: &Client, message: String) {
+		let (chat_counter, broadcast_counter) = {
+			let mut counters = self.counters.lock();
+			let chat_counter = counters.fetch_and_increment_chat_counter();
+			let broadcast_counter = counters.fetch_and_increment_broadcast_counter();
+			(chat_counter, broadcast_counter)
+		};
 		let chat_message = ChatBroadcast {
 			sender_id: sender.id(),
 			sender_name: sender.name().to_string(),
 			message,
-			counter,
+			counter: chat_counter,
 		};
-		self.broadcast(chat_message.into())
+		self.broadcast_with_count(chat_message.into(), broadcast_counter);
 	}
 
-	pub fn broadcast(&self, response: BroadcastMessage) -> impl Future<Output = ()> {
-		let futures: Vec<_> = self
-			.clients_by_id
-			.iter()
-			.map(|(_id, client)| client.clone())
-			.map(move |client| {
-				let response = response.clone();
-				async move {
-					client.send_broadcast_message(response).await;
-				}
-			})
-			.collect();
-		futures::future::join_all(futures).map(|_: Vec<()>| ())
+	pub fn broadcast(&self, message: BroadcastMessage) {
+		let count = self.counters.lock().fetch_and_increment_broadcast_counter();
+		self.broadcast_with_count(message, count);
+	}
+
+	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) {
+		for (_, client) in self.clients_by_id.iter() {
+			client.enqueue_broadcast(message.clone(), count);
+		}
 	}
 }
 

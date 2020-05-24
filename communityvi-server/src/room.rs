@@ -54,14 +54,12 @@ impl Room {
 		}
 	}
 
-	pub async fn send_chat_message(&self, sender: &Client, message: String) {
-		let future = self.inner.clients.write().send_chat_message(sender, message);
-		future.await;
+	pub fn send_chat_message(&self, sender: &Client, message: String) {
+		self.inner.clients.read().send_chat_message(sender, message);
 	}
 
-	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
-		let future = self.inner.clients.read().broadcast(response.into());
-		future.await;
+	pub fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
+		self.inner.clients.read().broadcast(response.into());
 	}
 
 	pub fn current_reference_time(&self) -> std::time::Duration {

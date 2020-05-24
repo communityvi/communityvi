@@ -105,7 +105,11 @@ fn should_broadcast_messages() {
 				counter: 0,
 			});
 
-			alice_test_client.send_request(request).await;
+			let request_id = alice_test_client.send_request(request).await;
+			assert_eq!(
+				SuccessMessage::Success,
+				alice_test_client.receive_success_message(request_id).await
+			);
 
 			assert_eq!(
 				expected_chat_broadcast,

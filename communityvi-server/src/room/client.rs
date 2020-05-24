@@ -1,3 +1,4 @@
+use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
@@ -15,12 +16,18 @@ struct Inner {
 	pub id: ClientId,
 	pub name: String,
 	pub connection: MessageSender,
+	pub broadcast_buffer: BroadcastBuffer,
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, connection: MessageSender) -> Self {
+	pub fn new(id: ClientId, name: String, broadcast_buffer: BroadcastBuffer, connection: MessageSender) -> Self {
 		Self {
-			inner: Arc::new(Inner { id, name, connection }),
+			inner: Arc::new(Inner {
+				id,
+				name,
+				connection,
+				broadcast_buffer,
+			}),
 		}
 	}
 
@@ -68,7 +75,7 @@ impl Client {
 		}
 	}
 
-	pub async fn send_broadcast_message(&self, message: impl Into<BroadcastMessage>) -> bool {
+	pub async fn send_broadcast_message(&self, message: impl Into<BroadcastMessage> + Unpin) -> bool {
 		if self
 			.inner
 			.connection
@@ -84,5 +91,13 @@ impl Client {
 		} else {
 			true
 		}
+	}
+
+	pub fn enqueue_broadcast(&self, message: impl Into<BroadcastMessage> + Unpin, count: usize) {
+		self.inner.broadcast_buffer.enqueue(message.into(), count);
+	}
+
+	pub async fn wait_for_broadcast(&self) -> BroadcastMessage {
+		self.inner.broadcast_buffer.wait_for_broadcast().await
 	}
 }
