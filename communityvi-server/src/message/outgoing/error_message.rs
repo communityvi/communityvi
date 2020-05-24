@@ -14,6 +14,7 @@ pub enum ErrorMessageType {
 	InvalidOperation,
 	InternalServerError,
 	IncorrectMediumVersion,
+	EmptyChatMessage,
 }
 
 #[cfg(test)]

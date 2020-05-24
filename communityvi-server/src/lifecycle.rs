@@ -153,6 +153,12 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 	use ClientRequest::*;
 	match request {
 		Chat(ChatRequest { message }) => {
+			if message.trim().is_empty() {
+				return Err(ErrorMessage::builder()
+					.error(ErrorMessageType::EmptyChatMessage)
+					.message("Chat messages must not be empty!".to_string())
+					.build());
+			}
 			room.send_chat_message(client, message);
 			Ok(SuccessMessage::Success)
 		}
@@ -262,7 +268,7 @@ mod test {
 	use super::*;
 	use crate::lifecycle::{handle_messages, handle_request, register_client};
 	use crate::message::client_request::{MediumRequest, PauseRequest};
-	use crate::message::outgoing::broadcast_message::{BroadcastMessage, MediumBroadcast};
+	use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, MediumBroadcast};
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse, VersionedMediumResponse};
 	use crate::room::client_id::ClientId;
@@ -296,6 +302,43 @@ mod test {
 			}
 			_ => panic!("Invalid response"),
 		};
+	}
+
+	#[tokio::test]
+	async fn the_client_should_get_an_error_for_empty_chat_messages() {
+		let room = Room::new(1);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+
+		let empty_chat_request = ChatRequest {
+			message: " \t".to_string(),
+		};
+		let non_empty_chat_request = ChatRequest {
+			message: "Hi!".to_string(),
+		};
+		let error =
+			handle_request(&room, &client, empty_chat_request.into()).expect_err("Accepted empty chat message.");
+		handle_request(&room, &client, non_empty_chat_request.clone().into())
+			.expect("Failed to send proper chat message");
+
+		assert_eq!(
+			error,
+			ErrorMessage::builder()
+				.error(ErrorMessageType::EmptyChatMessage)
+				.message("Chat messages must not be empty!".to_string())
+				.build()
+		);
+
+		// ensure we don't see the empty chat message
+		let received_message = test_client.receive_broadcast_message().await;
+		assert_eq!(
+			received_message,
+			BroadcastMessage::Chat(ChatBroadcast {
+				sender_id: client.id(),
+				sender_name: client.name().to_string(),
+				message: non_empty_chat_request.message,
+				counter: 0
+			})
+		)
 	}
 
 	#[tokio::test]
