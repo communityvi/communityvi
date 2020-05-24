@@ -139,9 +139,10 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 			None => break, // connection has been closed
 		};
 		debug!(
-			"Received {:?} message from {}",
-			std::mem::discriminant(&message),
-			client.id(),
+			"Received {} message from '{}' (#{})",
+			message.request.kind(),
+			client.name(),
+			Into::<u64>::into(client.id()),
 		);
 
 		match handle_request(room, &client, message.request) {

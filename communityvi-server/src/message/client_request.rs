@@ -26,6 +26,20 @@ pub enum ClientRequest {
 	Pause(PauseRequest),
 }
 
+impl ClientRequest {
+	pub fn kind(&self) -> &'static str {
+		use ClientRequest::*;
+		match self {
+			Register(_) => "Register",
+			Chat(_) => "Chat",
+			GetReferenceTime => "GetReferenceTime",
+			InsertMedium(_) => "InsertMedium",
+			Play(_) => "Play",
+			Pause(_) => "Pause",
+		}
+	}
+}
+
 pub trait RequestConvertible: Into<ClientRequest> {
 	fn with_id(self, request_id: u64) -> ClientRequestWithId {
 		ClientRequestWithId {
