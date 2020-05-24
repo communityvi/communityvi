@@ -13,7 +13,9 @@ use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
+use governor::{Quota, RateLimiter};
 use log::{debug, error, info};
+use nonzero_ext::nonzero;
 use std::convert::TryFrom;
 
 pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
@@ -118,8 +120,13 @@ pub async fn send_broadcasts(client: Client) {
 	}
 }
 
+const QUOTA: Quota = Quota::per_second(nonzero!(1u32)).allow_burst(nonzero!(10u32));
+
 async fn handle_messages(room: &Room, client: Client, mut message_receiver: MessageReceiver) {
+	let rate_limiter = RateLimiter::direct(QUOTA);
 	loop {
+		rate_limiter.until_ready().await;
+
 		let message = match message_receiver.receive().await {
 			Some(message) => message,
 			None => break, // connection has been closed
