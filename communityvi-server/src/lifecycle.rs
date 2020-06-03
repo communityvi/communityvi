@@ -155,116 +155,144 @@ async fn handle_messages(room: &Room, client: Client, mut message_receiver: Mess
 fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
 	use ClientRequest::*;
 	match request {
-		Chat(ChatRequest { message }) => {
-			if message.trim().is_empty() {
-				return Err(ErrorMessage::builder()
-					.error(ErrorMessageType::EmptyChatMessage)
-					.message("Chat messages must not be empty!".to_string())
-					.build());
-			}
-			room.send_chat_message(client, message);
-			Ok(SuccessMessage::Success)
-		}
-		Register { .. } => {
-			error!(
-				"Client: {} tried to register even though it is already registered.",
-				client.id()
-			);
-			Err(ErrorMessage::builder()
-				.error(ErrorMessageType::InvalidOperation)
-				.message("Already registered".to_string())
-				.build())
-		}
-		GetReferenceTime => {
-			let reference_time = room.current_reference_time();
-			Ok(SuccessMessage::ReferenceTime {
-				milliseconds: u64::try_from(reference_time.as_millis()).unwrap(),
+		Chat(chat_request) => handle_chat_request(room, client, chat_request),
+		Register { .. } => handle_register_request(client),
+		GetReferenceTime => handle_get_reference_time_request(room),
+		InsertMedium(insert_medium_request) => handle_insert_medium_request(room, client, insert_medium_request),
+		Play(play_request) => handle_play_request(room, client, play_request),
+		Pause(pause_request) => handle_pause_request(room, client, pause_request),
+	}
+}
+
+fn handle_chat_request(
+	room: &Room,
+	client: &Client,
+	ChatRequest { message }: ChatRequest,
+) -> Result<SuccessMessage, ErrorMessage> {
+	if message.trim().is_empty() {
+		return Err(ErrorMessage::builder()
+			.error(ErrorMessageType::EmptyChatMessage)
+			.message("Chat messages must not be empty!".to_string())
+			.build());
+	}
+	room.send_chat_message(client, message);
+	Ok(SuccessMessage::Success)
+}
+
+fn handle_register_request(client: &Client) -> Result<SuccessMessage, ErrorMessage> {
+	error!(
+		"Client: {} tried to register even though it is already registered.",
+		client.id()
+	);
+	Err(ErrorMessage::builder()
+		.error(ErrorMessageType::InvalidOperation)
+		.message("Already registered".to_string())
+		.build())
+}
+
+fn handle_get_reference_time_request(room: &Room) -> Result<SuccessMessage, ErrorMessage> {
+	let reference_time = room.current_reference_time();
+	Ok(SuccessMessage::ReferenceTime {
+		milliseconds: u64::try_from(reference_time.as_millis()).unwrap(),
+	})
+}
+
+fn handle_insert_medium_request(
+	room: &Room,
+	client: &Client,
+	InsertMediumRequest {
+		previous_version,
+		medium: medium_request,
+	}: InsertMediumRequest,
+) -> Result<SuccessMessage, ErrorMessage> {
+	let medium = Medium::try_from(medium_request)?;
+	let versioned_medium = match room.insert_medium(medium, previous_version) {
+		Some(versioned_medium) => versioned_medium,
+		None => {
+			return Err(ErrorMessage {
+				error: ErrorMessageType::IncorrectMediumVersion,
+				message: format!(
+					"Medium version is incorrect. Request had {} but current version is {}.",
+					previous_version,
+					room.medium().version
+				),
 			})
 		}
-		InsertMedium(InsertMediumRequest {
-			medium: medium_request,
-			previous_version,
-		}) => {
-			let medium = Medium::try_from(medium_request)?;
-			let versioned_medium = match room.insert_medium(medium, previous_version) {
-				Some(versioned_medium) => versioned_medium,
-				None => {
-					return Err(ErrorMessage {
-						error: ErrorMessageType::IncorrectMediumVersion,
-						message: format!(
-							"Medium version is incorrect. Request had {} but current version is {}.",
-							previous_version,
-							room.medium().version
-						),
-					})
-				}
-			};
+	};
 
-			room.broadcast(MediumStateChangedBroadcast {
-				changed_by_name: client.name().to_string(),
-				changed_by_id: client.id(),
-				medium: VersionedMediumBroadcast::new(versioned_medium, false),
-			});
+	room.broadcast(MediumStateChangedBroadcast {
+		changed_by_name: client.name().to_string(),
+		changed_by_id: client.id(),
+		medium: VersionedMediumBroadcast::new(versioned_medium, false),
+	});
 
-			Ok(SuccessMessage::Success)
-		}
-		Play(PlayRequest {
-			previous_version,
-			skipped,
-			start_time_in_milliseconds,
-		}) => {
-			let versioned_medium =
-				match room.play_medium(Duration::milliseconds(start_time_in_milliseconds), previous_version) {
-					None => {
-						return Err(ErrorMessage {
-							error: ErrorMessageType::IncorrectMediumVersion,
-							message: format!(
-								"Medium version is incorrect. Request had {} but current version is {}.",
-								previous_version,
-								room.medium().version
-							),
-						})
-					}
-					Some(versioned_medium) => versioned_medium,
-				};
-			room.broadcast(MediumStateChangedBroadcast {
-				changed_by_name: client.name().to_string(),
-				changed_by_id: client.id(),
-				medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-			});
-			Ok(SuccessMessage::Success)
-		}
-		Pause(PauseRequest {
-			previous_version,
-			skipped,
-			position_in_milliseconds,
-		}) => {
-			let versioned_medium = match room.pause_medium(
-				Duration::milliseconds(
-					i64::try_from(position_in_milliseconds.max(0).min(u64::try_from(i64::MAX).unwrap())).unwrap(),
+	Ok(SuccessMessage::Success)
+}
+
+fn handle_play_request(
+	room: &Room,
+	client: &Client,
+	PlayRequest {
+		previous_version,
+		skipped,
+		start_time_in_milliseconds,
+	}: PlayRequest,
+) -> Result<SuccessMessage, ErrorMessage> {
+	let versioned_medium = match room.play_medium(Duration::milliseconds(start_time_in_milliseconds), previous_version)
+	{
+		None => {
+			return Err(ErrorMessage {
+				error: ErrorMessageType::IncorrectMediumVersion,
+				message: format!(
+					"Medium version is incorrect. Request had {} but current version is {}.",
+					previous_version,
+					room.medium().version
 				),
-				previous_version,
-			) {
-				None => {
-					return Err(ErrorMessage {
-						error: ErrorMessageType::IncorrectMediumVersion,
-						message: format!(
-							"Medium version is incorrect. Request had {} but current version is {}.",
-							previous_version,
-							room.medium().version
-						),
-					})
-				}
-				Some(versioned_medium) => versioned_medium,
-			};
-			room.broadcast(MediumStateChangedBroadcast {
-				changed_by_name: client.name().to_string(),
-				changed_by_id: client.id(),
-				medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-			});
-			Ok(SuccessMessage::Success)
+			})
 		}
-	}
+		Some(versioned_medium) => versioned_medium,
+	};
+	room.broadcast(MediumStateChangedBroadcast {
+		changed_by_name: client.name().to_string(),
+		changed_by_id: client.id(),
+		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
+	});
+	Ok(SuccessMessage::Success)
+}
+
+fn handle_pause_request(
+	room: &Room,
+	client: &Client,
+	PauseRequest {
+		previous_version,
+		skipped,
+		position_in_milliseconds,
+	}: PauseRequest,
+) -> Result<SuccessMessage, ErrorMessage> {
+	let versioned_medium = match room.pause_medium(
+		Duration::milliseconds(
+			i64::try_from(position_in_milliseconds.max(0).min(u64::try_from(i64::MAX).unwrap())).unwrap(),
+		),
+		previous_version,
+	) {
+		None => {
+			return Err(ErrorMessage {
+				error: ErrorMessageType::IncorrectMediumVersion,
+				message: format!(
+					"Medium version is incorrect. Request had {} but current version is {}.",
+					previous_version,
+					room.medium().version
+				),
+			})
+		}
+		Some(versioned_medium) => versioned_medium,
+	};
+	room.broadcast(MediumStateChangedBroadcast {
+		changed_by_name: client.name().to_string(),
+		changed_by_id: client.id(),
+		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
+	});
+	Ok(SuccessMessage::Success)
 }
 
 #[cfg(test)]
