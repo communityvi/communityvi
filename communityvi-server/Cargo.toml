@@ -11,7 +11,7 @@ chrono = {version = "0.4", features = ["serde"]}
 env_logger = "0.7"
 futures = "0.3"
 gotham = {git = "https://github.com/communityvi/gotham", branch = "feature/fix-websockets", default-features = false}
-governor = "0.2"
+governor = {version = "0.2", default-features = false, features = ["std"]}
 log = "0.4"
 mime = "0.3"
 nonzero_ext = "0.2"

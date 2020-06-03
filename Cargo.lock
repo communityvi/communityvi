@@ -19,15 +19,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ahash"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3e0bf23f51883cce372d5d5892211236856e4bb37fb942e1eb135ee0f146e3"
-dependencies = [
- "const-random",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -305,17 +296,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dashmap"
-version = "3.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cfcd41ae02d60edded204341d2798ba519c336c51a37330aa4b98a1128def32"
-dependencies = [
- "ahash 0.3.5",
- "cfg-if",
- "num_cpus",
-]
-
-[[package]]
 name = "digest"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -581,13 +561,11 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc3edd420247e2b5752e5e15bb279f77631a146d83b1629978ec5384f333ab59"
 dependencies = [
- "dashmap",
  "futures",
  "futures-timer",
  "no-std-compat",
  "nonzero_ext 0.1.5",
  "parking_lot",
- "quanta",
  "rand 0.7.3",
  "spin",
 ]
@@ -617,7 +595,7 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e6073d0ca812575946eb5f35ff68dbe519907b25c42530389ff946dc84c6ead"
 dependencies = [
- "ahash 0.2.18",
+ "ahash",
  "autocfg 0.1.7",
 ]
 
@@ -1111,16 +1089,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eef52fac62d0ea7b9b4dc7da092aa64ea7ec3d90af6679422d3d7e0e14b6ee15"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "quanta"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7a1905379198075914bc93d32a5465c40474f90a078bb13439cb00c547bcc"
-dependencies = [
- "libc",
- "winapi 0.3.8",
 ]
 
 [[package]]
