@@ -97,7 +97,7 @@ impl BroadcastBuffer {
 impl Inner {
 	/// Ensures that there is a bounded count of messages in the buffer by enforcing some simple rules:
 	/// * Only ever keep the medium state with highest version alive
-	///		 (which is the last in the buffer since the order of versions is already enforced when enqueueing)
+	///    (which is the last in the buffer since the order of versions is already enforced when enqueueing)
 	/// * Only ever keep at most the last CHAT_MESSAGE_BUFFER_LIMIT chat messages.
 	/// * Remove Join and Left messages for the same client as long as we don't still have any chat messages from them.
 	///

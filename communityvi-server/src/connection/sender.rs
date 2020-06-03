@@ -63,8 +63,7 @@ where
 {
 	pub fn new(response_sink: ResponseSink) -> Self {
 		let inner = SinkMessageSenderInner { response_sink };
-		let connection = Self { inner: inner.into() };
-		connection
+		Self { inner: inner.into() }
 	}
 
 	async fn send_message(&self, message: OutgoingMessage) -> Result<(), ()> {

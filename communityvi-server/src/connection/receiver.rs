@@ -87,7 +87,7 @@ where
 				None,
 			)
 			.await;
-		let _ = self.message_sender.close().await;
+		self.message_sender.close().await;
 		None
 	}
 }

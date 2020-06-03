@@ -173,8 +173,7 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 			Err(ErrorMessage::builder()
 				.error(ErrorMessageType::InvalidOperation)
 				.message("Already registered".to_string())
-				.build()
-				.into())
+				.build())
 		}
 		GetReferenceTime => {
 			let reference_time = room.current_reference_time();
@@ -187,7 +186,7 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 			previous_version,
 		}) => {
 			let medium = Medium::try_from(medium_request)?;
-			let versioned_medium = match room.insert_medium(medium.clone(), previous_version) {
+			let versioned_medium = match room.insert_medium(medium, previous_version) {
 				Some(versioned_medium) => versioned_medium,
 				None => {
 					return Err(ErrorMessage {
@@ -395,8 +394,7 @@ mod test {
 			medium: MediumRequest::FixedLength {
 				name: "Metropolis".to_string(),
 				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
-			}
-			.into(),
+			},
 			previous_version: 0,
 		};
 		let response = handle_request(&room, &alice, request.into()).expect_err("Failed to ger error response");
@@ -558,7 +556,7 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room.insert_medium(medium, 0).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
@@ -590,7 +588,7 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room.insert_medium(medium, 0).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,

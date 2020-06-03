@@ -23,7 +23,7 @@
  * > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * > SOFTWARE.
  */
-use base64;
+
 use gotham::hyper::header::{HeaderValue, CONNECTION, UPGRADE};
 use gotham::hyper::{upgrade::Upgraded, Body, HeaderMap, Response, StatusCode};
 use log::error;
@@ -106,7 +106,7 @@ mod tests {
 	#[test]
 	fn key_to_accept() {
 		// From https://tools.ietf.org/html/rfc6455#section-1.2
-		let key = accept_key("dGhlIHNhbXBsZSBub25jZQ==".as_bytes());
+		let key = accept_key(b"dGhlIHNhbXBsZSBub25jZQ==");
 		assert_eq!(key, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
 	}
 }

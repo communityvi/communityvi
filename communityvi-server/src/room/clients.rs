@@ -222,7 +222,7 @@ mod test {
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
 		clients
-			.add_and_return_existing(long_name.to_string(), message_sender.clone())
+			.add_and_return_existing(long_name, message_sender.clone())
 			.expect("Failed to add client with name that is not too long");
 	}
 
@@ -232,7 +232,7 @@ mod test {
 		let mut clients = Clients::with_limit(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = clients.add_and_return_existing(long_name.to_string(), message_sender.clone());
+		let result = clients.add_and_return_existing(long_name, message_sender.clone());
 
 		assert!(matches!(result, Err(RoomError::ClientNameTooLong)));
 	}

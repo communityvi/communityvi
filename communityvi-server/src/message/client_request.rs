@@ -112,13 +112,9 @@ impl TryFrom<MediumRequest> for Medium {
 					Err(ErrorMessage::builder()
 						.error(ErrorMessageType::InvalidFormat)
 						.message("Length of a medium must not be larger than one year.".to_string())
-						.build()
-						.into())
+						.build())
 				} else {
-					Ok(
-						FixedLengthMedium::new(name.clone(), Duration::milliseconds(length_in_milliseconds as i64))
-							.into(),
-					)
+					Ok(FixedLengthMedium::new(name, Duration::milliseconds(length_in_milliseconds as i64)).into())
 				}
 			}
 			MediumRequest::Empty => Ok(Medium::Empty),
@@ -244,7 +240,7 @@ mod test {
 		let insert_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
 			medium: MediumRequest::FixedLength {
 				name: "Blues Brothers".to_string(),
-				length_in_milliseconds: 8520000,
+				length_in_milliseconds: 8_520_000,
 			},
 			previous_version: 0,
 		})
