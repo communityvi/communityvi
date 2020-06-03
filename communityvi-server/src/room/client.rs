@@ -100,4 +100,16 @@ impl Client {
 	pub async fn wait_for_broadcast(&self) -> BroadcastMessage {
 		self.inner.broadcast_buffer.wait_for_broadcast().await
 	}
+
+	pub async fn send_ping(&self, payload: Vec<u8>) -> bool {
+		if self.inner.connection.send_ping(payload).await.is_err() {
+			info!(
+				"Failed to send ping to client with id {} because it went away.",
+				self.inner.id
+			);
+			false
+		} else {
+			true
+		}
+	}
 }

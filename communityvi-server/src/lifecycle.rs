@@ -1,4 +1,4 @@
-use crate::connection::receiver::MessageReceiver;
+use crate::connection::receiver::{MessageReceiver, ReceivedMessage};
 use crate::connection::sender::MessageSender;
 use crate::message::client_request::{
 	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
@@ -13,18 +13,25 @@ use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
 use log::{debug, error, info};
 use nonzero_ext::nonzero;
 use std::convert::TryFrom;
 
+/// Once this count of heartbeats are missed, the client is kicked.
+const MISSED_HEARTBEAT_LIMIT: usize = 3;
+
 pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
 		let client_name = client.name().to_string();
+		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT);
 		tokio::select! {
-			_ = handle_messages(&room, client.clone(), message_receiver) => {},
-			_ = send_broadcasts(client) => {}
+			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => {},
+			_ = send_broadcasts(client.clone()) => {}
+			_ = heartbeat(client, pong_receiver) => {},
 		};
 		room.remove_client(client_id);
 
@@ -41,12 +48,17 @@ async fn register_client(
 	message_sender: MessageSender,
 	mut message_receiver: MessageReceiver,
 ) -> Option<(Client, MessageReceiver)> {
+	use ReceivedMessage::*;
 	let request = match message_receiver.receive().await {
-		None => {
+		Finished => {
 			error!("Client registration failed. Socket closed prematurely.");
 			return None;
 		}
-		Some(request) => request,
+		Pong { .. } => {
+			error!("Client registration failed. Received Pong instead of register request.");
+			return None;
+		}
+		Request(request) => request,
 	};
 
 	let name = if let ClientRequest::Register(RegisterRequest { name }) = request.request {
@@ -127,16 +139,63 @@ pub async fn send_broadcasts(client: Client) {
 	}
 }
 
+pub async fn heartbeat(client: Client, mut pong_receiver: mpsc::Receiver<Vec<u8>>) {
+	const HEARTBEAT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL);
+	let mut missed_heartbeats = 0;
+
+	for count in 0..usize::MAX {
+		interval.tick().await;
+
+		client.send_ping(count.to_ne_bytes().as_ref().into()).await;
+
+		let receive_pong = async {
+			while let Some(payload) = pong_receiver.next().await {
+				let payload = match <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) {
+					Ok(payload) => payload,
+					Err(_) => return Err(()),
+				};
+
+				let received_count = usize::from_ne_bytes(payload);
+				if received_count == count {
+					return Ok(());
+				}
+			}
+			Err(())
+		};
+		if tokio::time::timeout(HEARTBEAT_INTERVAL, receive_pong).await.is_err() {
+			missed_heartbeats += 1;
+			if missed_heartbeats >= MISSED_HEARTBEAT_LIMIT {
+				break;
+			}
+		} else {
+			missed_heartbeats = 0;
+		}
+	}
+}
+
 const QUOTA: Quota = Quota::per_second(nonzero!(1u32)).allow_burst(nonzero!(10u32));
 
-async fn handle_messages(room: &Room, client: Client, mut message_receiver: MessageReceiver) {
+async fn handle_messages(
+	room: &Room,
+	client: Client,
+	mut message_receiver: MessageReceiver,
+	mut pong_sender: mpsc::Sender<Vec<u8>>,
+) {
 	let rate_limiter = RateLimiter::direct(QUOTA);
 	loop {
 		rate_limiter.until_ready().await;
 
 		let message = match message_receiver.receive().await {
-			Some(message) => message,
-			None => break, // connection has been closed
+			ReceivedMessage::Request(message) => message,
+			ReceivedMessage::Pong { payload } => {
+				if pong_sender.send(payload).await.is_err() {
+					break;
+				}
+				continue;
+			}
+			ReceivedMessage::Finished => break,
 		};
 		debug!(
 			"Received {} message from '{}' (#{})",
@@ -680,7 +739,8 @@ mod test {
 		tokio::spawn({
 			async move {
 				let room = &room;
-				handle_messages(room, client_handle, message_receiver).await
+				let (pong_sender, _pong_receiver) = mpsc::channel(0);
+				handle_messages(room, client_handle, message_receiver, pong_sender).await
 			}
 		});
 

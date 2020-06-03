@@ -28,5 +28,9 @@ impl MessageSenderTrait for FakeMessageSender {
 		Ok(())
 	}
 
+	async fn send_ping(&self, _payload: Vec<u8>) -> Result<(), ()> {
+		Ok(())
+	}
+
 	async fn close(&self) {}
 }
