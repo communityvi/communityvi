@@ -185,8 +185,6 @@ async fn handle_messages(
 ) {
 	let rate_limiter = RateLimiter::direct(QUOTA);
 	loop {
-		rate_limiter.until_ready().await;
-
 		let message = match message_receiver.receive().await {
 			ReceivedMessage::Request(message) => message,
 			ReceivedMessage::Pong { payload } => {
@@ -197,6 +195,10 @@ async fn handle_messages(
 			}
 			ReceivedMessage::Finished => break,
 		};
+
+		// rate limit after receiving a message so we don't apply it to receiving pong messages
+		rate_limiter.until_ready().await;
+
 		debug!(
 			"Received {} message from '{}' (#{})",
 			message.request.kind(),
