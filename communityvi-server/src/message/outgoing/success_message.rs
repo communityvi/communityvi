@@ -4,6 +4,7 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::medium::playback_state::PlaybackState;
 use crate::room::medium::{Medium, VersionedMedium};
+use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
@@ -69,7 +70,7 @@ impl From<PlaybackState> for PlaybackStateResponse {
 				start_time_in_milliseconds: start_time.num_milliseconds(),
 			},
 			PlaybackState::Paused { at_position } => Self::Paused {
-				position_in_milliseconds: at_position.num_milliseconds() as u64,
+				position_in_milliseconds: u64::try_from(at_position.num_milliseconds()).unwrap(),
 			},
 		}
 	}
@@ -89,7 +90,7 @@ impl From<Medium> for MediumResponse {
 		match medium {
 			Medium::FixedLength(fixed_length) => MediumResponse::FixedLength {
 				name: fixed_length.name,
-				length_in_milliseconds: fixed_length.length.num_milliseconds() as u64,
+				length_in_milliseconds: u64::try_from(fixed_length.length.num_milliseconds()).unwrap(),
 				playback_state: fixed_length.playback.into(),
 			},
 			Medium::Empty => MediumResponse::Empty,
@@ -131,7 +132,7 @@ mod test {
 			current_medium: VersionedMediumResponse {
 				medium: MediumResponse::FixedLength {
 					name: "WarGames".to_string(),
-					length_in_milliseconds: Duration::minutes(114).num_milliseconds() as u64,
+					length_in_milliseconds: u64::try_from(Duration::minutes(114).num_milliseconds()).unwrap(),
 					playback_state: PlaybackStateResponse::Paused {
 						position_in_milliseconds: 0,
 					},

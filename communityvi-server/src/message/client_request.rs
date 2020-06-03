@@ -108,13 +108,17 @@ impl TryFrom<MediumRequest> for Medium {
 				name,
 				length_in_milliseconds,
 			} => {
-				if length_in_milliseconds > (Duration::days(365).num_milliseconds() as u64) {
+				if length_in_milliseconds > (u64::try_from(Duration::days(365).num_milliseconds()).unwrap()) {
 					Err(ErrorMessage::builder()
 						.error(ErrorMessageType::InvalidFormat)
 						.message("Length of a medium must not be larger than one year.".to_string())
 						.build())
 				} else {
-					Ok(FixedLengthMedium::new(name, Duration::milliseconds(length_in_milliseconds as i64)).into())
+					Ok(FixedLengthMedium::new(
+						name,
+						Duration::milliseconds(i64::try_from(length_in_milliseconds).unwrap()),
+					)
+					.into())
 				}
 			}
 			MediumRequest::Empty => Ok(Medium::Empty),
@@ -128,7 +132,7 @@ impl From<Medium> for MediumRequest {
 			Medium::Empty => MediumRequest::Empty,
 			Medium::FixedLength(fixed_length) => MediumRequest::FixedLength {
 				name: fixed_length.name,
-				length_in_milliseconds: fixed_length.length.num_milliseconds() as u64,
+				length_in_milliseconds: u64::try_from(fixed_length.length.num_milliseconds()).unwrap(),
 			},
 		}
 	}

@@ -265,6 +265,7 @@ fn test_server_should_not_serve_reference_client_if_disabled() {
 }
 
 #[derive(Debug)]
+#[allow(clippy::empty_enum)]
 enum ImpossibleError {}
 impl Display for ImpossibleError {
 	fn fmt(&self, _formatter: &mut Formatter) -> std::fmt::Result {

@@ -98,11 +98,12 @@ impl Inner {
 	/// Ensures that there is a bounded count of messages in the buffer by enforcing some simple rules:
 	/// * Only ever keep the medium state with highest version alive
 	///    (which is the last in the buffer since the order of versions is already enforced when enqueueing)
-	/// * Only ever keep at most the last CHAT_MESSAGE_BUFFER_LIMIT chat messages.
+	/// * Only ever keep at most the last `CHAT_MESSAGE_BUFFER_LIMIT` chat messages.
 	/// * Remove Join and Left messages for the same client as long as we don't still have any chat messages from them.
 	///
 	/// This means we can calculate the maximum count of messages by taking the worst case scenario
-	/// (see worst_count_of_messages_to_keep_alive())
+	/// (see `worst_count_of_messages_to_keep_alive`)
+	#[allow(clippy::filter_map)]
 	fn collect_garbage(&mut self) {
 		let mut seen_chat_messages = 0;
 		let mut last_seen_medium_index = None;

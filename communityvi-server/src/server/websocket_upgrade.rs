@@ -39,12 +39,12 @@ const PROTO_WEBSOCKET: &str = "websocket";
 const SEC_WEBSOCKET_KEY: &str = "Sec-WebSocket-Key";
 const SEC_WEBSOCKET_ACCEPT: &str = "Sec-WebSocket-Accept";
 
-/// Check if a WebSocket upgrade was requested.
+/// Check if a websocket upgrade was requested.
 pub fn requested(headers: &HeaderMap) -> bool {
 	headers.get(UPGRADE) == Some(&HeaderValue::from_static(PROTO_WEBSOCKET))
 }
 
-/// Accept a WebSocket upgrade request.
+/// Accept a websocket upgrade request.
 ///
 /// Returns HTTP response, and a future that eventually resolves
 /// into websocket object.

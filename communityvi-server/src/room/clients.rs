@@ -111,8 +111,9 @@ impl Clients {
 		self.broadcast_with_count(message, count);
 	}
 
+	#[allow(clippy::needless_pass_by_value)] // it is not necessarily more performant to pass by reference here
 	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) {
-		for (_, client) in self.clients_by_id.iter() {
+		for client in self.clients_by_id.values() {
 			client.enqueue_broadcast(message.clone(), count);
 		}
 	}
@@ -127,6 +128,7 @@ fn normalized_name(name: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
 	use crate::utils::fake_message_sender::FakeMessageSender;

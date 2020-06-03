@@ -1,3 +1,4 @@
+#![allow(clippy::empty_enum)] // TypedBuilder
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
@@ -18,6 +19,7 @@ pub enum ErrorMessageType {
 }
 
 #[cfg(test)]
+#[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
 

@@ -105,6 +105,7 @@ impl Room {
 }
 
 #[cfg(test)]
+#[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
 	use crate::room::medium::fixed_length::FixedLengthMedium;

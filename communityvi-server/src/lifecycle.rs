@@ -178,7 +178,7 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 		GetReferenceTime => {
 			let reference_time = room.current_reference_time();
 			Ok(SuccessMessage::ReferenceTime {
-				milliseconds: reference_time.as_millis() as u64,
+				milliseconds: u64::try_from(reference_time.as_millis()).unwrap(),
 			})
 		}
 		InsertMedium(InsertMediumRequest {
@@ -240,7 +240,9 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 			position_in_milliseconds,
 		}) => {
 			let versioned_medium = match room.pause_medium(
-				Duration::milliseconds(position_in_milliseconds.max(0).min(i64::MAX as u64) as i64),
+				Duration::milliseconds(
+					i64::try_from(position_in_milliseconds.max(0).min(u64::try_from(i64::MAX).unwrap())).unwrap(),
+				),
 				previous_version,
 			) {
 				None => {
@@ -297,7 +299,7 @@ mod test {
 		match response {
 			SuccessMessage::ReferenceTime { milliseconds } => {
 				assert!(
-					(milliseconds >= TEST_DELAY.as_millis() as u64) && (milliseconds < 1000),
+					(milliseconds >= u64::try_from(TEST_DELAY.as_millis()).unwrap()) && (milliseconds < 1000),
 					"milliseconds = {}",
 					milliseconds
 				);
@@ -393,7 +395,7 @@ mod test {
 		let request = InsertMediumRequest {
 			medium: MediumRequest::FixedLength {
 				name: "Metropolis".to_string(),
-				length_in_milliseconds: Duration::days(400).num_milliseconds() as u64,
+				length_in_milliseconds: u64::try_from(Duration::days(400).num_milliseconds()).unwrap(),
 			},
 			previous_version: 0,
 		};
@@ -439,7 +441,7 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: medium.length.num_milliseconds() as u64,
+					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: true,
 					playback_state: PlaybackStateResponse::Playing {
 						start_time_in_milliseconds: -1024,
@@ -487,7 +489,7 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: medium.length.num_milliseconds() as u64,
+					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: false,
 					playback_state: PlaybackStateResponse::Paused {
 						position_in_milliseconds: 1027,
@@ -532,7 +534,7 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: medium.length.num_milliseconds() as u64,
+					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: true,
 					playback_state: PlaybackStateResponse::Paused {
 						position_in_milliseconds: 1000,
@@ -770,7 +772,7 @@ mod test {
 				current_medium: VersionedMediumResponse {
 					medium: MediumResponse::FixedLength {
 						name: video_name,
-						length_in_milliseconds: video_length.num_milliseconds() as u64,
+						length_in_milliseconds: u64::try_from(video_length.num_milliseconds()).unwrap(),
 						playback_state: PlaybackStateResponse::Playing {
 							start_time_in_milliseconds: 0,
 						}
@@ -858,7 +860,7 @@ mod test {
 				current_medium: VersionedMediumResponse {
 					medium: MediumResponse::FixedLength {
 						name: video_name,
-						length_in_milliseconds: video_length.num_milliseconds() as u64,
+						length_in_milliseconds: u64::try_from(video_length.num_milliseconds()).unwrap(),
 						playback_state: PlaybackStateResponse::Paused {
 							position_in_milliseconds: 0
 						}

@@ -92,7 +92,7 @@ impl MediumBroadcast {
 		match medium.into() {
 			Medium::FixedLength(medium) => MediumBroadcast::FixedLength {
 				name: medium.name,
-				length_in_milliseconds: medium.length.num_milliseconds() as u64,
+				length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
 				playback_skipped: skipped,
 				playback_state: medium.playback.into(),
 			},
