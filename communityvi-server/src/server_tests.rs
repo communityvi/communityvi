@@ -362,6 +362,7 @@ fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_
 		log_filters: "".to_string(),
 		room_size_limit: 10,
 		heartbeat_interval: std::time::Duration::from_secs(2),
+		missed_heartbeat_limit: 3,
 	};
 	let router = create_router(configuration, room, enable_reference_client);
 	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");

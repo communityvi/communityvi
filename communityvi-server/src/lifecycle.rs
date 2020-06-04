@@ -38,7 +38,7 @@ pub async fn run_client(
 		tokio::select! {
 			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => {},
 			_ = send_broadcasts(client.clone()) => {}
-			_ = heartbeat(client, pong_receiver, configuration.heartbeat_interval) => {},
+			_ = heartbeat(client, pong_receiver, configuration.heartbeat_interval, configuration.missed_heartbeat_limit) => {},
 		};
 		room.remove_client(client_id);
 
@@ -150,6 +150,7 @@ pub async fn heartbeat(
 	client: Client,
 	mut pong_receiver: mpsc::Receiver<Vec<u8>>,
 	heartbeat_interval: std::time::Duration,
+	missed_heartbeat_limit: u8,
 ) {
 	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
@@ -175,7 +176,7 @@ pub async fn heartbeat(
 		};
 		if tokio::time::timeout(heartbeat_interval, receive_pong).await.is_err() {
 			missed_heartbeats += 1;
-			if missed_heartbeats >= MISSED_HEARTBEAT_LIMIT {
+			if missed_heartbeats >= missed_heartbeat_limit {
 				break;
 			}
 		} else {
@@ -378,6 +379,7 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
+	use std::time::Instant;
 	use tokio::time::delay_for;
 
 	#[tokio::test]
@@ -968,6 +970,57 @@ mod test {
 				}
 			},
 			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_send_heartbeats() {
+		let room = Room::new(1);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
+
+		let heartbeat_interval = std::time::Duration::from_millis(1);
+		tokio::spawn(heartbeat(client, pong_receiver, heartbeat_interval, 0));
+
+		let start = Instant::now();
+		const ITERATIONS: u32 = 4;
+		for _ in 0..ITERATIONS {
+			let payload = test_client.receive_ping().await;
+			pong_sender.send(payload).await.unwrap();
+		}
+		let took = start.elapsed();
+		let minimum_duration = ITERATIONS * heartbeat_interval;
+		let maximum_duration = 2 * ITERATIONS * heartbeat_interval;
+		assert!(
+			(took > minimum_duration) && (took < maximum_duration),
+			"{:?} is not between {:?} and {:?}",
+			took,
+			minimum_duration,
+			maximum_duration,
+		);
+	}
+
+	#[tokio::test]
+	async fn should_stop_after_missed_heartbeat_limit() {
+		let room = Room::new(1);
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_pong_sender, pong_receiver) = mpsc::channel(0);
+
+		let heartbeat_interval = std::time::Duration::from_millis(1);
+		let missed_heartbeat_limit = 1;
+
+		let start = Instant::now();
+		heartbeat(client, pong_receiver, heartbeat_interval, missed_heartbeat_limit).await;
+		let took = start.elapsed();
+
+		let minimum_duration = u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
+		let maximum_duration = 3 * u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
+		assert!(
+			(took > minimum_duration) && (took < maximum_duration),
+			"{:?} is not between {:?} and {:?}",
+			took,
+			minimum_duration,
+			maximum_duration,
 		);
 	}
 
