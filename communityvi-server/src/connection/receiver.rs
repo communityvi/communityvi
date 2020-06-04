@@ -48,7 +48,6 @@ where
 		use ReceivedMessage::Finished;
 
 		for _ in 0..MAXIMUM_RETRIES {
-			// FIXME: timeout
 			let websocket_message = match self.request_stream.next().await {
 				Some(websocket_message) => websocket_message,
 				None => return Finished,
