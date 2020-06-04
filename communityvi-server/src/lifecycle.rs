@@ -1,3 +1,4 @@
+use crate::configuration::Configuration;
 use crate::connection::receiver::{MessageReceiver, ReceivedMessage};
 use crate::connection::sender::MessageSender;
 use crate::message::client_request::{
@@ -23,15 +24,21 @@ use std::convert::TryFrom;
 /// Once this count of heartbeats are missed, the client is kicked.
 const MISSED_HEARTBEAT_LIMIT: usize = 3;
 
-pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
+pub async fn run_client(
+	configuration: Configuration,
+	room: Room,
+	message_sender: MessageSender,
+	message_receiver: MessageReceiver,
+) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
 		let client_name = client.name().to_string();
 		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT);
+
 		tokio::select! {
 			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => {},
 			_ = send_broadcasts(client.clone()) => {}
-			_ = heartbeat(client, pong_receiver) => {},
+			_ = heartbeat(client, pong_receiver, configuration.heartbeat_interval) => {},
 		};
 		room.remove_client(client_id);
 
@@ -139,10 +146,12 @@ pub async fn send_broadcasts(client: Client) {
 	}
 }
 
-pub async fn heartbeat(client: Client, mut pong_receiver: mpsc::Receiver<Vec<u8>>) {
-	const HEARTBEAT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
-
-	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL);
+pub async fn heartbeat(
+	client: Client,
+	mut pong_receiver: mpsc::Receiver<Vec<u8>>,
+	heartbeat_interval: std::time::Duration,
+) {
+	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
 
 	for count in 0..usize::MAX {
@@ -164,7 +173,7 @@ pub async fn heartbeat(client: Client, mut pong_receiver: mpsc::Receiver<Vec<u8>
 			}
 			Err(())
 		};
-		if tokio::time::timeout(HEARTBEAT_INTERVAL, receive_pong).await.is_err() {
+		if tokio::time::timeout(heartbeat_interval, receive_pong).await.is_err() {
 			missed_heartbeats += 1;
 			if missed_heartbeats >= MISSED_HEARTBEAT_LIMIT {
 				break;

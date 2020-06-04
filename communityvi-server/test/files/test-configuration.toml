@@ -1,3 +1,4 @@
 address = "127.0.0.1:8000"
 log_filters = "info"
 room_size_limit = 42
+heartbeat_interval = "2s"

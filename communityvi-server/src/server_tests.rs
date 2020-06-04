@@ -1,3 +1,4 @@
+use crate::configuration::Configuration;
 use crate::message::client_request::{ChatRequest, RegisterRequest};
 use crate::message::outgoing::broadcast_message::{
 	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast,
@@ -356,7 +357,13 @@ where
 
 fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_client: bool) {
 	let room = Room::new(10);
-	let router = create_router(room, enable_reference_client);
+	let configuration = Configuration {
+		address: "127.0.0.1:8000".parse().unwrap(),
+		log_filters: "".to_string(),
+		room_size_limit: 10,
+		heartbeat_interval: std::time::Duration::from_secs(2),
+	};
+	let router = create_router(configuration, room, enable_reference_client);
 	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");
 	test(&server);
 }

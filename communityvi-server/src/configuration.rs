@@ -11,6 +11,8 @@ pub struct Configuration {
 	pub address: SocketAddr,
 	pub log_filters: String,
 	pub room_size_limit: usize,
+	#[serde(with = "humantime_serde")]
+	pub heartbeat_interval: std::time::Duration,
 }
 
 impl Configuration {
@@ -86,10 +88,12 @@ mod test {
 			address,
 			log_filters,
 			room_size_limit,
+			heartbeat_interval,
 		} = Configuration::from_file(TEST_FILE_PATH).unwrap();
 
 		assert_eq!(SocketAddr::from_str("127.0.0.1:8000").unwrap(), address);
 		assert_eq!("info", log_filters);
 		assert_eq!(42, room_size_limit);
+		assert_eq!(std::time::Duration::from_secs(2), heartbeat_interval);
 	}
 }

@@ -13,6 +13,7 @@ env_logger = "0.7"
 futures = "0.3"
 gotham = {git = "https://github.com/communityvi/gotham", branch = "feature/fix-websockets", default-features = false}
 governor = {version = "0.2", default-features = false, features = ["std"]}
+humantime-serde = "1.0"
 log = "0.4"
 mime = "0.3"
 nonzero_ext = "0.2"
