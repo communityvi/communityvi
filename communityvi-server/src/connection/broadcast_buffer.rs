@@ -170,7 +170,7 @@ impl Inner {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::message::outgoing::broadcast_message::MediumBroadcast;
+	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast};
 	use crate::room::client_id::ClientId;
 	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
@@ -216,6 +216,7 @@ mod test {
 			let message = ClientLeftBroadcast {
 				id: id.into(),
 				name: format!("{}", id),
+				reason: LeftReason::Closed,
 			};
 			self.enqueue_next(message.into());
 		}

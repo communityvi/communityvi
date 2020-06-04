@@ -37,6 +37,14 @@ broadcast_from_struct!(ClientJoined, ClientJoinedBroadcast);
 pub struct ClientLeftBroadcast {
 	pub id: ClientId,
 	pub name: String,
+	pub reason: LeftReason,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum LeftReason {
+	Closed,
+	Timeout,
 }
 
 broadcast_from_struct!(ClientLeft, ClientLeftBroadcast);
@@ -169,10 +177,14 @@ mod test {
 		let client_left_broadcast = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
 			id: ClientId::from(42),
 			name: "Hedwig".to_string(),
+			reason: LeftReason::Closed,
 		});
 		let json =
 			serde_json::to_string(&client_left_broadcast).expect("Failed to serialize ClientLeft broadcast to JSON");
-		assert_eq!(r#"{"type":"client_left","id":42,"name":"Hedwig"}"#, json);
+		assert_eq!(
+			r#"{"type":"client_left","id":42,"name":"Hedwig","reason":"closed"}"#,
+			json
+		);
 
 		let deserialized_client_left_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize ClientLeft broadcast from JSON");
