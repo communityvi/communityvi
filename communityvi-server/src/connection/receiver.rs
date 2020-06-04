@@ -17,7 +17,20 @@ pub type WebSocketMessageReceiver = StreamMessageReceiver<InfallibleStream<Split
 #[async_trait]
 pub trait MessageReceiverTrait {
 	/// Receive a message from the client or None if the connection has been closed.
-	async fn receive(&mut self) -> Option<ClientRequestWithId>;
+	async fn receive(&mut self) -> ReceivedMessage;
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ReceivedMessage {
+	Request(ClientRequestWithId),
+	Pong { payload: Vec<u8> },
+	Finished,
+}
+
+impl From<ClientRequestWithId> for ReceivedMessage {
+	fn from(request: ClientRequestWithId) -> Self {
+		ReceivedMessage::Request(request)
+	}
 }
 
 pub struct StreamMessageReceiver<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
@@ -30,19 +43,26 @@ impl<RequestStream> MessageReceiverTrait for StreamMessageReceiver<RequestStream
 where
 	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send,
 {
-	async fn receive(&mut self) -> Option<ClientRequestWithId> {
+	async fn receive(&mut self) -> ReceivedMessage {
 		const MAXIMUM_RETRIES: usize = 10;
+		use ReceivedMessage::Finished;
 
 		for _ in 0..MAXIMUM_RETRIES {
+			// FIXME: timeout
 			let websocket_message = match self.request_stream.next().await {
 				Some(websocket_message) => websocket_message,
-				None => return None,
+				None => return Finished,
 			};
 
-			if websocket_message.is_close() {
-				self.message_sender.close().await;
-				return None;
-			}
+			use tokio_tungstenite::tungstenite::Message::*;
+			let websocket_message = match websocket_message {
+				Pong(payload) => return ReceivedMessage::Pong { payload },
+				Close(_) => {
+					self.message_sender.close().await;
+					return Finished;
+				}
+				websocket_message => websocket_message,
+			};
 
 			let client_request = match ClientRequestWithId::try_from(&websocket_message) {
 				Ok(client_request) => client_request,
@@ -74,7 +94,7 @@ where
 				}
 			};
 
-			return Some(client_request);
+			return client_request.into();
 		}
 
 		let _ = self
@@ -88,7 +108,7 @@ where
 			)
 			.await;
 		self.message_sender.close().await;
-		None
+		Finished
 	}
 }
 

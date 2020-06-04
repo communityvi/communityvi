@@ -19,6 +19,7 @@ pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver)
 
 #[cfg(test)]
 pub mod test {
+	use crate::connection::receiver::ReceivedMessage;
 	use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 	use crate::message::WebSocketMessage;
 	use crate::utils::test_client::WebsocketTestClient;
@@ -34,7 +35,7 @@ pub mod test {
 		}
 
 		// try to receive them on the server
-		assert!(message_receiver.receive().await.is_none());
+		assert_eq!(message_receiver.receive().await, ReceivedMessage::Finished);
 
 		// receive 10 responses from the server
 		for _ in 0usize..10 {

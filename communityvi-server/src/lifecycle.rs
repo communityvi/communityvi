@@ -1,10 +1,11 @@
-use crate::connection::receiver::MessageReceiver;
+use crate::configuration::Configuration;
+use crate::connection::receiver::{MessageReceiver, ReceivedMessage};
 use crate::connection::sender::MessageSender;
 use crate::message::client_request::{
 	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
 };
 use crate::message::outgoing::broadcast_message::{
-	ClientJoinedBroadcast, ClientLeftBroadcast, MediumStateChangedBroadcast, VersionedMediumBroadcast,
+	ClientJoinedBroadcast, ClientLeftBroadcast, LeftReason, MediumStateChangedBroadcast, VersionedMediumBroadcast,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
@@ -13,18 +14,31 @@ use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
 use chrono::Duration;
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
 use log::{debug, error, info};
 use nonzero_ext::nonzero;
 use std::convert::TryFrom;
 
-pub async fn run_client(room: Room, message_sender: MessageSender, message_receiver: MessageReceiver) {
+/// Once this count of heartbeats are missed, the client is kicked.
+const MISSED_HEARTBEAT_LIMIT: usize = 3;
+
+pub async fn run_client(
+	configuration: Configuration,
+	room: Room,
+	message_sender: MessageSender,
+	message_receiver: MessageReceiver,
+) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
 		let client_name = client.name().to_string();
-		tokio::select! {
-			_ = handle_messages(&room, client.clone(), message_receiver) => {},
-			_ = send_broadcasts(client) => {}
+		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT);
+
+		let left_reason = tokio::select! {
+			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
+			_ = send_broadcasts(client.clone()) => LeftReason::Closed,
+			left_reason = heartbeat(client, pong_receiver, configuration.heartbeat_interval, configuration.missed_heartbeat_limit) => left_reason,
 		};
 		room.remove_client(client_id);
 
@@ -32,6 +46,7 @@ pub async fn run_client(room: Room, message_sender: MessageSender, message_recei
 		room.broadcast(ClientLeftBroadcast {
 			id: client_id,
 			name: client_name,
+			reason: left_reason,
 		});
 	}
 }
@@ -41,12 +56,17 @@ async fn register_client(
 	message_sender: MessageSender,
 	mut message_receiver: MessageReceiver,
 ) -> Option<(Client, MessageReceiver)> {
+	use ReceivedMessage::*;
 	let request = match message_receiver.receive().await {
-		None => {
+		Finished => {
 			error!("Client registration failed. Socket closed prematurely.");
 			return None;
 		}
-		Some(request) => request,
+		Pong { .. } => {
+			error!("Client registration failed. Received Pong instead of register request.");
+			return None;
+		}
+		Request(request) => request,
 	};
 
 	let name = if let ClientRequest::Register(RegisterRequest { name }) = request.request {
@@ -127,17 +147,73 @@ pub async fn send_broadcasts(client: Client) {
 	}
 }
 
+pub async fn heartbeat(
+	client: Client,
+	mut pong_receiver: mpsc::Receiver<Vec<u8>>,
+	heartbeat_interval: std::time::Duration,
+	missed_heartbeat_limit: u8,
+) -> LeftReason {
+	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + heartbeat_interval, heartbeat_interval);
+	let mut missed_heartbeats = 0;
+
+	for count in 0..usize::MAX {
+		interval.tick().await;
+
+		if !client.send_ping(count.to_ne_bytes().as_ref().into()).await {
+			return LeftReason::Closed;
+		}
+
+		let receive_pong = async {
+			while let Some(payload) = pong_receiver.next().await {
+				let payload = match <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) {
+					Ok(payload) => payload,
+					Err(_) => return Err(()),
+				};
+
+				let received_count = usize::from_ne_bytes(payload);
+				if received_count == count {
+					return Ok(());
+				}
+			}
+			Err(())
+		};
+		if tokio::time::timeout(heartbeat_interval, receive_pong).await.is_err() {
+			missed_heartbeats += 1;
+			if missed_heartbeats >= missed_heartbeat_limit {
+				break;
+			}
+		} else {
+			missed_heartbeats = 0;
+		}
+	}
+
+	LeftReason::Timeout
+}
+
 const QUOTA: Quota = Quota::per_second(nonzero!(1u32)).allow_burst(nonzero!(10u32));
 
-async fn handle_messages(room: &Room, client: Client, mut message_receiver: MessageReceiver) {
+async fn handle_messages(
+	room: &Room,
+	client: Client,
+	mut message_receiver: MessageReceiver,
+	mut pong_sender: mpsc::Sender<Vec<u8>>,
+) {
 	let rate_limiter = RateLimiter::direct(QUOTA);
 	loop {
+		let message = match message_receiver.receive().await {
+			ReceivedMessage::Request(message) => message,
+			ReceivedMessage::Pong { payload } => {
+				if pong_sender.send(payload).await.is_err() {
+					break;
+				}
+				continue;
+			}
+			ReceivedMessage::Finished => break,
+		};
+
+		// rate limit after receiving a message so we don't apply it to receiving pong messages
 		rate_limiter.until_ready().await;
 
-		let message = match message_receiver.receive().await {
-			Some(message) => message,
-			None => break, // connection has been closed
-		};
 		debug!(
 			"Received {} message from '{}' (#{})",
 			message.request.kind(),
@@ -308,6 +384,7 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
+	use std::time::Instant;
 	use tokio::time::delay_for;
 
 	#[tokio::test]
@@ -680,7 +757,8 @@ mod test {
 		tokio::spawn({
 			async move {
 				let room = &room;
-				handle_messages(room, client_handle, message_receiver).await
+				let (pong_sender, _pong_receiver) = mpsc::channel(0);
+				handle_messages(room, client_handle, message_receiver, pong_sender).await
 			}
 		});
 
@@ -897,6 +975,61 @@ mod test {
 				}
 			},
 			response
+		);
+	}
+
+	#[tokio::test]
+	async fn should_send_heartbeats() {
+		let room = Room::new(1);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
+
+		let heartbeat_interval = std::time::Duration::from_millis(1);
+		tokio::spawn(async move {
+			let left_reason = heartbeat(client, pong_receiver, heartbeat_interval, 0).await;
+			assert_eq!(left_reason, LeftReason::Closed);
+		});
+
+		let start = Instant::now();
+		const ITERATIONS: u32 = 4;
+		for _ in 0..ITERATIONS {
+			let payload = test_client.receive_ping().await;
+			pong_sender.send(payload).await.unwrap();
+		}
+		let took = start.elapsed();
+		let minimum_duration = ITERATIONS * heartbeat_interval;
+		let maximum_duration = 2 * ITERATIONS * heartbeat_interval;
+		assert!(
+			(took > minimum_duration) && (took < maximum_duration),
+			"{:?} is not between {:?} and {:?}",
+			took,
+			minimum_duration,
+			maximum_duration,
+		);
+	}
+
+	#[tokio::test]
+	async fn should_stop_after_missed_heartbeat_limit() {
+		let room = Room::new(1);
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_pong_sender, pong_receiver) = mpsc::channel(0);
+
+		let heartbeat_interval = std::time::Duration::from_millis(1);
+		let missed_heartbeat_limit = 1;
+
+		let start = Instant::now();
+		let left_reason = heartbeat(client, pong_receiver, heartbeat_interval, missed_heartbeat_limit).await;
+		assert_eq!(left_reason, LeftReason::Timeout);
+		let took = start.elapsed();
+
+		let minimum_duration = u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
+		let maximum_duration = 3 * u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
+		assert!(
+			(took > minimum_duration) && (took < maximum_duration),
+			"{:?} is not between {:?} and {:?}",
+			took,
+			minimum_duration,
+			maximum_duration,
 		);
 	}
 

@@ -388,7 +388,18 @@ function handleBroadcast(message, messageEvent) {
 		}
 
 		case 'client_left': {
-			displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} left the room.`);
+			switch (message.reason) {
+				case 'closed':
+					displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} left the room.`);
+					break;
+
+				case 'timeout':
+					displayChatMessage('', 'Server', `User ${message.name} with id ${message.id} timed out.`);
+					break;
+
+				default:
+					alert(`Unknown leftReason ${message.reason}`)
+			}
 			break;
 		}
 

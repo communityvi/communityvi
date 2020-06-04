@@ -18,6 +18,7 @@ pub trait MessageSenderTrait {
 	async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> Result<(), ()>;
 	async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> Result<(), ()>;
 	async fn send_broadcast_message(&self, message: BroadcastMessage) -> Result<(), ()>;
+	async fn send_ping(&self, payload: Vec<u8>) -> Result<(), ()>;
 	async fn close(&self);
 }
 
@@ -49,6 +50,12 @@ where
 	async fn send_broadcast_message(&self, message: BroadcastMessage) -> Result<(), ()> {
 		let outgoing_message = OutgoingMessage::Broadcast { message };
 		self.send_message(outgoing_message).await
+	}
+
+	async fn send_ping(&self, payload: Vec<u8>) -> Result<(), ()> {
+		let mut inner = self.inner.lock().await;
+		let ping = WebSocketMessage::Ping(payload);
+		inner.response_sink.send(ping).await.map_err(|_| ())
 	}
 
 	async fn close(&self) {

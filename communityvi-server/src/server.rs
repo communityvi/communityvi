@@ -18,10 +18,14 @@ pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::
 
 pub async fn run_server(configuration: &Configuration, enable_reference_client: bool) {
 	let room = Room::new(configuration.room_size_limit);
-	let _ = gotham::init_server(configuration.address, create_router(room, enable_reference_client)).await;
+	let _ = gotham::init_server(
+		configuration.address,
+		create_router(configuration.clone(), room, enable_reference_client),
+	)
+	.await;
 }
 
-pub fn create_router(room: Room, enable_reference_client: bool) -> Router {
+pub fn create_router(configuration: Configuration, room: Room, enable_reference_client: bool) -> Router {
 	build_simple_router(move |route| {
 		if enable_reference_client {
 			route.scope("/reference", reference_client_scope);
@@ -30,7 +34,7 @@ pub fn create_router(room: Room, enable_reference_client: bool) -> Router {
 		route
 			.get("/ws")
 			.to_new_handler(UnwindSafeGothamHandler::from(move |state| {
-				websocket_handler(room, state)
+				websocket_handler(configuration, room, state)
 			}));
 	})
 }
@@ -71,7 +75,7 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 	});
 }
 
-fn websocket_handler(room: Room, mut state: State) -> (State, Response<Body>) {
+fn websocket_handler(configuration: Configuration, room: Room, mut state: State) -> (State, Response<Body>) {
 	let body = Body::take_from(&mut state);
 	let headers = HeaderMap::take_from(&mut state);
 	let response = if websocket_upgrade::requested(&headers) {
@@ -79,7 +83,7 @@ fn websocket_handler(room: Room, mut state: State) -> (State, Response<Body>) {
 			Ok((response, websocket_future)) => {
 				tokio::spawn(async move {
 					match websocket_future.await {
-						Ok(websocket) => run_client_connection(room, websocket).await,
+						Ok(websocket) => run_client_connection(configuration, room, websocket).await,
 						Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
 					}
 				});
@@ -100,7 +104,7 @@ fn bad_request() -> Response<Body> {
 		.expect("Failed to build BAD_REQUEST response.")
 }
 
-async fn run_client_connection(room: Room, websocket: WebSocket) {
+async fn run_client_connection(configuration: Configuration, room: Room, websocket: WebSocket) {
 	let (message_sender, message_receiver) = split_websocket(websocket);
-	run_client(room, message_sender, message_receiver).await
+	run_client(configuration, room, message_sender, message_receiver).await
 }
