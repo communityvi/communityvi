@@ -978,6 +978,7 @@ mod test {
 		);
 	}
 
+	#[cfg(not(target_os = "windows"))]
 	#[tokio::test]
 	async fn should_send_heartbeats() {
 		let room = Room::new(1);
@@ -1008,6 +1009,7 @@ mod test {
 		);
 	}
 
+	#[cfg(not(target_os = "windows"))]
 	#[tokio::test]
 	async fn should_stop_after_missed_heartbeat_limit() {
 		let room = Room::new(1);
