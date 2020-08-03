@@ -39,6 +39,25 @@ impl TimeSource {
 	}
 }
 
+pub enum Interval {
+	Tokio(tokio::time::Interval),
+	Test(TestInterval),
+}
+
+impl Interval {
+	pub async fn tick(&mut self) {
+		match self {
+			Interval::Tokio(interval) => {
+				interval.tick().await;
+			}
+			Interval::Test(interval) => interval
+				.next()
+				.await
+				.unwrap_or_else(|| panic!("{} dropped prematurely.", type_name::<TimeSource>())),
+		};
+	}
+}
+
 pub struct TestInterval {
 	current_time: Duration,
 	next_deadline: Duration,
@@ -66,25 +85,6 @@ impl Stream for TestInterval {
 		}
 
 		Poll::Pending
-	}
-}
-
-pub enum Interval {
-	Tokio(tokio::time::Interval),
-	Test(TestInterval),
-}
-
-impl Interval {
-	pub async fn tick(&mut self) {
-		match self {
-			Interval::Tokio(interval) => {
-				interval.tick().await;
-			}
-			Interval::Test(interval) => interval
-				.next()
-				.await
-				.unwrap_or_else(|| panic!("{} dropped prematurely.", type_name::<TimeSource>())),
-		};
 	}
 }
 
