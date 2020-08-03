@@ -13,6 +13,7 @@ use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
+use crate::utils::time_source::TimeSource;
 use chrono::Duration;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
@@ -153,7 +154,8 @@ pub async fn heartbeat(
 	heartbeat_interval: std::time::Duration,
 	missed_heartbeat_limit: u8,
 ) -> LeftReason {
-	let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + heartbeat_interval, heartbeat_interval);
+	let time_source = TimeSource::default();
+	let mut interval = time_source.interval_at(heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
 
 	for count in 0..usize::MAX {
@@ -177,7 +179,7 @@ pub async fn heartbeat(
 			}
 			Err(())
 		};
-		if tokio::time::timeout(heartbeat_interval, receive_pong).await.is_err() {
+		if time_source.timeout(heartbeat_interval, receive_pong).await.is_err() {
 			missed_heartbeats += 1;
 			if missed_heartbeats >= missed_heartbeat_limit {
 				break;
