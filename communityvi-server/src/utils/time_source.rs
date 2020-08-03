@@ -1,7 +1,7 @@
 use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
-use pin_project::__private::Pin;
 use std::any::type_name;
+use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::time::interval_at;
