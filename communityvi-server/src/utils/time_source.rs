@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::time::{interval_at, timeout};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct TimeSource {
 	test_channel: Option<broadcast::Sender<Duration>>,
 }
