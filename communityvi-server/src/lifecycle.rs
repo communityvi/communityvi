@@ -1,6 +1,6 @@
-use crate::configuration::Configuration;
 use crate::connection::receiver::{MessageReceiver, ReceivedMessage};
 use crate::connection::sender::MessageSender;
+use crate::context::ApplicationContext;
 use crate::message::client_request::{
 	ChatRequest, ClientRequest, InsertMediumRequest, PauseRequest, PlayRequest, RegisterRequest,
 };
@@ -26,7 +26,7 @@ use std::convert::TryFrom;
 const MISSED_HEARTBEAT_LIMIT: usize = 3;
 
 pub async fn run_client(
-	configuration: Configuration,
+	application_context: ApplicationContext,
 	room: Room,
 	message_sender: MessageSender,
 	message_receiver: MessageReceiver,
@@ -39,7 +39,13 @@ pub async fn run_client(
 		let left_reason = tokio::select! {
 			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
 			_ = send_broadcasts(client.clone()) => LeftReason::Closed,
-			left_reason = heartbeat(client, pong_receiver, configuration.heartbeat_interval, configuration.missed_heartbeat_limit) => left_reason,
+			left_reason = heartbeat(
+				client,
+				&application_context.time_source,
+				pong_receiver,
+				application_context.configuration.heartbeat_interval,
+				application_context.configuration.missed_heartbeat_limit
+			) => left_reason,
 		};
 		room.remove_client(client_id);
 
@@ -150,11 +156,11 @@ pub async fn send_broadcasts(client: Client) {
 
 pub async fn heartbeat(
 	client: Client,
+	time_source: &TimeSource,
 	mut pong_receiver: mpsc::Receiver<Vec<u8>>,
 	heartbeat_interval: std::time::Duration,
 	missed_heartbeat_limit: u8,
 ) -> LeftReason {
-	let time_source = TimeSource::default();
 	let mut interval = time_source.interval_at(heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
 
@@ -984,12 +990,13 @@ mod test {
 	#[tokio::test]
 	async fn should_send_heartbeats() {
 		let room = Room::new(1);
+		let time_source = TimeSource::default();
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
 		tokio::spawn(async move {
-			let left_reason = heartbeat(client, pong_receiver, heartbeat_interval, 0).await;
+			let left_reason = heartbeat(client, &time_source, pong_receiver, heartbeat_interval, 0).await;
 			assert_eq!(left_reason, LeftReason::Closed);
 		});
 
@@ -1015,6 +1022,7 @@ mod test {
 	#[tokio::test]
 	async fn should_stop_after_missed_heartbeat_limit() {
 		let room = Room::new(1);
+		let time_source = TimeSource::default();
 		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
@@ -1022,7 +1030,14 @@ mod test {
 		let missed_heartbeat_limit = 1;
 
 		let start = Instant::now();
-		let left_reason = heartbeat(client, pong_receiver, heartbeat_interval, missed_heartbeat_limit).await;
+		let left_reason = heartbeat(
+			client,
+			&time_source,
+			pong_receiver,
+			heartbeat_interval,
+			missed_heartbeat_limit,
+		)
+		.await;
 		assert_eq!(left_reason, LeftReason::Timeout);
 		let took = start.elapsed();
 

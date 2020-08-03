@@ -16,6 +16,7 @@ use structopt::StructOpt;
 mod commandline;
 mod configuration;
 mod connection;
+mod context;
 mod error;
 mod lifecycle;
 mod message;

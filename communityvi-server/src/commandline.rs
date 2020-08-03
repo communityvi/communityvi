@@ -1,6 +1,8 @@
 use crate::configuration::Configuration;
+use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
 use crate::server::run_server;
+use crate::utils::time_source::TimeSource;
 use log::info;
 use structopt::StructOpt;
 
@@ -31,9 +33,11 @@ impl Default for BaseCommand {
 impl Commandline {
 	pub async fn run(self) -> Result<(), CommunityviError> {
 		let configuration = Configuration::from_file(&self.configuration_file_path)?;
+		let time_source = TimeSource::default();
+		let application_context = ApplicationContext::new(configuration, time_source);
 
 		env_logger::Builder::new()
-			.parse_filters(&configuration.log_filters)
+			.parse_filters(&application_context.configuration.log_filters)
 			.init();
 
 		let base_command = self.command.unwrap_or_default();
@@ -41,18 +45,18 @@ impl Commandline {
 			BaseCommand::Run => {
 				info!(
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
-					configuration.address
+					application_context.configuration.address
 				);
-				run_server(&configuration, false).await
+				run_server(&application_context, false).await
 			}
 			BaseCommand::Demo => {
 				info!(
 					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
-					configuration.address
+					application_context.configuration.address
 				);
-				run_server(&configuration, true).await
+				run_server(&application_context, true).await
 			}
-			BaseCommand::Configuration => println!("{:?}", configuration),
+			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
 		}
 		Ok(())
 	}

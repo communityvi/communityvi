@@ -1,4 +1,5 @@
 use crate::configuration::Configuration;
+use crate::context::ApplicationContext;
 use crate::message::client_request::{ChatRequest, RegisterRequest};
 use crate::message::outgoing::broadcast_message::{
 	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, LeftReason,
@@ -9,6 +10,7 @@ use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
+use crate::utils::time_source::TimeSource;
 use futures::FutureExt;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
@@ -365,7 +367,9 @@ fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_
 		heartbeat_interval: std::time::Duration::from_secs(2),
 		missed_heartbeat_limit: 3,
 	};
-	let router = create_router(configuration, room, enable_reference_client);
+	let time_source = TimeSource::test();
+	let application_context = ApplicationContext::new(configuration, time_source);
+	let router = create_router(application_context, room, enable_reference_client);
 	let server = gotham::test::TestServer::new(router).expect("Failed to build test server");
 	test(&server);
 }
