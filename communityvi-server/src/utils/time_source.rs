@@ -1,10 +1,12 @@
 use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
+use pin_project::pin_project;
 use std::any::type_name;
+use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::broadcast;
-use tokio::time::interval_at;
+use tokio::time::{interval_at, timeout};
 
 #[derive(Default)]
 pub struct TimeSource {
@@ -25,6 +27,18 @@ impl TimeSource {
 				current_time: Default::default(),
 				next_deadline: start,
 				period,
+				receiver: sender.subscribe(),
+			}),
+		}
+	}
+
+	pub fn timeout<ValueFuture: Future>(&self, duration: Duration, future: ValueFuture) -> Timeout<ValueFuture> {
+		match &self.test_channel {
+			None => Timeout::Tokio(timeout(duration, future)),
+			Some(sender) => Timeout::Test(TestTimeout {
+				future,
+				current_time: Default::default(),
+				deadline: duration,
 				receiver: sender.subscribe(),
 			}),
 		}
@@ -83,6 +97,64 @@ impl Stream for TestInterval {
 			self.next_deadline += period;
 			return Poll::Ready(Some(()));
 		}
+
+		Poll::Pending
+	}
+}
+
+#[pin_project(project = ProjectedTimeout)]
+pub enum Timeout<ValueFuture> {
+	Tokio(#[pin] tokio::time::Timeout<ValueFuture>),
+	Test(#[pin] TestTimeout<ValueFuture>),
+}
+
+impl<ValueFuture: Future> Future for Timeout<ValueFuture> {
+	type Output = Result<ValueFuture::Output, ()>;
+
+	fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
+		let this = self.project();
+		match this {
+			ProjectedTimeout::Tokio(timeout) => match timeout.poll(context) {
+				Poll::Ready(Ok(output)) => Poll::Ready(Ok(output)),
+				Poll::Ready(Err(_)) => Poll::Ready(Err(())),
+				Poll::Pending => Poll::Pending,
+			},
+			ProjectedTimeout::Test(timeout) => timeout.poll(context),
+		}
+	}
+}
+
+#[pin_project]
+pub struct TestTimeout<ValueFuture> {
+	#[pin]
+	future: ValueFuture,
+	current_time: Duration,
+	deadline: Duration,
+	#[pin]
+	receiver: broadcast::Receiver<Duration>,
+}
+
+impl<ValueFuture: Future> Future for TestTimeout<ValueFuture> {
+	type Output = Result<ValueFuture::Output, ()>;
+
+	fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
+		let this = self.project();
+		let receive_poll = this.receiver.poll_next(context);
+		match receive_poll {
+			Poll::Ready(Some(time_delta)) => *this.current_time += time_delta.expect("Failed to receive current time."),
+			Poll::Ready(None) => return Poll::Ready(Err(())),
+			Poll::Pending => {}
+		}
+
+		if this.current_time >= this.deadline {
+			return Poll::Ready(Err(()));
+		}
+
+		let value_poll = this.future.poll(context);
+		match value_poll {
+			Poll::Ready(value) => return Poll::Ready(Ok(value)),
+			Poll::Pending => {}
+		};
 
 		Poll::Pending
 	}
@@ -244,5 +316,46 @@ mod test {
 			let mut pinned_third_period_future = unsafe { Pin::new_unchecked(&mut third_period_future) };
 			assert_eq!(poll!(pinned_third_period_future.as_mut()), Poll::Pending);
 		}
+	}
+
+	#[tokio::test]
+	async fn time_source_should_create_tokio_timeout_that_elapses() {
+		let time_source = TimeSource::default();
+
+		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::pending::<u8>());
+		assert_eq!(timeout.await, Err(()));
+	}
+
+	#[tokio::test]
+	async fn time_source_should_create_tokio_timeout_that_succeeds() {
+		let time_source = TimeSource::default();
+
+		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::ready(42));
+		assert_eq!(timeout.await, Ok(42));
+	}
+
+	#[tokio::test]
+	async fn test_timeout_should_not_time_out_too_early() {
+		let time_source = TimeSource::test();
+
+		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		assert_eq!(timeout.await, Ok(42));
+
+		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		time_source.advance_time(Duration::from_millis(42));
+		assert_eq!(timeout.await, Ok(42));
+	}
+
+	#[tokio::test]
+	async fn test_timeout_should_time_out() {
+		let time_source = TimeSource::test();
+
+		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		time_source.advance_time(Duration::from_millis(1337));
+		assert_eq!(timeout.await, Err(()));
+
+		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::pending::<u8>());
+		time_source.advance_time(Duration::from_millis(1));
+		assert_eq!(timeout.await, Err(()));
 	}
 }
