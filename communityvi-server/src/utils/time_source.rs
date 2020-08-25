@@ -291,6 +291,21 @@ mod test {
 	}
 
 	#[tokio::test]
+	async fn test_time_source_should_advance_time_with_cloned_objects() {
+		let original_time_source = TimeSource::test();
+		let mut interval = original_time_source.interval_at(Duration::from_millis(1), Duration::from_millis(1));
+		matches!(interval, Interval::Test(_));
+
+		let cloned_time_source = original_time_source.clone();
+		cloned_time_source.advance_time(Duration::from_millis(1));
+		{
+			let mut start_future = interval.tick();
+			let mut pinned_start_future = unsafe { Pin::new_unchecked(&mut start_future) };
+			assert_eq!(poll!(pinned_start_future.as_mut()), Poll::Ready(()));
+		}
+	}
+
+	#[tokio::test]
 	async fn test_interval_should_trigger_multiple_times_after_advancing_multiple_period_lengths() {
 		let time_source = TimeSource::test();
 
