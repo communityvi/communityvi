@@ -45,11 +45,10 @@ impl TimeSource {
 	}
 
 	pub fn advance_time(&self, by_duration: Duration) {
-		self.test_channel
+		let _ = self.test_channel
 			.as_ref()
 			.expect("Can only be called in test mode.")
-			.send(by_duration)
-			.expect("Failed to advance time");
+			.send(by_duration);
 	}
 }
 
@@ -283,6 +282,12 @@ mod test {
 			time_source.advance_time(Duration::from_secs(40));
 			assert_eq!(poll!(pinned_second_period_future.as_mut()), Poll::Ready(()));
 		}
+	}
+
+	#[tokio::test]
+	async fn test_time_source_should_advance_time_without_created_objects() {
+		let original_time_source = TimeSource::test();
+		original_time_source.advance_time(Duration::from_millis(1));
 	}
 
 	#[tokio::test]
