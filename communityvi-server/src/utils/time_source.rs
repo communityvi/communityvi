@@ -358,15 +358,6 @@ mod test {
 		}
 	}
 
-	/*
-	TODO: Does this still make sense?
-	#[tokio::test]
-	async fn test_time_source_should_advance_time_without_created_objects() {
-		let original_time_source = TimeSource::test();
-		original_time_source.advance_time("irrelevant", Duration::from_millis(1));
-	}
-	 */
-
 	#[tokio::test]
 	async fn test_time_source_should_advance_time_with_cloned_objects() {
 		let original_time_source = TimeSource::test();
