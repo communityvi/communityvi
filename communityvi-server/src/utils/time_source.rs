@@ -16,7 +16,7 @@ pub struct TimeSource {
 }
 
 pub struct TestTimeSources {
-	named_time_sources: parking_lot::Mutex<BTreeMap<&'static str, Arc<AwaitableTimeSource>>>,
+	named_time_sources: parking_lot::Mutex<BTreeMap<&'static str, Arc<TestTimeSource>>>,
 }
 
 impl Default for TestTimeSources {
@@ -27,12 +27,12 @@ impl Default for TestTimeSources {
 	}
 }
 
-pub struct AwaitableTimeSource {
+pub struct TestTimeSource {
 	time_sender: broadcast::Sender<Duration>,
 	notification: Notify,
 }
 
-impl Default for AwaitableTimeSource {
+impl Default for TestTimeSource {
 	fn default() -> Self {
 		Self {
 			time_sender: broadcast::channel(16).0,
