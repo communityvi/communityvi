@@ -238,6 +238,7 @@ mod test {
 	use super::*;
 	use futures::poll;
 	use tokio::time::timeout;
+	use std::fmt::Debug;
 
 	#[tokio::test]
 	async fn time_source_should_create_tokio_interval_with_correct_short_period() {
@@ -366,11 +367,7 @@ mod test {
 
 		let cloned_time_source = original_time_source.clone();
 		cloned_time_source.advance_time("dolly", Duration::from_millis(1));
-		{
-			let mut start_future = interval.tick();
-			let mut pinned_start_future = unsafe { Pin::new_unchecked(&mut start_future) };
-			assert_eq!(poll!(pinned_start_future.as_mut()), Poll::Ready(()));
-		}
+		assert_poll(Poll::Ready(()), interval.tick()).await;
 	}
 
 	#[tokio::test]
@@ -384,26 +381,10 @@ mod test {
 
 		time_source.advance_time("multiple", Duration::from_secs(210));
 
-		{
-			let mut start_future = interval.tick();
-			let mut pinned_start_future = unsafe { Pin::new_unchecked(&mut start_future) };
-			assert_eq!(poll!(pinned_start_future.as_mut()), Poll::Ready(()));
-		}
-		{
-			let mut first_period_future = interval.tick();
-			let mut pinned_first_period_future = unsafe { Pin::new_unchecked(&mut first_period_future) };
-			assert_eq!(poll!(pinned_first_period_future.as_mut()), Poll::Ready(()));
-		}
-		{
-			let mut second_period_future = interval.tick();
-			let mut pinned_second_period_future = unsafe { Pin::new_unchecked(&mut second_period_future) };
-			assert_eq!(poll!(pinned_second_period_future.as_mut()), Poll::Ready(()));
-		}
-		{
-			let mut third_period_future = interval.tick();
-			let mut pinned_third_period_future = unsafe { Pin::new_unchecked(&mut third_period_future) };
-			assert_eq!(poll!(pinned_third_period_future.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Ready(()), interval.tick()).await;
+		assert_poll(Poll::Ready(()), interval.tick()).await;
+		assert_poll(Poll::Ready(()), interval.tick()).await;
+		assert_poll(Poll::Pending, interval.tick()).await;
 	}
 
 	#[tokio::test]
@@ -452,26 +433,14 @@ mod test {
 		const TIMEOUT_NAME: &str = "timeout";
 		let time_source = TimeSource::test();
 
-		{
-			let mut wait_future = time_source.wait_for_time_request(TIMEOUT_NAME);
-			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future) };
-			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, time_source.wait_for_time_request(TIMEOUT_NAME)).await;
 
 		let wait_before = time_source.wait_for_time_request(TIMEOUT_NAME);
 		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
-		{
-			let mut wait_before = wait_before;
-			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before) };
-			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Ready(()));
-		}
+		assert_poll(Poll::Ready(()), wait_before).await;
 
 		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
-		{
-			let mut wait_after = time_source.wait_for_time_request(TIMEOUT_NAME);
-			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after) };
-			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Ready(()));
-		}
+		assert_poll(Poll::Ready(()), time_source.wait_for_time_request(TIMEOUT_NAME)).await;
 	}
 
 	#[tokio::test]
@@ -480,26 +449,14 @@ mod test {
 		const WAIT_NAME: &str = "infinity";
 		let time_source = TimeSource::test();
 
-		{
-			let mut wait_future = time_source.wait_for_time_request(WAIT_NAME);
-			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future) };
-			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
 
 		let wait_before = time_source.wait_for_time_request(WAIT_NAME);
 		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
-		{
-			let mut wait_before = wait_before;
-			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before) };
-			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, wait_before).await;
 
 		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
-		{
-			let mut wait_after = time_source.wait_for_time_request(WAIT_NAME);
-			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after) };
-			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
 	}
 
 	#[tokio::test]
@@ -508,27 +465,21 @@ mod test {
 		const WAIT_NAME: &str = "infinity";
 		let time_source = TimeSource::test();
 
-		{
-			let mut wait_future = time_source.wait_for_time_request(WAIT_NAME);
-			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future )};
-			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
 
 		let wait_before = time_source.wait_for_time_request(WAIT_NAME);
 		let mut interval = time_source.interval_at(INTERVAL_NAME, Duration::from_millis(0), Duration::from_millis(1));
 		interval.tick().await;
-		{
-			let mut wait_before = wait_before;
-			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before )};
-			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, wait_before).await;
 
 		let mut interval = time_source.interval_at(INTERVAL_NAME, Duration::from_millis(0), Duration::from_millis(1));
 		interval.tick().await;
-		{
-			let mut wait_after = time_source.wait_for_time_request(WAIT_NAME);
-			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after )};
-			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Pending);
-		}
+		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
+	}
+
+	#[must_use = "async functions must be awaited."]
+	async fn assert_poll<OutputType: Debug + PartialEq>(expected: Poll<OutputType>, mut future: impl Future<Output = OutputType>) {
+		let mut pinned = unsafe { Pin::new_unchecked(&mut future) };
+		assert_eq!(expected, poll!(pinned.as_mut()));
 	}
 }
