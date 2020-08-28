@@ -12,15 +12,14 @@ use std::sync::Arc;
 
 #[derive(Clone, Default)]
 pub struct TimeSource {
-	test_timesource: Option<Arc<TestTimeSource>>,
+	test_timesources: Option<Arc<TestTimeSources>>,
 }
 
-// TODO: Fix naming
-pub struct TestTimeSource {
+pub struct TestTimeSources {
 	named_time_sources: parking_lot::Mutex<BTreeMap<&'static str, Arc<AwaitableTimeSource>>>,
 }
 
-impl Default for TestTimeSource {
+impl Default for TestTimeSources {
 	fn default() -> Self {
 		Self {
 			named_time_sources: Default::default(),
@@ -42,7 +41,7 @@ impl Default for AwaitableTimeSource {
 	}
 }
 
-impl TestTimeSource {
+impl TestTimeSources {
 	fn interval_at(&self, name: &'static str, start: Duration, period: Duration) -> TestInterval {
 		let mut time_sources = self.named_time_sources.lock();
 		let time_source = time_sources.entry(name).or_default();
@@ -94,33 +93,33 @@ impl TestTimeSource {
 impl TimeSource {
 	pub fn test() -> Self {
 		Self {
-			test_timesource: Some(Default::default()),
+			test_timesources: Some(Default::default()),
 		}
 	}
 
 	pub fn interval_at(&self, name: &'static str, start: Duration, period: Duration) -> Interval {
-		match &self.test_timesource {
+		match &self.test_timesources {
 			None => Interval::Tokio(interval_at(tokio::time::Instant::now() + start, period)),
 			Some(test_time_source) => Interval::Test(test_time_source.interval_at(name, start, period)),
 		}
 	}
 
 	pub fn timeout<ValueFuture: Future>(&self, name: &'static str, duration: Duration, future: ValueFuture) -> Timeout<ValueFuture> {
-		match &self.test_timesource {
+		match &self.test_timesources {
 			None => Timeout::Tokio(timeout(duration, future)),
 			Some(test_time_source) => Timeout::Test(test_time_source.timeout(name, duration, future)),
 		}
 	}
 
 	pub fn advance_time(&self, name: &'static str, by_duration: Duration) {
-		let _ = self.test_timesource
+		let _ = self.test_timesources
 			.as_ref()
 			.expect("Can only be called in test mode.")
 			.advance_time(name, by_duration);
 	}
 
 	pub async fn wait_for_time_request(&self, name: &'static str) {
-		match &self.test_timesource {
+		match &self.test_timesources {
 			None => (),
 			Some(test_time_source) => test_time_source.wait_for_time_request(name).await,
 		}
