@@ -459,22 +459,86 @@ mod test {
 
 	#[tokio::test]
 	async fn test_timeout_should_trigger_time_request() {
+		const TIMEOUT_NAME: &str = "timeout";
 		let time_source = TimeSource::test();
 
 		{
-			let mut wait_future = time_source.wait_for_time_request("timeout");
+			let mut wait_future = time_source.wait_for_time_request(TIMEOUT_NAME);
 			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future) };
 			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
 		}
 
-		let wait = time_source.wait_for_time_request("timeout");
-		let timeout = async {
-			time_source.timeout("timeout", Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
-		};
+		let wait_before = time_source.wait_for_time_request(TIMEOUT_NAME);
+		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
 		{
-			let mut joined_future = futures::future::join(timeout, wait);
-			let mut pinned_joined_future = unsafe { Pin::new_unchecked(&mut joined_future) };
-			assert_eq!(poll!(pinned_joined_future.as_mut()), Poll::Ready(((), ())));
+			let mut wait_before = wait_before;
+			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before) };
+			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Ready(()));
+		}
+
+		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		{
+			let mut wait_after = time_source.wait_for_time_request(TIMEOUT_NAME);
+			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after) };
+			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Ready(()));
+		}
+	}
+
+	#[tokio::test]
+	async fn test_timeout_with_different_name_should_not_trigger_time_request() {
+		const TIMEOUT_NAME: &str = "timeout";
+		const WAIT_NAME: &str = "infinity";
+		let time_source = TimeSource::test();
+
+		{
+			let mut wait_future = time_source.wait_for_time_request(WAIT_NAME);
+			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future) };
+			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
+		}
+
+		let wait_before = time_source.wait_for_time_request(WAIT_NAME);
+		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		{
+			let mut wait_before = wait_before;
+			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before) };
+			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Pending);
+		}
+
+		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		{
+			let mut wait_after = time_source.wait_for_time_request(WAIT_NAME);
+			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after) };
+			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Pending);
+		}
+	}
+
+	#[tokio::test]
+	async fn test_interval_with_different_name_should_not_trigger_time_request() {
+		const INTERVAL_NAME: &str = "interval";
+		const WAIT_NAME: &str = "infinity";
+		let time_source = TimeSource::test();
+
+		{
+			let mut wait_future = time_source.wait_for_time_request(WAIT_NAME);
+			let mut pinned_wait_future = unsafe { Pin::new_unchecked(&mut wait_future )};
+			assert_eq!(poll!(pinned_wait_future.as_mut()), Poll::Pending);
+		}
+
+		let wait_before = time_source.wait_for_time_request(WAIT_NAME);
+		let mut interval = time_source.interval_at(INTERVAL_NAME, Duration::from_millis(0), Duration::from_millis(1));
+		interval.tick().await;
+		{
+			let mut wait_before = wait_before;
+			let mut pinned_wait_before = unsafe { Pin::new_unchecked(&mut wait_before )};
+			assert_eq!(poll!(pinned_wait_before.as_mut()), Poll::Pending);
+		}
+
+		let mut interval = time_source.interval_at(INTERVAL_NAME, Duration::from_millis(0), Duration::from_millis(1));
+		interval.tick().await;
+		{
+			let mut wait_after = time_source.wait_for_time_request(WAIT_NAME);
+			let mut pinned_wait_after = unsafe { Pin::new_unchecked(&mut wait_after )};
+			assert_eq!(poll!(pinned_wait_after.as_mut()), Poll::Pending);
 		}
 	}
 }
