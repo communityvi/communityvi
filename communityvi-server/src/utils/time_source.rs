@@ -58,7 +58,6 @@ impl TestTimeSources {
 	}
 
 	fn timeout<ValueFuture: Future>(&self, name: &'static str, duration: Duration, future: ValueFuture) -> TestTimeout<ValueFuture> {
-		// TODO: remove duplication
 		let mut time_sources = self.named_time_sources.lock();
 		let time_source = time_sources.entry(name).or_default();
 		let timeout = TestTimeout {
