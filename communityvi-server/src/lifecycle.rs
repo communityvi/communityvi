@@ -188,7 +188,11 @@ pub async fn heartbeat(
 			}
 			Err(())
 		};
-		if time_source.timeout(HEARTBEAT_TIMEOUT_NAME, heartbeat_interval, receive_pong).await.is_err() {
+		if time_source
+			.timeout(HEARTBEAT_TIMEOUT_NAME, heartbeat_interval, receive_pong)
+			.await
+			.is_err()
+		{
 			missed_heartbeats += 1;
 			if missed_heartbeats >= missed_heartbeat_limit {
 				break;
@@ -1000,7 +1004,7 @@ mod test {
 
 		tokio::spawn(async move {
 			let left_reason = heartbeat(client, &time_source_for_heartbeat, pong_receiver, heartbeat_interval, 0).await;
-			assert_eq!(left_reason, LeftReason::Closed);  // NOTE: This line will most likely never run
+			assert_eq!(left_reason, LeftReason::Closed); // NOTE: This line will most likely never run
 		});
 
 		time_source.wait_for_time_request(HEARTBEAT_INTERVAL_NAME).await;
@@ -1024,7 +1028,7 @@ mod test {
 
 		tokio::spawn(async move {
 			let left_reason = heartbeat(client, &time_source_for_heartbeat, pong_receiver, heartbeat_interval, 0).await;
-			assert_eq!(left_reason, LeftReason::Closed);  // NOTE: This line will most likely never run
+			assert_eq!(left_reason, LeftReason::Closed); // NOTE: This line will most likely never run
 		});
 
 		let payload = test_client.receive_ping().await;
@@ -1047,7 +1051,10 @@ mod test {
 			let time_source = time_source_for_test;
 
 			time_source.wait_for_time_request(HEARTBEAT_INTERVAL_NAME).await;
-			time_source.advance_time(HEARTBEAT_INTERVAL_NAME, (MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval);
+			time_source.advance_time(
+				HEARTBEAT_INTERVAL_NAME,
+				(MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval,
+			);
 
 			for _ in 0..MISSED_HEARTBEAT_LIMIT {
 				time_source.wait_for_time_request(HEARTBEAT_TIMEOUT_NAME).await;
@@ -1062,7 +1069,7 @@ mod test {
 			heartbeat_interval,
 			missed_heartbeat_limit,
 		)
-			.await;
+		.await;
 		assert_eq!(left_reason, LeftReason::Timeout);
 	}
 

@@ -2,13 +2,13 @@ use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use std::any::type_name;
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, Notify};
 use tokio::time::{interval_at, timeout};
-use std::collections::BTreeMap;
-use std::sync::Arc;
 
 #[derive(Clone, Default)]
 pub struct TimeSource {
@@ -57,7 +57,12 @@ impl TestTimeSources {
 		interval
 	}
 
-	fn timeout<ValueFuture: Future>(&self, name: &'static str, duration: Duration, future: ValueFuture) -> TestTimeout<ValueFuture> {
+	fn timeout<ValueFuture: Future>(
+		&self,
+		name: &'static str,
+		duration: Duration,
+		future: ValueFuture,
+	) -> TestTimeout<ValueFuture> {
 		let mut time_sources = self.named_time_sources.lock();
 		let time_source = time_sources.entry(name).or_default();
 		let timeout = TestTimeout {
@@ -103,7 +108,12 @@ impl TimeSource {
 		}
 	}
 
-	pub fn timeout<ValueFuture: Future>(&self, name: &'static str, duration: Duration, future: ValueFuture) -> Timeout<ValueFuture> {
+	pub fn timeout<ValueFuture: Future>(
+		&self,
+		name: &'static str,
+		duration: Duration,
+		future: ValueFuture,
+	) -> Timeout<ValueFuture> {
 		match &self.test_timesources {
 			None => Timeout::Tokio(timeout(duration, future)),
 			Some(test_time_source) => Timeout::Test(test_time_source.timeout(name, duration, future)),
@@ -111,7 +121,8 @@ impl TimeSource {
 	}
 
 	pub fn advance_time(&self, name: &'static str, by_duration: Duration) {
-		let _ = self.test_timesources
+		let _ = self
+			.test_timesources
 			.as_ref()
 			.expect("Can only be called in test mode.")
 			.advance_time(name, by_duration);
@@ -236,8 +247,8 @@ impl<ValueFuture: Future> Future for TestTimeout<ValueFuture> {
 mod test {
 	use super::*;
 	use futures::poll;
-	use tokio::time::timeout;
 	use std::fmt::Debug;
+	use tokio::time::timeout;
 
 	#[tokio::test]
 	async fn time_source_should_create_tokio_interval_with_correct_short_period() {
@@ -361,7 +372,8 @@ mod test {
 	#[tokio::test]
 	async fn test_time_source_should_advance_time_with_cloned_objects() {
 		let original_time_source = TimeSource::test();
-		let mut interval = original_time_source.interval_at("dolly", Duration::from_millis(1), Duration::from_millis(1));
+		let mut interval =
+			original_time_source.interval_at("dolly", Duration::from_millis(1), Duration::from_millis(1));
 		matches!(interval, Interval::Test(_));
 
 		let cloned_time_source = original_time_source.clone();
@@ -435,10 +447,16 @@ mod test {
 		assert_poll(Poll::Pending, time_source.wait_for_time_request(TIMEOUT_NAME)).await;
 
 		let wait_before = time_source.wait_for_time_request(TIMEOUT_NAME);
-		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		time_source
+			.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(()))
+			.await
+			.expect("Timeout failed");
 		assert_poll(Poll::Ready(()), wait_before).await;
 
-		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		time_source
+			.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(()))
+			.await
+			.expect("Timeout failed");
 		assert_poll(Poll::Ready(()), time_source.wait_for_time_request(TIMEOUT_NAME)).await;
 	}
 
@@ -451,10 +469,16 @@ mod test {
 		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
 
 		let wait_before = time_source.wait_for_time_request(WAIT_NAME);
-		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		time_source
+			.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(()))
+			.await
+			.expect("Timeout failed");
 		assert_poll(Poll::Pending, wait_before).await;
 
-		time_source.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(())).await.expect("Timeout failed");
+		time_source
+			.timeout(TIMEOUT_NAME, Duration::from_millis(1337), futures::future::ready(()))
+			.await
+			.expect("Timeout failed");
 		assert_poll(Poll::Pending, time_source.wait_for_time_request(WAIT_NAME)).await;
 	}
 
@@ -477,7 +501,10 @@ mod test {
 	}
 
 	#[must_use = "async functions must be awaited."]
-	async fn assert_poll<OutputType: Debug + PartialEq>(expected: Poll<OutputType>, mut future: impl Future<Output = OutputType>) {
+	async fn assert_poll<OutputType: Debug + PartialEq>(
+		expected: Poll<OutputType>,
+		mut future: impl Future<Output = OutputType>,
+	) {
 		let mut pinned = unsafe { Pin::new_unchecked(&mut future) };
 		assert_eq!(expected, poll!(pinned.as_mut()));
 	}
