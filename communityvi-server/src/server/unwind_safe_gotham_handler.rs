@@ -40,7 +40,7 @@ where
 {
 	type Instance = Self;
 
-	fn new_handler(&self) -> Result<Self::Instance, gotham::error::Error> {
+	fn new_handler(&self) -> anyhow::Result<Self::Instance> {
 		let closure = self.handler.0.clone();
 		Ok(UnwindSafeGothamHandler {
 			handler: AssertUnwindSafe(closure),
