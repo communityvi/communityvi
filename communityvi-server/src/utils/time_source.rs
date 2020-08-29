@@ -77,12 +77,14 @@ impl TestTimeSources {
 		timeout
 	}
 
+	#[cfg(test)]
 	fn advance_time(&self, name: &'static str, by_duration: Duration) {
 		let time_sources = self.named_time_sources.lock();
 		let time_source = time_sources.get(name).expect("No time sender of this name");
 		let _ = time_source.time_sender.send(by_duration); // ignore error so this works even without anyone waiting
 	}
 
+	#[cfg(test)]
 	async fn wait_for_time_request(&self, name: &'static str) {
 		let time_source = {
 			// subscope so the MutexGuard isn't held across an await point
@@ -95,6 +97,7 @@ impl TestTimeSources {
 }
 
 impl TimeSource {
+	#[cfg(test)]
 	pub fn test() -> Self {
 		Self {
 			test_timesources: Some(Default::default()),
@@ -120,14 +123,15 @@ impl TimeSource {
 		}
 	}
 
+	#[cfg(test)]
 	pub fn advance_time(&self, name: &'static str, by_duration: Duration) {
-		let _ = self
-			.test_timesources
+		self.test_timesources
 			.as_ref()
 			.expect("Can only be called in test mode.")
 			.advance_time(name, by_duration);
 	}
 
+	#[cfg(test)]
 	pub async fn wait_for_time_request(&self, name: &'static str) {
 		match &self.test_timesources {
 			None => (),
