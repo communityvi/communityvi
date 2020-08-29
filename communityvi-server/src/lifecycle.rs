@@ -395,7 +395,6 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
-	use std::time::Instant;
 	use tokio::time::delay_for;
 
 	#[tokio::test]
@@ -1032,9 +1031,43 @@ mod test {
 		pong_sender.send(payload).await.unwrap();
 	}
 
-	#[cfg(not(target_os = "windows"))]
 	#[tokio::test]
-	async fn should_stop_after_missed_heartbeat_limit() {
+	async fn should_stop_after_missed_heartbeat_limit_with_test_time_source() {
+		let room = Room::new(1);
+		let time_source = TimeSource::test();
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_pong_sender, pong_receiver) = mpsc::channel(0);
+
+		let heartbeat_interval = std::time::Duration::from_millis(1);
+		let missed_heartbeat_limit = 1;
+
+		// task for advancing test time
+		let time_source_for_test = time_source.clone();
+		tokio::spawn(async move {
+			let time_source = time_source_for_test;
+
+			time_source.wait_for_time_request(HEARTBEAT_INTERVAL_NAME).await;
+			time_source.advance_time(HEARTBEAT_INTERVAL_NAME, (MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval);
+
+			for _ in 0..MISSED_HEARTBEAT_LIMIT {
+				time_source.wait_for_time_request(HEARTBEAT_TIMEOUT_NAME).await;
+				time_source.advance_time(HEARTBEAT_TIMEOUT_NAME, heartbeat_interval);
+			}
+		});
+
+		let left_reason = heartbeat(
+			client,
+			&time_source,
+			pong_receiver,
+			heartbeat_interval,
+			missed_heartbeat_limit,
+		)
+			.await;
+		assert_eq!(left_reason, LeftReason::Timeout);
+	}
+
+	#[tokio::test]
+	async fn should_stop_after_missed_heartbeats_with_real_time_source() {
 		let room = Room::new(1);
 		let time_source = TimeSource::default();
 		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
@@ -1043,7 +1076,6 @@ mod test {
 		let heartbeat_interval = std::time::Duration::from_millis(1);
 		let missed_heartbeat_limit = 1;
 
-		let start = Instant::now();
 		let left_reason = heartbeat(
 			client,
 			&time_source,
@@ -1053,17 +1085,6 @@ mod test {
 		)
 		.await;
 		assert_eq!(left_reason, LeftReason::Timeout);
-		let took = start.elapsed();
-
-		let minimum_duration = u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
-		let maximum_duration = 3 * u32::from(missed_heartbeat_limit + 1) * heartbeat_interval;
-		assert!(
-			(took > minimum_duration) && (took < maximum_duration),
-			"{:?} is not between {:?} and {:?}",
-			took,
-			minimum_duration,
-			maximum_duration,
-		);
 	}
 
 	async fn register_test_client(
