@@ -11,7 +11,6 @@ use crate::room::Room;
 use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
-use futures::FutureExt;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
 use gotham::hyper::Body;
@@ -19,7 +18,6 @@ use gotham::plain::test::TestServer;
 use gotham::test::Server;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::future::Future;
 use std::ops::DerefMut;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
@@ -34,7 +32,7 @@ fn should_respond_to_websocket_messages() {
 			let client_id = register_client("Ferris", &mut test_client).await;
 			assert_eq!(ClientId::from(0), client_id);
 		};
-		run_future_on_test_server(future, server);
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -55,7 +53,7 @@ fn should_not_allow_invalid_messages_during_registration() {
 				.build();
 			assert_eq!(expected_response, response);
 		};
-		run_future_on_test_server(future, server);
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -76,7 +74,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 				.build();
 			assert_eq!(expected_response, response);
 		};
-		run_future_on_test_server(future, server);
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -123,7 +121,7 @@ fn should_broadcast_messages() {
 				bob_test_client.receive_broadcast_message().await
 			);
 		};
-		run_future_on_test_server(future, server);
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -146,7 +144,7 @@ fn should_broadcast_when_client_leaves_the_room() {
 			let leave_message = alice_test_client.receive_broadcast_message().await;
 			assert_eq!(expected_leave_message, leave_message);
 		};
-		run_future_on_test_server(future, server);
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -288,7 +286,7 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 			let pong = test_client.receive_raw().await;
 			assert!(pong.is_pong());
 		};
-		run_future_on_test_server(future, server)
+		server.run_future(future);
 	};
 	test_with_test_server(test, false);
 }
@@ -299,7 +297,7 @@ fn registered_websocket_test_client(name: &'static str, server: &TestServer) -> 
 		let client_id = { register_client(name, &mut test_client).await };
 		(client_id, test_client)
 	};
-	run_future_on_test_server(register_future, server)
+	server.run_future(register_future)
 }
 
 async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
@@ -335,30 +333,19 @@ fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 	let mut response = client
 		.perform(request)
 		.expect("Failed to initiate websocket connection.");
-	// We don't own the `TestRespons`'s `Body`, so we need to swap it out for an empty one ...
+	// We don't own the `TestResponse`'s `Body`, so we need to swap it out for an empty one ...
 	let mut body = Body::empty();
 	std::mem::swap(&mut body, response.deref_mut().body_mut());
 
-	let websocket = server
-		.run_future(async move {
-			let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
-			let websocket_stream = WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await;
-			Ok::<_, ImpossibleError>(websocket_stream) // `test::Server::run_future` requires `Result` with `Error` for no apparent reason
-		})
-		.unwrap(); // wrap the `ImpossibleError` away, whoooosh
+	let websocket = server.run_future(async move {
+		let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
+		WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await
+	});
 
 	websocket.into()
 }
 
-fn run_future_on_test_server<FutureType, Output>(future: FutureType, server: &TestServer) -> Output
-where
-	Output: Send + 'static,
-	FutureType: Future<Output = Output> + Send + 'static,
-{
-	server.run_future(future.map(Ok::<_, ImpossibleError>)).unwrap()
-}
-
-fn test_with_test_server(test: impl FnOnce(&TestServer) -> (), enable_reference_client: bool) {
+fn test_with_test_server(test: impl FnOnce(&TestServer), enable_reference_client: bool) {
 	let room = Room::new(10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
