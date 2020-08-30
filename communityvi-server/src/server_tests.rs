@@ -28,7 +28,7 @@ const TEST_SERVER_URL: &str = "127.0.0.1:10000";
 fn should_respond_to_websocket_messages() {
 	let test = |server: &TestServer| {
 		let mut test_client = websocket_test_client(server);
-		let future = async move {
+		let future = async {
 			let client_id = register_client("Ferris", &mut test_client).await;
 			assert_eq!(ClientId::from(0), client_id);
 		};
@@ -41,7 +41,7 @@ fn should_respond_to_websocket_messages() {
 fn should_not_allow_invalid_messages_during_registration() {
 	let test = |server: &TestServer| {
 		let mut test_client = websocket_test_client(server);
-		let future = async move {
+		let future = async {
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
 
@@ -63,7 +63,7 @@ fn should_not_allow_invalid_messages_after_successful_registration() {
 	let test = |server: &TestServer| {
 		let (_client_id, mut test_client) = registered_websocket_test_client("Ferris", server);
 
-		let future = async move {
+		let future = async {
 			let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 			test_client.send_raw(invalid_message).await;
 			let response = test_client.receive_error_message(None).await;
@@ -91,7 +91,7 @@ fn should_broadcast_messages() {
 		let (bob_client_id, mut bob_test_client) = registered_websocket_test_client("Bob", server);
 		assert_eq!(ClientId::from(1), bob_client_id);
 
-		let future = async move {
+		let future = async {
 			let expected_bob_joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 				id: bob_client_id,
 				name: "Bob".to_string(),
@@ -132,7 +132,7 @@ fn should_broadcast_when_client_leaves_the_room() {
 		let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", server);
 		let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", server);
 
-		let future = async move {
+		let future = async {
 			let _ = alice_test_client.receive_broadcast_message().await; // skip join message for bob
 			std::mem::drop(bob_test_client);
 
@@ -280,7 +280,7 @@ impl Error for ImpossibleError {}
 fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let test = |server: &TestServer| {
 		let mut test_client = websocket_test_client(server);
-		let future = async move {
+		let future = async {
 			test_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
 			let pong = test_client.receive_raw().await;
@@ -293,7 +293,7 @@ fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 
 fn registered_websocket_test_client(name: &'static str, server: &TestServer) -> (ClientId, WebsocketTestClient) {
 	let mut test_client = websocket_test_client(server);
-	let register_future = async move {
+	let register_future = async {
 		let client_id = { register_client(name, &mut test_client).await };
 		(client_id, test_client)
 	};
@@ -337,7 +337,7 @@ fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 	let mut body = Body::empty();
 	std::mem::swap(&mut body, response.deref_mut().body_mut());
 
-	let websocket = server.run_future(async move {
+	let websocket = server.run_future(async {
 		let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
 		WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await
 	});
