@@ -8,18 +8,18 @@ repository = "https://github.com/communityvi/communityvi"
 [dependencies]
 anyhow = "1"
 async-trait = "0.1.30"
-base64 = "0.12"
+base64 = "0.13"
 chrono = {version = "0.4", features = ["serde"]}
-env_logger = "0.7"
+env_logger = "0.8"
 futures = "0.3"
-gotham = {git = "https://github.com/gotham-rs/gotham", branch = "master", default-features = false}
-governor = {version = "0.2", default-features = false, features = ["std"]}
+gotham = {version = "0.5.0-rc.1", default-features = false}
+governor = {version = "0.3", default-features = false, features = ["std", "jitter"]}
 humantime-serde = "1.0"
 log = "0.4"
 mime = "0.3"
 nonzero_ext = "0.2"
-parking_lot = "0.10"
-pin-project = "0.4"
+parking_lot = "0.11"
+pin-project = "1"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 sha1 = "0.6"
