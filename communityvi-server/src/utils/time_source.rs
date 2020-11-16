@@ -49,7 +49,7 @@ impl TestTimeSources {
 			current_time: Default::default(),
 			next_deadline: start,
 			period,
-			receiver: time_source.time_sender.subscribe(),
+			receiver: time_source.time_sender.subscribe().into_stream().boxed(),
 		};
 
 		time_source.notification.notify();
@@ -163,7 +163,7 @@ pub struct TestInterval {
 	current_time: Duration,
 	next_deadline: Duration,
 	period: Duration,
-	receiver: broadcast::Receiver<Duration>,
+	receiver: Pin<Box<dyn Stream<Item = Result<Duration, tokio::sync::broadcast::RecvError>> + Send + 'static>>,
 }
 
 impl Stream for TestInterval {
