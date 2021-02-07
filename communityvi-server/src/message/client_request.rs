@@ -5,6 +5,7 @@ use crate::message::{MessageError, WebSocketMessage};
 use crate::room::medium::fixed_length::FixedLengthMedium;
 use crate::room::medium::Medium;
 use chrono::Duration;
+use log::error;
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -189,7 +190,8 @@ impl TryFrom<&WebSocketMessage> for RequestIdOnly {
 
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
 		match websocket_message {
-			WebSocketMessage::Text(json) => serde_json::from_str(json).map_err(|_| ()),
+			WebSocketMessage::Text(json) => serde_json::from_str(json)
+				.map_err(|error| error!("Error while deserializing websocket message from JSON: {:?}", error)),
 			_ => Err(()),
 		}
 	}

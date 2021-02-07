@@ -8,6 +8,8 @@ use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::Sink;
 use futures::SinkExt;
+use log::error;
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -33,9 +35,10 @@ struct SinkMessageSenderInner<ResponseSink> {
 }
 
 #[async_trait]
-impl<ResponseSink> MessageSenderTrait for SinkMessageSender<ResponseSink>
+impl<ResponseSink, SinkError> MessageSenderTrait for SinkMessageSender<ResponseSink>
 where
-	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
+	ResponseSink: Sink<WebSocketMessage, Error = SinkError> + Send + Unpin + 'static,
+	SinkError: Debug + 'static,
 {
 	async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> Result<(), ()> {
 		let outgoing_message = OutgoingMessage::Success { request_id, message };
@@ -55,7 +58,11 @@ where
 	async fn send_ping(&self, payload: Vec<u8>) -> Result<(), ()> {
 		let mut inner = self.inner.lock().await;
 		let ping = WebSocketMessage::Ping(payload);
-		inner.response_sink.send(ping).await.map_err(|_| ())
+		inner
+			.response_sink
+			.send(ping)
+			.await
+			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
 	}
 
 	async fn close(&self) {
@@ -64,9 +71,10 @@ where
 	}
 }
 
-impl<ResponseSink> SinkMessageSender<ResponseSink>
+impl<ResponseSink, SinkError> SinkMessageSender<ResponseSink>
 where
-	ResponseSink: Sink<WebSocketMessage> + Unpin,
+	ResponseSink: Sink<WebSocketMessage, Error = SinkError> + Unpin,
+	SinkError: Debug + 'static,
 {
 	pub fn new(response_sink: ResponseSink) -> Self {
 		let inner = SinkMessageSenderInner { response_sink };
@@ -78,13 +86,18 @@ where
 
 		let websocket_message = WebSocketMessage::from(&message);
 
-		inner.response_sink.send(websocket_message).await.map_err(|_| ())
+		inner
+			.response_sink
+			.send(websocket_message)
+			.await
+			.map_err(|error| error!("Error while sending message: {:?}", error))
 	}
 }
 
-impl<ResponseSink> From<SinkMessageSender<ResponseSink>> for MessageSender
+impl<ResponseSink, SinkError> From<SinkMessageSender<ResponseSink>> for MessageSender
 where
-	ResponseSink: Sink<WebSocketMessage> + Send + Unpin + 'static,
+	ResponseSink: Sink<WebSocketMessage, Error = SinkError> + Send + Unpin + 'static,
+	SinkError: Debug + 'static,
 {
 	fn from(sink_message_sender: SinkMessageSender<ResponseSink>) -> Self {
 		Arc::pin(sink_message_sender)
