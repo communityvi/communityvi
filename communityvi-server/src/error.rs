@@ -1,7 +1,6 @@
 use crate::configuration::ConfigurationError;
-use serde::export::Formatter;
 use std::error::Error;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum CommunityviError {
