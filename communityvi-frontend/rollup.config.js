@@ -5,6 +5,7 @@ import livereload from 'rollup-plugin-livereload';
 import { terser } from 'rollup-plugin-terser';
 import sveltePreprocess from 'svelte-preprocess';
 import typescript from '@rollup/plugin-typescript';
+import sass from 'rollup-plugin-sass';
 import css from 'rollup-plugin-css-only';
 
 const production = !process.env.ROLLUP_WATCH;
@@ -46,9 +47,14 @@ export default {
 				dev: !production
 			}
 		}),
+
+		// preprocess any included sass files
+		sass({ output: 'public/build/global.css' }),
+
 		// we'll extract any component CSS out into
 		// a separate file - better for performance
-		css({ output: 'bundle.css' }),
+		// note: the css plugin already prepends the public/build path.
+		css({ output: 'svelte.css' }),
 
 		// If you have external dependencies installed from
 		// npm, you'll most likely need these plugins. In
