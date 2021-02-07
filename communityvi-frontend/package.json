@@ -9,12 +9,14 @@
     "validate": "svelte-check"
   },
   "devDependencies": {
+    "@fortawesome/fontawesome-free": "^5.15.2",
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
     "@rollup/plugin-typescript": "^6.0.0",
     "@tsconfig/svelte": "^1.0.0",
     "bulma": "^0.9",
     "rollup": "^2.3.4",
+    "rollup-plugin-copy": "^3.3.0",
     "rollup-plugin-css-only": "^3.1.0",
     "rollup-plugin-livereload": "^2.0.0",
     "rollup-plugin-sass": "^1.2",

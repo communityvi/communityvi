@@ -7,6 +7,7 @@ import sveltePreprocess from 'svelte-preprocess';
 import typescript from '@rollup/plugin-typescript';
 import sass from 'rollup-plugin-sass';
 import css from 'rollup-plugin-css-only';
+import copy from "rollup-plugin-copy";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -69,6 +70,14 @@ export default {
 		typescript({
 			sourceMap: !production,
 			inlineSources: !production
+		}),
+
+		// We need to copy over the webfonts from the fontawesome dependency in order for them to load.
+		copy({
+			targets: [{
+				src: 'node_modules/@fortawesome/fontawesome-free/webfonts',
+				dest: 'public'
+			}]
 		}),
 
 		// In dev mode, call `npm run start` once
