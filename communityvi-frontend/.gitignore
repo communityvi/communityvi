@@ -1,0 +1,7 @@
+node_modules/
+public/build/
+.idea/
+*.iml
+*.swp
+Thumbs.db
+.DS_Store
