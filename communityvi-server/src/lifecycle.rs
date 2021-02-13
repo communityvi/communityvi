@@ -248,7 +248,7 @@ fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Resul
 	match request {
 		Chat(chat_request) => handle_chat_request(room, client, chat_request),
 		Register { .. } => handle_register_request(client),
-		GetReferenceTime => handle_get_reference_time_request(room),
+		GetReferenceTime => Ok(handle_get_reference_time_request(room)),
 		InsertMedium(insert_medium_request) => handle_insert_medium_request(room, client, insert_medium_request),
 		Play(play_request) => handle_play_request(room, client, play_request),
 		Pause(pause_request) => handle_pause_request(room, client, pause_request),
@@ -281,11 +281,11 @@ fn handle_register_request(client: &Client) -> Result<SuccessMessage, ErrorMessa
 		.build())
 }
 
-fn handle_get_reference_time_request(room: &Room) -> Result<SuccessMessage, ErrorMessage> {
+fn handle_get_reference_time_request(room: &Room) -> SuccessMessage {
 	let reference_time = room.current_reference_time();
-	Ok(SuccessMessage::ReferenceTime {
+	SuccessMessage::ReferenceTime {
 		milliseconds: u64::try_from(reference_time.as_millis()).unwrap(),
-	})
+	}
 }
 
 fn handle_insert_medium_request(
