@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "build": "rollup -c",
-    "dev": "rollup -c -w",
+    "watch": "rollup -c -w",
     "start": "sirv public",
     "validate": "svelte-check",
     "test": "jest tests",
