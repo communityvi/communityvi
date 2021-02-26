@@ -3,6 +3,7 @@ on:
   push:
     paths:
     - 'communityvi-frontend/**'
+    - '.github/**'
 defaults:
   run:
     # The frontend project is not in the repository root
