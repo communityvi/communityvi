@@ -1,9 +1,12 @@
 name: Frontend
+on:
+  push:
+    paths:
+    - 'communityvi-frontend/**'
 defaults:
   run:
     # The frontend project is not in the repository root
     working-directory: ./communityvi-frontend
-on: push
 jobs:
   lint:
     name: Lint
