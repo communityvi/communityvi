@@ -1,0 +1,41 @@
+name: Frontend
+on:
+  push:
+    paths:
+    - 'communityvi-frontend/**'
+    - '.github/**'
+defaults:
+  run:
+    # The frontend project is not in the repository root
+    working-directory: ./communityvi-frontend
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install NodeJS 15.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 15.x
+      - name: Install packages
+        run: npm install
+      - name: ESLint
+        run: npm run lint
+      - name: Svelte check
+        run: npm run validate
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install NodeJS 15.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 15.x
+      - name: Install packages
+        run: npm install
+      - name: Test
+        run: npm run test
