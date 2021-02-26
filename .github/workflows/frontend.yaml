@@ -1,3 +1,4 @@
+name: Frontend
 defaults:
   run:
     # The frontend project is not in the repository root

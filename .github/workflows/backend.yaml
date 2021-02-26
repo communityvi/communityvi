@@ -1,3 +1,4 @@
+name: Backend
 on: push
 env:
   CARGO_TERM_COLOR: always
