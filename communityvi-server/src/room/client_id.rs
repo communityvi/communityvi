@@ -14,9 +14,9 @@ impl From<u64> for ClientId {
 	}
 }
 
-impl Into<u64> for ClientId {
-	fn into(self) -> u64 {
-		self.id
+impl From<ClientId> for u64 {
+	fn from(client_id: ClientId) -> Self {
+		client_id.id
 	}
 }
 
