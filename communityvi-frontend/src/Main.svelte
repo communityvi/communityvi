@@ -2,13 +2,13 @@
 	export let name: string;
 </script>
 
-<div>
+<div id="main">
 	<h1>Hello {name}!</h1>
 	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
 </div>
 
 <style type="text/sass">
-	main
+	#main
 		text-align: center
 		padding: 1em
 		max-width: 240px
@@ -21,6 +21,6 @@
 		font-weight: 100
 
 	@media (min-width: 640px)
-		main
+		#main
 			max-width: none
 </style>
