@@ -1,4 +1,4 @@
-import App from '../src/App.svelte';
+import App from '../src/Main.svelte';
 import { render } from '@testing-library/svelte'
 
 describe('The main App component', () => {

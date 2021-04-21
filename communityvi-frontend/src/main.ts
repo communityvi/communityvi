@@ -1,12 +1,14 @@
 import './styles/main.sass';
 
-import App from './App.svelte';
+import Header from './Header.svelte';
+import Main from './Main.svelte';
 
-const app = new App({
-	target: document.body,
+new Header({
+	target: document.getElementsByTagName('header')[0]
+});
+new Main({
+	target: document.getElementsByTagName('main')[0],
 	props: {
 		name: 'world'
 	}
 });
-
-export default app;
