@@ -154,9 +154,6 @@ pub async fn send_broadcasts(client: Client) {
 	}
 }
 
-const HEARTBEAT_INTERVAL_NAME: &str = "heartbeat_interval";
-const HEARTBEAT_TIMEOUT_NAME: &str = "heartbeat_timeout";
-
 pub async fn heartbeat(
 	client: Client,
 	time_source: &TimeSource,
@@ -164,7 +161,7 @@ pub async fn heartbeat(
 	heartbeat_interval: std::time::Duration,
 	missed_heartbeat_limit: u8,
 ) -> LeftReason {
-	let mut interval = time_source.interval_at(HEARTBEAT_INTERVAL_NAME, heartbeat_interval, heartbeat_interval);
+	let mut interval = time_source.interval_at(heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
 
 	for count in 0..usize::MAX {
@@ -188,11 +185,7 @@ pub async fn heartbeat(
 			}
 			Err(())
 		};
-		if time_source
-			.timeout(HEARTBEAT_TIMEOUT_NAME, heartbeat_interval, receive_pong)
-			.await
-			.is_err()
-		{
+		if time_source.timeout(heartbeat_interval, receive_pong).await.is_err() {
 			missed_heartbeats += 1;
 			if missed_heartbeats >= missed_heartbeat_limit {
 				break;
@@ -1007,10 +1000,10 @@ mod test {
 			assert_eq!(left_reason, LeftReason::Closed); // NOTE: This line will most likely never run
 		});
 
-		time_source.wait_for_time_request(HEARTBEAT_INTERVAL_NAME).await;
+		time_source.wait_for_time_request().await;
 		const ITERATIONS: u32 = (MISSED_HEARTBEAT_LIMIT as u32) + 1;
 		for _ in 0..ITERATIONS {
-			time_source.advance_time(HEARTBEAT_INTERVAL_NAME, heartbeat_interval);
+			time_source.advance_time(heartbeat_interval);
 			let payload = test_client.receive_ping().await;
 			pong_sender.send(payload).await.unwrap();
 		}
@@ -1050,15 +1043,12 @@ mod test {
 		tokio::spawn(async move {
 			let time_source = time_source_for_test;
 
-			time_source.wait_for_time_request(HEARTBEAT_INTERVAL_NAME).await;
-			time_source.advance_time(
-				HEARTBEAT_INTERVAL_NAME,
-				(MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval,
-			);
+			time_source.wait_for_time_request().await;
+			time_source.advance_time((MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval);
 
 			for _ in 0..MISSED_HEARTBEAT_LIMIT {
-				time_source.wait_for_time_request(HEARTBEAT_TIMEOUT_NAME).await;
-				time_source.advance_time(HEARTBEAT_TIMEOUT_NAME, heartbeat_interval);
+				time_source.wait_for_time_request().await;
+				time_source.advance_time(heartbeat_interval);
 			}
 		});
 
