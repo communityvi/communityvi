@@ -131,7 +131,13 @@ pub struct TestInterval {
 	current_time: Duration,
 	next_deadline: Duration,
 	period: Duration,
-	receiver: Pin<Box<dyn Stream<Item = Result<Duration, tokio_stream::wrappers::errors::BroadcastStreamRecvError>> + Send + 'static>>,
+	receiver: Pin<
+		Box<
+			dyn Stream<Item = Result<Duration, tokio_stream::wrappers::errors::BroadcastStreamRecvError>>
+				+ Send
+				+ 'static,
+		>,
+	>,
 }
 
 impl Stream for TestInterval {

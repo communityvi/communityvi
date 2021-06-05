@@ -4,13 +4,13 @@ use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
 use gotham::hyper::http::{header, HeaderMap, Response};
+use gotham::hyper::upgrade::OnUpgrade;
 use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
 use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, ScopeBuilder};
 use gotham::router::Router;
 use gotham::state::{FromState, State};
 use log::error;
-use gotham::hyper::upgrade::OnUpgrade;
 
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
@@ -93,7 +93,7 @@ fn websocket_handler(application_context: ApplicationContext, room: Room, mut st
 				}
 				Err(()) => bad_request(),
 			}
-		},
+		}
 		_ => bad_request(),
 	};
 	(state, response)

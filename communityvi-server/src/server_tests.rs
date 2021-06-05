@@ -13,7 +13,7 @@ use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
-use gotham::hyper::{Response};
+use gotham::hyper::Response;
 use gotham::plain::test::TestServer;
 use gotham::test::Server;
 use std::error::Error;
@@ -335,7 +335,9 @@ fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 
 	let websocket = server.run_future(async {
 		let response: Response<_> = response.into();
-		let upgraded = gotham::hyper::upgrade::on(response).await.expect("Failed to upgrade connection");
+		let upgraded = gotham::hyper::upgrade::on(response)
+			.await
+			.expect("Failed to upgrade connection");
 		WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await
 	});
 

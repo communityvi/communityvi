@@ -31,10 +31,10 @@ use sha1::Sha1;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 
+use gotham::hyper::upgrade::OnUpgrade;
 use std::future::Future;
 pub use tungstenite::protocol::{Message, Role};
 pub use tungstenite::Error;
-use gotham::hyper::upgrade::OnUpgrade;
 
 const PROTO_WEBSOCKET: &str = "websocket";
 const SEC_WEBSOCKET_KEY: &str = "Sec-WebSocket-Key";
