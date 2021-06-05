@@ -13,33 +13,6 @@
 		"test:watch": "npm run test -- --watch",
 		"format": "prettier --write --plugin-search-dir=. ."
 	},
-	"jest": {
-		"globals": {
-			"ts-jest": {
-				"tsconfig": "./tsconfig.json"
-			}
-		},
-		"transform": {
-			"^.+\\.svelte$": [
-				"svelte-jester",
-				{
-					"preprocess": true
-				}
-			],
-			"^.+\\.ts$": "ts-jest"
-		},
-		"setupFilesAfterEnv": [
-			"<rootDir>/tests/jest-setup.ts"
-		],
-		"moduleFileExtensions": [
-			"ts",
-			"js",
-			"svelte"
-		],
-		"moduleNameMapper": {
-			"^\\$lib/(.*)$": "<rootDir>/src/lib/$1"
-		}
-	},
 	"devDependencies": {
 		"@fortawesome/free-solid-svg-icons": "^5.15",
 		"@sveltejs/adapter-static": "next",
