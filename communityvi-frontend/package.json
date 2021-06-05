@@ -1,0 +1,42 @@
+{
+	"name": "communityvi-frontend",
+	"description": "Communityvi Frontend",
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"watch": "svelte-kit dev",
+		"build": "svelte-kit build",
+		"preview": "svelte-kit preview",
+		"validate": "svelte-check --fail-on-warnings --fail-on-hints",
+		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!'",
+		"test": "jest tests",
+		"test:watch": "npm run test -- --watch",
+		"format": "prettier --write --plugin-search-dir=. ."
+	},
+	"devDependencies": {
+		"@fortawesome/free-solid-svg-icons": "^5.15",
+		"@sveltejs/adapter-static": "next",
+		"@sveltejs/kit": "next",
+		"@testing-library/jest-dom": "^5.12",
+		"@testing-library/svelte": "^3.0",
+		"@typescript-eslint/eslint-plugin": "^4.19",
+		"@typescript-eslint/parser": "^4.19",
+		"bulma": "^0.9",
+		"eslint": "^7.22",
+		"eslint-config-prettier": "^8.1",
+		"eslint-plugin-svelte3": "^3.2",
+		"jest": "^26.6",
+		"prettier": "~2.3",
+		"prettier-plugin-svelte": "^2.2",
+		"sass": "^1.32",
+		"svelma": "^0.4",
+		"svelte": "^3.34",
+		"svelte-check": "^2.1",
+		"svelte-fa": "^2.2",
+		"svelte-jester": "^1.5",
+		"svelte-preprocess": "^4.0",
+		"ts-jest": "^26.5",
+		"tslib": "^2.0",
+		"typescript": "^4.0"
+	}
+}

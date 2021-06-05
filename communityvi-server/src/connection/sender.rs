@@ -65,6 +65,7 @@ where
 			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
 	}
 
+	#[allow(clippy::let_underscore_drop)] // Ignore Clippy here because we don't care about the result.
 	async fn close(&self) {
 		let mut inner = self.inner.lock().await;
 		let _ = inner.response_sink.send(WebSocketMessage::Close(None)).await;

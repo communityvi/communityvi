@@ -1,5 +1,8 @@
 name: Backend
-on: push
+on:
+  push:
+    paths-ignore:
+    - 'communityvi-frontend/**'
 env:
   CARGO_TERM_COLOR: always
 jobs:
