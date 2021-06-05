@@ -1,2 +1,2 @@
 // Include setup for more expect(...) matchers
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom';

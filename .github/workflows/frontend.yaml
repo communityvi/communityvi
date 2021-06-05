@@ -21,7 +21,7 @@ jobs:
           node-version: 15.x
       - name: Install packages
         run: npm install
-      - name: ESLint
+      - name: ESLint & Prettier
         run: npm run lint
       - name: Svelte check
         run: npm run validate

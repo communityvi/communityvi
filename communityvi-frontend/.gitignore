@@ -1,8 +1,9 @@
-node_modules/
-public/build/
-public/webfonts/
+.DS_Store
+node_modules
+/.svelte-kit
+/build
+/functions
 .idea/
 *.iml
 *.swp
 Thumbs.db
-.DS_Store
