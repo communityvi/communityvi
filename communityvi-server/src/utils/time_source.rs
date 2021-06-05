@@ -11,7 +11,7 @@ use tokio::time::{interval_at, timeout};
 
 #[derive(Clone, Default)]
 pub struct TimeSource {
-	test_timesources: Option<Arc<TestTimeSource>>,
+	test_timesource: Option<Arc<TestTimeSource>>,
 }
 
 pub struct TestTimeSource {
@@ -70,19 +70,19 @@ impl TimeSource {
 	#[cfg(test)]
 	pub fn test() -> Self {
 		Self {
-			test_timesources: Some(Default::default()),
+			test_timesource: Some(Default::default()),
 		}
 	}
 
 	pub fn interval_at(&self, start: Duration, period: Duration) -> Interval {
-		match &self.test_timesources {
+		match &self.test_timesource {
 			None => Interval::Tokio(interval_at(tokio::time::Instant::now() + start, period)),
 			Some(test_time_source) => Interval::Test(test_time_source.interval_at(start, period)),
 		}
 	}
 
 	pub fn timeout<ValueFuture: Future>(&self, duration: Duration, future: ValueFuture) -> Timeout<ValueFuture> {
-		match &self.test_timesources {
+		match &self.test_timesource {
 			None => Timeout::Tokio(timeout(duration, future)),
 			Some(test_time_source) => Timeout::Test(test_time_source.timeout(duration, future)),
 		}
@@ -90,7 +90,7 @@ impl TimeSource {
 
 	#[cfg(test)]
 	pub fn advance_time(&self, by_duration: Duration) {
-		self.test_timesources
+		self.test_timesource
 			.as_ref()
 			.expect("Can only be called in test mode.")
 			.advance_time(by_duration);
@@ -98,7 +98,7 @@ impl TimeSource {
 
 	#[cfg(test)]
 	pub async fn wait_for_time_request(&self) {
-		match &self.test_timesources {
+		match &self.test_timesource {
 			None => (),
 			Some(test_time_source) => test_time_source.wait_for_time_request().await,
 		}
