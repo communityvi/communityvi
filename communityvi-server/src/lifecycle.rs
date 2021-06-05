@@ -392,7 +392,7 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
-	use tokio::time::delay_for;
+	use tokio::time::sleep;
 
 	#[tokio::test]
 	async fn the_client_should_get_access_to_the_server_reference_time() {
@@ -404,7 +404,7 @@ mod test {
 			.add_client_and_return_existing("Alice".to_string(), message_sender)
 			.expect("Did not get client handle!");
 
-		delay_for(TEST_DELAY).await; // ensure that some time has passed
+		sleep(TEST_DELAY).await; // ensure that some time has passed
 		let response = handle_request(&room, &client, ClientRequest::GetReferenceTime)
 			.expect("Failed to get reference time message");
 

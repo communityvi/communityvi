@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, Notify};
 use tokio::time::{interval_at, timeout};
+use tokio_stream::wrappers::BroadcastStream;
 
 #[derive(Clone, Default)]
 pub struct TimeSource {
@@ -34,10 +35,11 @@ impl TestTimeSource {
 			current_time: Default::default(),
 			next_deadline: start,
 			period,
-			receiver: self.time_sender.subscribe().into_stream().boxed(),
+			receiver: Box::pin(BroadcastStream::new(self.time_sender.subscribe())),
 		};
 
-		self.notification.notify();
+		// FIXME: Check if this use of tokio::sync::Notify is correct!
+		self.notification.notify_one();
 
 		interval
 	}
@@ -47,10 +49,11 @@ impl TestTimeSource {
 			future,
 			current_time: Default::default(),
 			deadline: duration,
-			receiver: self.time_sender.subscribe(),
+			receiver: BroadcastStream::new(self.time_sender.subscribe()),
 		};
 
-		self.notification.notify();
+		// FIXME: Check if this use of tokio::sync::Notify is correct!
+		self.notification.notify_one();
 
 		timeout
 	}
@@ -128,7 +131,7 @@ pub struct TestInterval {
 	current_time: Duration,
 	next_deadline: Duration,
 	period: Duration,
-	receiver: Pin<Box<dyn Stream<Item = Result<Duration, tokio::sync::broadcast::RecvError>> + Send + 'static>>,
+	receiver: Pin<Box<dyn Stream<Item = Result<Duration, tokio_stream::wrappers::errors::BroadcastStreamRecvError>> + Send + 'static>>,
 }
 
 impl Stream for TestInterval {
@@ -183,7 +186,7 @@ pub struct TestTimeout<ValueFuture> {
 	current_time: Duration,
 	deadline: Duration,
 	#[pin]
-	receiver: broadcast::Receiver<Duration>,
+	receiver: BroadcastStream<Duration>,
 }
 
 impl<ValueFuture: Future> Future for TestTimeout<ValueFuture> {

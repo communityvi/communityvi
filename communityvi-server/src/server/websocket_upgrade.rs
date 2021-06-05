@@ -34,6 +34,7 @@ use tokio_tungstenite::{tungstenite, WebSocketStream};
 use std::future::Future;
 pub use tungstenite::protocol::{Message, Role};
 pub use tungstenite::Error;
+use gotham::hyper::upgrade::OnUpgrade;
 
 const PROTO_WEBSOCKET: &str = "websocket";
 const SEC_WEBSOCKET_KEY: &str = "Sec-WebSocket-Key";
@@ -50,7 +51,7 @@ pub fn requested(headers: &HeaderMap) -> bool {
 /// into websocket object.
 pub fn accept(
 	headers: &HeaderMap,
-	body: Body,
+	on_upgrade: OnUpgrade,
 ) -> Result<
 	(
 		Response<Body>,
@@ -60,7 +61,7 @@ pub fn accept(
 > {
 	let res = response(headers)?;
 	let ws = async {
-		let upgraded = match body.on_upgrade().await {
+		let upgraded = match on_upgrade.await {
 			Ok(upgraded) => upgraded,
 			Err(error) => {
 				error!("Failed to upgrade connection: {}", error);
@@ -72,6 +73,7 @@ pub fn accept(
 			max_send_queue: Some(1),
 			max_message_size: Some(10 * 1024),
 			max_frame_size: Some(10 * 1024),
+			accept_unmasked_frames: false,
 		});
 		Ok(WebSocketStream::from_raw_socket(upgraded, Role::Server, WEBSOCKET_CONFIGURATION).await)
 	};
