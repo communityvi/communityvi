@@ -2,7 +2,7 @@ use crate::connection::receiver::{MessageReceiver, WebSocketMessageReceiver};
 use crate::connection::sender::{MessageSender, WebSocketMessageSender};
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
-use futures::StreamExt;
+use futures::stream::StreamExt;
 
 pub mod broadcast_buffer;
 pub mod receiver;

@@ -4,6 +4,7 @@ use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
 use gotham::hyper::http::{header, HeaderMap, Response};
+use gotham::hyper::upgrade::OnUpgrade;
 use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
 use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, ScopeBuilder};
@@ -76,23 +77,24 @@ fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
 }
 
 fn websocket_handler(application_context: ApplicationContext, room: Room, mut state: State) -> (State, Response<Body>) {
-	let body = Body::take_from(&mut state);
 	let headers = HeaderMap::take_from(&mut state);
-	let response = if websocket_upgrade::requested(&headers) {
-		match websocket_upgrade::accept(&headers, body) {
-			Ok((response, websocket_future)) => {
-				tokio::spawn(async move {
-					match websocket_future.await {
-						Ok(websocket) => run_client_connection(application_context, room, websocket).await,
-						Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
-					}
-				});
-				response
+	let on_upgrade = OnUpgrade::try_take_from(&mut state);
+	let response = match on_upgrade {
+		Some(on_upgrade) if websocket_upgrade::requested(&headers) => {
+			match websocket_upgrade::accept(&headers, on_upgrade) {
+				Ok((response, websocket_future)) => {
+					tokio::spawn(async move {
+						match websocket_future.await {
+							Ok(websocket) => run_client_connection(application_context, room, websocket).await,
+							Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
+						}
+					});
+					response
+				}
+				Err(()) => bad_request(),
 			}
-			Err(()) => bad_request(),
 		}
-	} else {
-		bad_request()
+		_ => bad_request(),
 	};
 	(state, response)
 }

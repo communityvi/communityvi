@@ -13,12 +13,11 @@ use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::http::StatusCode;
-use gotham::hyper::Body;
+use gotham::hyper::Response;
 use gotham::plain::test::TestServer;
 use gotham::test::Server;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::ops::DerefMut;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
@@ -330,15 +329,15 @@ fn websocket_test_client(server: &TestServer) -> WebsocketTestClient {
 	headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
 	headers.insert(SEC_WEBSOCKET_KEY, HeaderValue::from_static("dGhlIHNhbXBsZSBub25jZQ=="));
 
-	let mut response = client
+	let response = client
 		.perform(request)
 		.expect("Failed to initiate websocket connection.");
-	// We don't own the `TestResponse`'s `Body`, so we need to swap it out for an empty one ...
-	let mut body = Body::empty();
-	std::mem::swap(&mut body, response.deref_mut().body_mut());
 
 	let websocket = server.run_future(async {
-		let upgraded = body.on_upgrade().await.expect("Failed to upgrade connection");
+		let response: Response<_> = response.into();
+		let upgraded = gotham::hyper::upgrade::on(response)
+			.await
+			.expect("Failed to upgrade connection");
 		WebSocketStream::from_raw_socket(upgraded, Role::Client, None).await
 	});
 

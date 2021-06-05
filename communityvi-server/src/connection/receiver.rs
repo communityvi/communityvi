@@ -138,6 +138,6 @@ pub mod test {
 
 	#[tokio::test]
 	async fn validate_that_tokio_test_does_not_wait_for_completion() {
-		tokio::spawn(tokio::time::delay_for(Duration::from_secs(10)));
+		tokio::spawn(tokio::time::sleep(Duration::from_secs(10)));
 	}
 }

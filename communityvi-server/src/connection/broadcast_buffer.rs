@@ -66,7 +66,8 @@ impl BroadcastBuffer {
 		}
 
 		if !inner.is_empty() {
-			self.new_broadcast_available_notification_channel.notify();
+			// FIXME: Check if this use of tokio::sync::Notify is correct!
+			self.new_broadcast_available_notification_channel.notify_one();
 		}
 	}
 
