@@ -3,23 +3,22 @@ import type {
 	ServerResponse,
 } from './response';
 import {RegisterRequest} from '$client/request';
-import {Transport, WebSocketTransport} from '$client/transport';
+import type {Transport} from '$client/transport';
+import type {Connection} from '$client/connection';
 
 export class Client {
-	readonly endpoint: string;
+	readonly transport: Transport;
 
-	constructor(endpoint: string) {
-		this.endpoint = endpoint;
+	constructor(transport: Transport) {
+		this.transport = transport;
 	}
 
 	async register(name: string): Promise<RegisteredClient> {
-		const transport = await WebSocketTransport.connect(this.endpoint, Client.log, Client.log);
-		return this.registerWithTransport(transport, name);
-	}
+		const connection = await this.transport.connect(Client.log, Client.log);
 
-	async registerWithTransport(transport: Transport, name: string): Promise<RegisteredClient> {
-		const response = await transport.performRequest(new RegisterRequest(name)) as HelloMessage;
-		return new RegisteredClient(response.id, name, transport);
+		const response = await connection.performRequest(new RegisterRequest(name)) as HelloMessage;
+
+		return new RegisteredClient(response.id, name, connection);
 	}
 
 	private static log(response: ServerResponse) {
@@ -31,11 +30,11 @@ export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
 
-	private readonly transport: Transport;
+	private readonly connection: Connection;
 
-	constructor(id: number, name: string, transport: Transport) {
+	constructor(id: number, name: string, connection: Connection) {
 		this.id = id;
 		this.name = name;
-		this.transport = transport;
+		this.connection = connection;
 	}
 }
