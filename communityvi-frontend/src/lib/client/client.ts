@@ -30,4 +30,8 @@ export class RegisteredClient {
 		this.name = name;
 		this.connection = connection;
 	}
+
+	logout(): void {
+		this.connection.disconnect();
+	}
 }

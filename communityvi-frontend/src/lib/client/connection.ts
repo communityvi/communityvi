@@ -10,6 +10,7 @@ import {
 
 export interface Connection {
 	performRequest(request: ClientRequest): Promise<SuccessMessage>;
+	disconnect(): void;
 }
 
 export class WebSocketConnection implements Connection {
@@ -105,6 +106,10 @@ export class WebSocketConnection implements Connection {
 		this.webSocket.send(JSON.stringify(requestWithId));
 
 		return pending;
+	}
+
+	disconnect(): void {
+		this.webSocket.close();
 	}
 }
 
