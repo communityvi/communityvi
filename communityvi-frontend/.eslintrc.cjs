@@ -19,7 +19,7 @@ module.exports = {
 		node: true,
 	},
 	rules: {
-		indent: ['error', 'tab'],
+		indent: ['error', 'tab', {SwitchCase: 1}],
 		'linebreak-style': ['error', 'unix'],
 		quotes: ['error', 'single'],
 		semi: ['error', 'always'],
