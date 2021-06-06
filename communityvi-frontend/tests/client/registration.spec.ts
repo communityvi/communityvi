@@ -12,11 +12,10 @@ describe('Client registrations', () => {
 	});
 
 	it('registers multiple clients with individual client IDs', async () => {
-		const client1 = new Client('ws://localhost:8000/ws');
-		const client2 = new Client('ws://localhost:8000/ws');
+		const client = new Client('ws://localhost:8000/ws');
 
-		const registeredClient1 = await client1.register('Stephanie');
-		const registeredClient2 = await client2.register('Johnny 5');
+		const registeredClient1 = await client.register('Stephanie');
+		const registeredClient2 = await client.register('Johnny 5');
 
 		expect(registeredClient1).toBeInstanceOf(RegisteredClient);
 		expect(registeredClient1.id).toBeGreaterThanOrEqual(0);
