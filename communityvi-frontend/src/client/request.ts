@@ -1,6 +1,6 @@
 export class RegisterRequest implements ClientRequest {
-	type = RequestType.Register
-	readonly name: string
+	type = RequestType.Register;
+	readonly name: string;
 
 	constructor(name: string) {
 		this.name = name;
@@ -8,11 +8,11 @@ export class RegisterRequest implements ClientRequest {
 }
 
 export interface ClientRequestWithId extends ClientRequest {
-	readonly request_id: number
+	readonly request_id: number;
 }
 
 export interface ClientRequest {
-	readonly type: RequestType
+	readonly type: RequestType;
 }
 
 enum RequestType {

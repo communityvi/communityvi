@@ -13,7 +13,7 @@ export class Client {
 	async register(name: string): Promise<RegisteredClient> {
 		const connection = await this.transport.connect(console.log, console.warn, console.warn);
 
-		const response = await connection.performRequest(new RegisterRequest(name)) as HelloMessage;
+		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
 
 		return new RegisteredClient(response.id, name, connection);
 	}

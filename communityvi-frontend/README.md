@@ -45,8 +45,8 @@ $ npm run test:watch
 ### Configuring the tests to run against real resources
 
 Our tests use mocks for the connection to the real WebSocket server (and other things), however, you can provide real
-endpoints if you  prefer. By doing so, you will enable all tests running against real resources.
+endpoints if you prefer. By doing so, you will enable all tests running against real resources.
 
-|Environment variable        |Description                            |Example               |
-|----------------------------|---------------------------------------|----------------------|
-|COMMUNITYVI_TEST_WS_ENDPOINT|Runs the tests against this endpoint.  |ws://localhost:8000/ws|
+| Environment variable         | Description                           | Example                |
+| ---------------------------- | ------------------------------------- | ---------------------- |
+| COMMUNITYVI_TEST_WS_ENDPOINT | Runs the tests against this endpoint. | ws://localhost:8000/ws |

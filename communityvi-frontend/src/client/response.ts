@@ -1,16 +1,16 @@
 export interface HelloMessage extends SuccessMessage {
-	readonly id: number
-	readonly clients: Array<number>
+	readonly id: number;
+	readonly clients: Array<number>;
 	// FIXME: Left out for now, needs `VersionedMedium` type.
 	//readonly current_medium:
 }
 
 export interface ReferenceTimeMessage extends SuccessMessage {
-	readonly milliseconds: number
+	readonly milliseconds: number;
 }
 
 export interface SuccessMessage {
-	readonly type: SuccessMessageType
+	readonly type: SuccessMessageType;
 }
 
 export enum SuccessMessageType {
@@ -20,13 +20,13 @@ export enum SuccessMessageType {
 }
 
 export interface SuccessResponse extends ServerResponse {
-	readonly request_id: number
-	readonly message: SuccessMessage
+	readonly request_id: number;
+	readonly message: SuccessMessage;
 }
 
 export interface ErrorMessage {
-	readonly type: ErrorMessageType
-	readonly message: string
+	readonly type: ErrorMessageType;
+	readonly message: string;
 }
 
 enum ErrorMessageType {
@@ -38,12 +38,12 @@ enum ErrorMessageType {
 }
 
 export interface ErrorResponse extends ServerResponse {
-	readonly request_id?: number
-	readonly message: ErrorMessage
+	readonly request_id?: number;
+	readonly message: ErrorMessage;
 }
 
 export interface ServerResponse {
-	readonly type: ResponseType
+	readonly type: ResponseType;
 }
 
 export enum ResponseType {

@@ -20,7 +20,7 @@ export default class TestTransport implements Transport {
 	connect(
 		broadcastCallback: BroadcastCallback,
 		unassignableResponseCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback
+		closedCallback: ClosedCallback,
 	): Promise<Connection> {
 		if (!this.webSocketTransport) {
 			return Promise.resolve(this.mockedConnection());
@@ -31,7 +31,7 @@ export default class TestTransport implements Transport {
 
 	private mockedConnection(): Connection {
 		const mockedConnection = mock<Connection>();
-		mockedConnection.performRequest.mockResolvedValueOnce(<HelloMessage> {
+		mockedConnection.performRequest.mockResolvedValueOnce(<HelloMessage>{
 			type: SuccessMessageType.Hello,
 			id: ++this.id,
 			clients: [...this.clients],

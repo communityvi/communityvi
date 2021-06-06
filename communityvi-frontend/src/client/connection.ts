@@ -6,25 +6,25 @@ export interface Connection {
 }
 
 export class WebSocketConnection implements Connection {
-	private readonly webSocket: WebSocket
-	private readonly broadcastCallback: BroadcastCallback
-	private readonly unassignableResponseCallback: UnassignableResponseCallback
-	private readonly closedCallback: ClosedCallback
+	private readonly webSocket: WebSocket;
+	private readonly broadcastCallback: BroadcastCallback;
+	private readonly unassignableResponseCallback: UnassignableResponseCallback;
+	private readonly closedCallback: ClosedCallback;
 
-	private pendingResponses: PendingResponses = {}
-	private nextRequestId = 0
+	private pendingResponses: PendingResponses = {};
+	private nextRequestId = 0;
 
 	constructor(
 		webSocket: WebSocket,
 		broadcastCallback: BroadcastCallback,
 		unassignableErrorCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback
+		closedCallback: ClosedCallback,
 	) {
 		this.broadcastCallback = broadcastCallback;
 		this.unassignableResponseCallback = unassignableErrorCallback;
 		this.closedCallback = closedCallback;
 
-		webSocket.onmessage = (messageEvent) => {
+		webSocket.onmessage = messageEvent => {
 			console.log('Received message:', messageEvent);
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
@@ -34,38 +34,41 @@ export class WebSocketConnection implements Connection {
 		this.webSocket = webSocket;
 	}
 
+	// This will be used later:
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private handleMessage(serverResponse: ServerResponse, event: MessageEvent): void {
 		switch (serverResponse.type) {
-		case ResponseType.Success: {
-			console.log('Success received:', serverResponse);
-			const successResponse = serverResponse as SuccessResponse;
+			case ResponseType.Success: {
+				console.log('Success received:', serverResponse);
+				const successResponse = serverResponse as SuccessResponse;
 
-			const pendingResponse = this.takePendingResponse(successResponse.request_id);
-			if (!pendingResponse) {
-				this.unassignableResponseCallback(successResponse);
+				const pendingResponse = this.takePendingResponse(successResponse.request_id);
+				if (!pendingResponse) {
+					this.unassignableResponseCallback(successResponse);
+					break;
+				}
+
+				pendingResponse.resolve(successResponse.message);
 				break;
 			}
+			case ResponseType.Error: {
+				console.log('Error received:', serverResponse);
+				const errorResponse = serverResponse as ErrorResponse;
 
-			pendingResponse.resolve(successResponse.message);
-			break;
-		}
-		case ResponseType.Error: {
-			console.log('Error received:', serverResponse);
-			const errorResponse = serverResponse as ErrorResponse;
+				const pendingResponse = this.takePendingResponse(errorResponse.request_id);
+				if (!pendingResponse) {
+					this.unassignableResponseCallback(errorResponse);
+					break;
+				}
 
-			const pendingResponse = this.takePendingResponse(errorResponse.request_id);
-			if (!pendingResponse) {
-				this.unassignableResponseCallback(errorResponse);
+				pendingResponse.reject(errorResponse);
 				break;
 			}
-
-			pendingResponse.reject(errorResponse);
-			break;
-		}
-		case ResponseType.Broadcast:
-			console.log('Broadcast received:', serverResponse);
-			this.broadcastCallback(serverResponse);
-			break;
+			case ResponseType.Broadcast: {
+				console.log('Broadcast received:', serverResponse);
+				this.broadcastCallback(serverResponse);
+				break;
+			}
 		}
 	}
 
@@ -83,14 +86,14 @@ export class WebSocketConnection implements Connection {
 	performRequest(request: ClientRequest): Promise<SuccessMessage> {
 		const requestWithId = {
 			request_id: ++this.nextRequestId,
-			...request
+			...request,
 		} as ClientRequestWithId;
 
 		const pending = new Promise<SuccessMessage>((resolve, reject) => {
 			this.pendingResponses[requestWithId.request_id] = {
 				requestType: request.type,
 				resolve,
-				reject
+				reject,
 			};
 		});
 
@@ -100,14 +103,14 @@ export class WebSocketConnection implements Connection {
 	}
 }
 
-export type BroadcastCallback = (broadcast: ServerResponse) => void
-export type UnassignableResponseCallback = (response: ServerResponse) => void
-export type ClosedCallback = (event: CloseEvent) => void
+export type BroadcastCallback = (broadcast: ServerResponse) => void;
+export type UnassignableResponseCallback = (response: ServerResponse) => void;
+export type ClosedCallback = (event: CloseEvent) => void;
 
-type PendingResponses = Record<number, PendingResponse>
+type PendingResponses = Record<number, PendingResponse>;
 
 interface PendingResponse {
-	readonly requestType: string
-	readonly resolve: (message: SuccessMessage) => void
-	readonly reject: (error: ErrorResponse) => void
+	readonly requestType: string;
+	readonly resolve: (message: SuccessMessage) => void;
+	readonly reject: (error: ErrorResponse) => void;
 }

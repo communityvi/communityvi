@@ -3,15 +3,15 @@ import {
 	ClosedCallback,
 	Connection,
 	UnassignableResponseCallback,
-	WebSocketConnection
+	WebSocketConnection,
 } from '$client/connection';
 
 export interface Transport {
 	connect(
 		broadcastCallback: BroadcastCallback,
 		unassignableResponseCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback
-	): Promise<Connection>
+		closedCallback: ClosedCallback,
+	): Promise<Connection>;
 }
 
 export class WebSocketTransport implements Transport {
@@ -24,25 +24,20 @@ export class WebSocketTransport implements Transport {
 	async connect(
 		broadcastCallback: BroadcastCallback,
 		unassignableResponseCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback
+		closedCallback: ClosedCallback,
 	): Promise<Connection> {
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
 			const webSocket = new WebSocket(this.endpoint);
-			webSocket.onopen = (event) => {
+			webSocket.onopen = event => {
 				console.log('Opening WebSocket succeeded:', event);
 				resolve(webSocket);
 			};
-			webSocket.onerror = (event) => {
+			webSocket.onerror = event => {
 				console.log('Failed to open WebSocket:', event);
 				reject();
 			};
 		});
 
-		return new WebSocketConnection(
-			webSocket,
-			broadcastCallback,
-			unassignableResponseCallback,
-			closedCallback
-		);
+		return new WebSocketConnection(webSocket, broadcastCallback, unassignableResponseCallback, closedCallback);
 	}
 }
