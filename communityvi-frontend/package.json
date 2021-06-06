@@ -9,6 +9,7 @@
 		"preview": "svelte-kit preview",
 		"validate": "svelte-check --fail-on-warnings --fail-on-hints",
 		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!'",
+		"lint:fix": "prettier -w --plugin-search-dir=. . && eslint --ignore-path .gitignore . --fix && echo 'ESLint Fixed!'",
 		"test": "jest tests",
 		"test:watch": "npm run test -- --watch",
 		"format": "prettier --write --plugin-search-dir=. ."
