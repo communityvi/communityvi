@@ -9,6 +9,10 @@ export interface ReferenceTimeMessage extends SuccessMessage {
 	readonly milliseconds: number;
 }
 
+export interface TimestampedSuccessMessage extends SuccessMessage {
+	readonly arrivalTimestamp: DOMHighResTimeStamp | DOMTimeStamp;
+}
+
 export interface SuccessMessage {
 	readonly type: SuccessMessageType;
 }

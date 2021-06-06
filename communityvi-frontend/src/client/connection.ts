@@ -1,5 +1,12 @@
 import type {ClientRequest, ClientRequestWithId} from '$client/request';
-import {ErrorResponse, ResponseType, ServerResponse, SuccessMessage, SuccessResponse} from '$client/response';
+import {
+	ErrorResponse,
+	ResponseType,
+	ServerResponse,
+	SuccessMessage,
+	SuccessResponse,
+	TimestampedSuccessMessage,
+} from '$client/response';
 
 export interface Connection {
 	performRequest(request: ClientRequest): Promise<SuccessMessage>;
@@ -34,8 +41,6 @@ export class WebSocketConnection implements Connection {
 		this.webSocket = webSocket;
 	}
 
-	// This will be used later:
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private handleMessage(serverResponse: ServerResponse, event: MessageEvent): void {
 		switch (serverResponse.type) {
 			case ResponseType.Success: {
@@ -48,7 +53,7 @@ export class WebSocketConnection implements Connection {
 					break;
 				}
 
-				pendingResponse.resolve(successResponse.message);
+				pendingResponse.resolve({arrivalTimestamp: event.timeStamp, ...successResponse.message});
 				break;
 			}
 			case ResponseType.Error: {
@@ -111,6 +116,6 @@ type PendingResponses = Record<number, PendingResponse>;
 
 interface PendingResponse {
 	readonly requestType: string;
-	readonly resolve: (message: SuccessMessage) => void;
+	readonly resolve: (message: TimestampedSuccessMessage) => void;
 	readonly reject: (error: ErrorResponse) => void;
 }
