@@ -1,4 +1,4 @@
-import type {ClientRequest, ClientRequestWithId} from '$client/request';
+import type {ClientRequest, ClientRequestWithId} from '$lib/client/request';
 import {
 	ErrorResponse,
 	ResponseType,
@@ -6,7 +6,7 @@ import {
 	SuccessMessage,
 	SuccessResponse,
 	TimestampedSuccessMessage,
-} from '$client/response';
+} from '$lib/client/response';
 
 export interface Connection {
 	performRequest(request: ClientRequest): Promise<SuccessMessage>;

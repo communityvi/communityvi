@@ -1,8 +1,8 @@
-import type {Transport} from '$client/transport';
-import type {BroadcastCallback, Connection, UnassignableResponseCallback, ClosedCallback} from '$client/connection';
+import type {Transport} from '$lib/client/transport';
+import type {BroadcastCallback, Connection, UnassignableResponseCallback, ClosedCallback} from '$lib/client/connection';
 import {mock} from 'jest-mock-extended';
-import {HelloMessage, SuccessMessageType} from '$client/response';
-import {WebSocketTransport} from '$client/transport';
+import {HelloMessage, SuccessMessageType} from '$lib/client/response';
+import {WebSocketTransport} from '$lib/client/transport';
 
 export default class TestTransport implements Transport {
 	private id = 0;

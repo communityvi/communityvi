@@ -4,7 +4,7 @@ import {
 	Connection,
 	UnassignableResponseCallback,
 	WebSocketConnection,
-} from '$client/connection';
+} from '$lib/client/connection';
 
 export interface Transport {
 	connect(

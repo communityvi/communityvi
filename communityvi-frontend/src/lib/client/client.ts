@@ -1,7 +1,7 @@
-import type {HelloMessage} from '$client/response';
-import {RegisterRequest} from '$client/request';
-import type {Transport} from '$client/transport';
-import type {Connection} from '$client/connection';
+import type {HelloMessage} from '$lib/client/response';
+import {RegisterRequest} from '$lib/client/request';
+import type {Transport} from '$lib/client/transport';
+import type {Connection} from '$lib/client/connection';
 
 export class Client {
 	readonly transport: Transport;

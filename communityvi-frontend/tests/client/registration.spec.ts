@@ -1,4 +1,4 @@
-import {Client, RegisteredClient} from '$client/client';
+import {Client, RegisteredClient} from '$lib/client/client';
 import TestTransport from './helper/test_transport';
 
 describe('Client registrations', () => {
