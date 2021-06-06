@@ -13,7 +13,11 @@ export default class TestTransport implements Transport {
 	constructor() {
 		const endpoint = process.env.COMMUNITYVI_TEST_WS_ENDPOINT;
 		if (endpoint !== undefined) {
-			this.webSocketTransport = new WebSocketTransport(endpoint.trim());
+			const trimmedEndpoint = endpoint.trim();
+			console.info(`[REAL] Running with real Transport at: '${trimmedEndpoint}'`);
+			this.webSocketTransport = new WebSocketTransport(trimmedEndpoint);
+		} else {
+			console.warn('[MOCK] Running with mocked Transport!');
 		}
 	}
 
