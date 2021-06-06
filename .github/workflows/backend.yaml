@@ -1,8 +1,13 @@
 name: Backend
 on:
   push:
-    paths-ignore:
-    - 'communityvi-frontend/**'
+    paths:
+    - 'communityvi-server/**'
+    - '.github/workflows/backend.yaml'
+defaults:
+  run:
+    # The backend project is not in the repository root
+    working-directory: ./communityvi-server
 env:
   CARGO_TERM_COLOR: always
 jobs:
