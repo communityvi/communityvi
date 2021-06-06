@@ -3,7 +3,7 @@ on:
   push:
     paths:
     - 'communityvi-frontend/**'
-    - '.github/**'
+    - '.github/workflows/frontend.yaml'
 defaults:
   run:
     # The frontend project is not in the repository root
