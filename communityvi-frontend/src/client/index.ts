@@ -3,7 +3,7 @@ import type {
 	ServerResponse,
 } from './response';
 import {RegisterRequest} from '$client/request';
-import {Transport} from '$client/transport';
+import {Transport, WebSocketTransport} from '$client/transport';
 
 export class Client {
 	readonly endpoint: string;
@@ -13,9 +13,12 @@ export class Client {
 	}
 
 	async register(name: string): Promise<RegisteredClient> {
-		const transport = await Transport.connect(this.endpoint, Client.log, Client.log);
-		const response = await transport.performRequest(new RegisterRequest(name)) as HelloMessage;
+		const transport = await WebSocketTransport.connect(this.endpoint, Client.log, Client.log);
+		return this.registerWithTransport(transport, name);
+	}
 
+	async registerWithTransport(transport: Transport, name: string): Promise<RegisteredClient> {
+		const response = await transport.performRequest(new RegisterRequest(name)) as HelloMessage;
 		return new RegisteredClient(response.id, name, transport);
 	}
 

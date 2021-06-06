@@ -2,7 +2,11 @@ import type {ErrorResponse, SuccessMessage} from '$client/response';
 import {ResponseType, ServerResponse, SuccessResponse} from '$client/response';
 import type {ClientRequest, ClientRequestWithId} from '$client/request';
 
-export class Transport {
+export interface Transport {
+	performRequest(request: ClientRequest): Promise<SuccessMessage>;
+}
+
+export class WebSocketTransport implements Transport {
 	private readonly webSocket: WebSocket
 	private readonly broadcastCallback: BroadcastCallback
 	private readonly unassignableResponseCallback: UnassignableResponseCallback
@@ -14,7 +18,7 @@ export class Transport {
 		endpoint: string,
 		broadcastCallback: BroadcastCallback,
 		unassignableResponseCallback: UnassignableResponseCallback
-	): Promise<Transport> {
+	): Promise<WebSocketTransport> {
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
 			const webSocket = new WebSocket(endpoint);
 			webSocket.onopen = (event) => {
@@ -27,7 +31,7 @@ export class Transport {
 			};
 		});
 
-		return new Transport(
+		return new WebSocketTransport(
 			webSocket,
 			broadcastCallback,
 			unassignableResponseCallback
