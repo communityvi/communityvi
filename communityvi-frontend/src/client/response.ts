@@ -13,7 +13,7 @@ export interface SuccessMessage {
 	readonly type: SuccessMessageType
 }
 
-enum SuccessMessageType {
+export enum SuccessMessageType {
 	Hello = 'hello',
 	ReferenceTime = 'reference_time',
 	Success = 'success',
