@@ -9,6 +9,7 @@ export class WebSocketConnection implements Connection {
 	private readonly webSocket: WebSocket
 	private readonly broadcastCallback: BroadcastCallback
 	private readonly unassignableResponseCallback: UnassignableResponseCallback
+	private readonly closedCallback: ClosedCallback
 
 	private pendingResponses: PendingResponses = {}
 	private nextRequestId = 0
@@ -16,16 +17,21 @@ export class WebSocketConnection implements Connection {
 	constructor(
 		webSocket: WebSocket,
 		broadcastCallback: BroadcastCallback,
-		unassignableErrorCallback: UnassignableResponseCallback
+		unassignableErrorCallback: UnassignableResponseCallback,
+		closedCallback: ClosedCallback
 	) {
+		this.broadcastCallback = broadcastCallback;
+		this.unassignableResponseCallback = unassignableErrorCallback;
+		this.closedCallback = closedCallback;
+
 		webSocket.onmessage = (messageEvent) => {
 			console.log('Received message:', messageEvent);
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
 		};
+		webSocket.onclose = this.closedCallback;
+
 		this.webSocket = webSocket;
-		this.broadcastCallback = broadcastCallback;
-		this.unassignableResponseCallback = unassignableErrorCallback;
 	}
 
 	private handleMessage(serverResponse: ServerResponse, event: MessageEvent): void {
@@ -96,6 +102,7 @@ export class WebSocketConnection implements Connection {
 
 export type BroadcastCallback = (broadcast: ServerResponse) => void
 export type UnassignableResponseCallback = (response: ServerResponse) => void
+export type ClosedCallback = (event: CloseEvent) => void
 
 type PendingResponses = Record<number, PendingResponse>
 

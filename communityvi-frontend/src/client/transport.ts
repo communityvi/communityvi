@@ -1,9 +1,16 @@
-import {BroadcastCallback, Connection, UnassignableResponseCallback, WebSocketConnection} from '$client/connection';
+import {
+	BroadcastCallback,
+	ClosedCallback,
+	Connection,
+	UnassignableResponseCallback,
+	WebSocketConnection
+} from '$client/connection';
 
 export interface Transport {
 	connect(
 		broadcastCallback: BroadcastCallback,
-		unassignableResponseCallback: UnassignableResponseCallback
+		unassignableResponseCallback: UnassignableResponseCallback,
+		closedCallback: ClosedCallback
 	): Promise<Connection>
 }
 
@@ -16,7 +23,8 @@ export class WebSocketTransport implements Transport {
 
 	async connect(
 		broadcastCallback: BroadcastCallback,
-		unassignableResponseCallback: UnassignableResponseCallback
+		unassignableResponseCallback: UnassignableResponseCallback,
+		closedCallback: ClosedCallback
 	): Promise<Connection> {
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
 			const webSocket = new WebSocket(this.endpoint);
@@ -33,7 +41,8 @@ export class WebSocketTransport implements Transport {
 		return new WebSocketConnection(
 			webSocket,
 			broadcastCallback,
-			unassignableResponseCallback
+			unassignableResponseCallback,
+			closedCallback
 		);
 	}
 }

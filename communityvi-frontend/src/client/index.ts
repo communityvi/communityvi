@@ -1,7 +1,4 @@
-import type {
-	HelloMessage,
-	ServerResponse,
-} from './response';
+import type {HelloMessage} from '$client/response';
 import {RegisterRequest} from '$client/request';
 import type {Transport} from '$client/transport';
 import type {Connection} from '$client/connection';
@@ -14,15 +11,11 @@ export class Client {
 	}
 
 	async register(name: string): Promise<RegisteredClient> {
-		const connection = await this.transport.connect(Client.log, Client.log);
+		const connection = await this.transport.connect(console.log, console.warn, console.warn);
 
 		const response = await connection.performRequest(new RegisterRequest(name)) as HelloMessage;
 
 		return new RegisteredClient(response.id, name, connection);
-	}
-
-	private static log(response: ServerResponse) {
-		console.log(response);
 	}
 }
 

@@ -1,5 +1,5 @@
 import type {Transport} from '$client/transport';
-import type {BroadcastCallback, Connection, UnassignableResponseCallback} from '$client/connection';
+import type {BroadcastCallback, Connection, UnassignableResponseCallback, ClosedCallback} from '$client/connection';
 import {mock} from 'jest-mock-extended';
 import {HelloMessage, SuccessMessageType} from '$client/response';
 import {WebSocketTransport} from '$client/transport';
@@ -19,13 +19,14 @@ export default class TestTransport implements Transport {
 
 	connect(
 		broadcastCallback: BroadcastCallback,
-		unassignableResponseCallback: UnassignableResponseCallback
+		unassignableResponseCallback: UnassignableResponseCallback,
+		closedCallback: ClosedCallback
 	): Promise<Connection> {
 		if (!this.webSocketTransport) {
 			return Promise.resolve(this.mockedConnection());
 		}
 
-		return this.webSocketTransport.connect(broadcastCallback, unassignableResponseCallback);
+		return this.webSocketTransport.connect(broadcastCallback, unassignableResponseCallback, closedCallback);
 	}
 
 	private mockedConnection(): Connection {
