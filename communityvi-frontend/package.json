@@ -15,7 +15,7 @@
 		"format": "prettier --write --plugin-search-dir=. ."
 	},
 	"devDependencies": {
-		"@fortawesome/free-solid-svg-icons": "^5.15",
+		"@fortawesome/fontawesome-free": "^5.15.3",
 		"@sveltejs/adapter-static": "next",
 		"@sveltejs/kit": "next",
 		"@testing-library/jest-dom": "^5.12",
@@ -31,10 +31,8 @@
 		"prettier": "~2.3",
 		"prettier-plugin-svelte": "^2.2",
 		"sass": "^1.32",
-		"svelma": "^0.4",
 		"svelte": "^3.34",
 		"svelte-check": "^2.1",
-		"svelte-fa": "^2.2",
 		"svelte-jester": "^1.5",
 		"svelte-preprocess": "^4.0",
 		"ts-jest": "^26.5",

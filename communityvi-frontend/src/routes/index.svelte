@@ -3,8 +3,6 @@
 </script>
 
 <script lang="ts">
-	import Fa from 'svelte-fa/src/fa.svelte';
-	import {faHouseUser} from '@fortawesome/free-solid-svg-icons';
 	import Hello from '$lib/Hello.svelte';
 	import Registration from '$lib/Registration.svelte';
 	import {WebSocketTransport} from '../lib/client/transport';
@@ -21,7 +19,6 @@
 
 <section>
 	<Notifications />
-	<Fa icon={faHouseUser} />
 	<Hello name="User" />
 	<Registration {client} />
 </section>
