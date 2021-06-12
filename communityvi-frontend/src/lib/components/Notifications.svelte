@@ -1,7 +1,7 @@
 <script lang="ts">
 	import {errorBag} from '$lib/stores';
-	import Notification from '$lib/Notification.svelte';
-	import {NotificationType} from '$lib/notification_type';
+	import Notification from '$lib/components/notification/Notification.svelte';
+	import {NotificationType} from '$lib/components/notification/notification_type';
 
 	function deleteErrorIdentifiedBy(id: number) {
 		errorBag.deleteWithId(id);

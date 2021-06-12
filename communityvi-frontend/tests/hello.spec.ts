@@ -1,4 +1,4 @@
-import Hello from '$lib/Hello.svelte';
+import Hello from '$lib/components/Hello.svelte';
 import {render} from '@testing-library/svelte';
 import '@testing-library/jest-dom';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type {Client} from '$lib/client/client';
 	import {errorBag, registeredClient} from '$lib/stores';
-	import {CloseReason} from './client/connection';
+	import {CloseReason} from '$lib/client/connection';
 
 	export let client: Client;
 

@@ -2,7 +2,7 @@
 	import {createEventDispatcher} from 'svelte';
 	import {fade} from 'svelte/transition';
 
-	import {NotificationType} from '$lib/notification_type';
+	import {NotificationType} from '$lib/components/notification/notification_type';
 
 	export let type: NotificationType = NotificationType.PRIMARY;
 	export let useLightAppearance = true;

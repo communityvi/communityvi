@@ -3,11 +3,11 @@
 </script>
 
 <script lang="ts">
-	import Hello from '$lib/Hello.svelte';
-	import Registration from '$lib/Registration.svelte';
-	import {WebSocketTransport} from '../lib/client/transport';
+	import Hello from '$lib/components/Hello.svelte';
+	import Registration from '$lib/components/Registration.svelte';
+	import {WebSocketTransport} from '$lib/client/transport';
 	import {Client} from '$lib/client/client';
-	import Notifications from '../lib/Notifications.svelte';
+	import Notifications from '$lib/components/Notifications.svelte';
 
 	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
