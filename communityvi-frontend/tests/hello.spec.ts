@@ -1,5 +1,6 @@
 import Hello from '$lib/Hello.svelte';
 import {render} from '@testing-library/svelte';
+import '@testing-library/jest-dom';
 
 describe('The Hello component', () => {
 	it('inserts the passed name into the output', async () => {

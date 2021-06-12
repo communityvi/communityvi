@@ -16,7 +16,6 @@ module.exports = {
 		],
 		'^.+\\.ts$': 'ts-jest',
 	},
-	setupFilesAfterEnv: ['<rootDir>/tests/jest-setup.ts'],
 	moduleFileExtensions: ['ts', 'js', 'svelte'],
 	moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, {prefix: '<rootDir>/'}),
 };
