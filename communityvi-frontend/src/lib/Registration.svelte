@@ -1,29 +1,26 @@
 <script lang="ts">
 	import type {Client} from '$lib/client/client';
-	import {registeredClientStore} from '$lib/stores';
+	import {registeredClient} from '$lib/stores';
 	import {onDestroy} from 'svelte';
 
 	export let client: Client;
 
 	let registeredName: string;
-	let isRegistered = false;
 
-	const unsubscribe = registeredClientStore.subscribe(registeredClient => {
+	$: isRegistered = $registeredClient !== undefined;
+
+	const unsubscribe = registeredClient.subscribe(registeredClient => {
 		registeredName = registeredClient?.name ?? '';
-		isRegistered = registeredClient !== undefined;
 	});
 
 	async function submit() {
 		if (isRegistered) {
-			registeredClientStore.update(registeredClient => {
-				registeredClient?.logout();
-
-				// FIXME: This should really happen in the `ClosedCallback`.
-				return undefined;
-			});
+			$registeredClient?.logout();
 		} else {
-			const registeredClient = await client.register(registeredName.trim());
-			registeredClientStore.set(registeredClient);
+			$registeredClient = await client.register(registeredName.trim(), () => {
+				console.info('Client disconnected.');
+				$registeredClient = undefined;
+			});
 		}
 	}
 

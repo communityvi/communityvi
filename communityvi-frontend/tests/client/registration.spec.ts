@@ -2,11 +2,14 @@ import {Client, RegisteredClient} from '$lib/client/client';
 import TestTransport from './helper/test_transport';
 
 describe('Client registrations', () => {
+	// eslint-disable-next-line @typescript-eslint/no-empty-function
+	const empty = () => {};
+
 	const transport = new TestTransport();
 	const client = new Client(transport);
 
 	it('registers a client', async () => {
-		const registeredClient = await client.register('Max');
+		const registeredClient = await client.register('Max', empty);
 
 		expect(registeredClient).toBeInstanceOf(RegisteredClient);
 		expect(registeredClient.id).toBeGreaterThanOrEqual(0);
@@ -14,8 +17,8 @@ describe('Client registrations', () => {
 	});
 
 	it('registers multiple clients with individual client IDs', async () => {
-		const registeredClient1 = await client.register('Stephanie');
-		const registeredClient2 = await client.register('Johnny 5');
+		const registeredClient1 = await client.register('Stephanie', empty);
+		const registeredClient2 = await client.register('Johnny 5', empty);
 
 		expect(registeredClient1).toBeInstanceOf(RegisteredClient);
 		expect(registeredClient1.id).toBeGreaterThanOrEqual(0);
