@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type {Client} from '$lib/client/client';
-	import {registeredClient} from '$lib/stores';
+	import {errorBag, registeredClient} from '$lib/stores';
 	import {CloseReason} from './client/connection';
 
 	export let client: Client;
@@ -17,7 +17,7 @@
 		try {
 			$registeredClient = await client.register(registeredName.trim(), onClose);
 		} catch (error) {
-			alert(error);
+			errorBag.reportError(error);
 		}
 	}
 

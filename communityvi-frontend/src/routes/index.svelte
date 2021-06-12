@@ -9,6 +9,7 @@
 	import Registration from '$lib/Registration.svelte';
 	import {WebSocketTransport} from '../lib/client/transport';
 	import {Client} from '$lib/client/client';
+	import Notifications from '../lib/Notifications.svelte';
 
 	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
@@ -19,6 +20,7 @@
 </svelte:head>
 
 <section>
+	<Notifications />
 	<Fa icon={faHouseUser} />
 	<Hello name="User" />
 	<Registration {client} />
