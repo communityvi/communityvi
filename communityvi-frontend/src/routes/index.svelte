@@ -10,7 +10,7 @@
 	import {WebSocketTransport} from '../lib/client/transport';
 	import {Client} from '$lib/client/client';
 
-	const transport = new WebSocketTransport('ws://localhost:8000/ws');
+	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
 </script>
 

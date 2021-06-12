@@ -15,7 +15,7 @@ export default class TestTransport implements Transport {
 		if (endpoint !== undefined) {
 			const trimmedEndpoint = endpoint.trim();
 			console.info(`[REAL] Running with real Transport at: '${trimmedEndpoint}'`);
-			this.webSocketTransport = new WebSocketTransport(trimmedEndpoint);
+			this.webSocketTransport = new WebSocketTransport(new URL(trimmedEndpoint));
 		} else {
 			console.warn('[MOCK] Running with mocked Transport!');
 		}

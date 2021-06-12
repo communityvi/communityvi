@@ -5,17 +5,17 @@ export interface Transport {
 }
 
 export class WebSocketTransport implements Transport {
-	readonly endpoint: string;
+	readonly endpoint: URL;
 	readonly timeoutInMilliseconds: number;
 
-	constructor(endpoint: string, timeoutInMilliseconds = 5_000) {
+	constructor(endpoint: URL, timeoutInMilliseconds = 5_000) {
 		this.endpoint = endpoint;
 		this.timeoutInMilliseconds = timeoutInMilliseconds;
 	}
 
 	async connect(): Promise<Connection> {
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
-			const webSocket = new WebSocket(this.endpoint);
+			const webSocket = new WebSocket(this.endpoint.toString());
 			webSocket.onopen = () => {
 				resolve(webSocket);
 				webSocket.onerror = null;
@@ -31,10 +31,10 @@ export class WebSocketTransport implements Transport {
 }
 
 class ConnectionFailedError extends Error {
-	readonly endpoint: string;
+	readonly endpoint: URL;
 	readonly cause: Event | ErrorEvent;
 
-	constructor(endpoint: string, cause: Event | ErrorEvent) {
+	constructor(endpoint: URL, cause: Event | ErrorEvent) {
 		if (cause instanceof ErrorEvent) {
 			super(`Could not connect to WebSocket at '${endpoint}', error was: '${cause.message}'`);
 		} else {
