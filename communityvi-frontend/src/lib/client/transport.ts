@@ -6,9 +6,11 @@ export interface Transport {
 
 export class WebSocketTransport implements Transport {
 	readonly endpoint: string;
+	readonly timeoutInMilliseconds: number;
 
-	constructor(endpoint: string) {
+	constructor(endpoint: string, timeoutInMilliseconds = 5_000) {
 		this.endpoint = endpoint;
+		this.timeoutInMilliseconds = timeoutInMilliseconds;
 	}
 
 	async connect(): Promise<Connection> {
@@ -22,6 +24,6 @@ export class WebSocketTransport implements Transport {
 			};
 		});
 
-		return new WebSocketConnection(webSocket);
+		return new WebSocketConnection(webSocket, this.timeoutInMilliseconds);
 	}
 }

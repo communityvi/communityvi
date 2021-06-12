@@ -7,6 +7,7 @@ import {
 	SuccessResponse,
 	TimestampedSuccessMessage,
 } from '$lib/client/response';
+import {promiseWithTimout} from '$lib/client/promises';
 
 export interface Connection {
 	setDelegate(delegate: ConnectionDelegate): void;
@@ -16,13 +17,14 @@ export interface Connection {
 
 export class WebSocketConnection implements Connection {
 	private readonly webSocket: WebSocket;
+	private readonly timeoutInMilliseconds: number;
 
 	private delegate?: ConnectionDelegate;
 
 	private pendingResponses: PendingResponses = {};
 	private nextRequestId = 0;
 
-	constructor(webSocket: WebSocket) {
+	constructor(webSocket: WebSocket, timeoutInMilliseconds: number) {
 		webSocket.onmessage = messageEvent => {
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
@@ -32,6 +34,7 @@ export class WebSocketConnection implements Connection {
 		};
 
 		this.webSocket = webSocket;
+		this.timeoutInMilliseconds = timeoutInMilliseconds;
 	}
 
 	setDelegate(delegate: ConnectionDelegate): void {
@@ -95,10 +98,13 @@ export class WebSocketConnection implements Connection {
 				reject,
 			};
 		});
+		const pendingWithTimeout = promiseWithTimout(pending, this.timeoutInMilliseconds, () => {
+			delete this.pendingResponses[requestWithId.request_id];
+		});
 
 		this.webSocket.send(JSON.stringify(requestWithId));
 
-		return pending;
+		return pendingWithTimeout;
 	}
 
 	disconnect(): void {
