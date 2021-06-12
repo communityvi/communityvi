@@ -25,6 +25,9 @@ export class WebSocketConnection implements Connection {
 	private nextRequestId = 0;
 
 	constructor(webSocket: WebSocket, timeoutInMilliseconds: number) {
+		webSocket.onerror = error => {
+			this.delegate?.connectionDidEncounterError(error);
+		};
 		webSocket.onmessage = messageEvent => {
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
@@ -115,6 +118,7 @@ export class WebSocketConnection implements Connection {
 }
 
 export interface ConnectionDelegate {
+	connectionDidEncounterError(error: Event | ErrorEvent): void;
 	connectionDidReceiveBroadcast(broadcast: ServerResponse): void;
 	connectionDidReceiveUnassignableResponse(response: ServerResponse): void;
 	connectionDidClose(): void;

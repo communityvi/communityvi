@@ -48,4 +48,8 @@ export class RegisteredClient implements ConnectionDelegate {
 	connectionDidClose(): void {
 		console.warn('Connection closed.');
 	}
+
+	connectionDidEncounterError(error: Event | ErrorEvent): void {
+		console.error('Received error:', error);
+	}
 }

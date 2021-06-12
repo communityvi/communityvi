@@ -18,9 +18,11 @@ export class WebSocketTransport implements Transport {
 			const webSocket = new WebSocket(this.endpoint);
 			webSocket.onopen = () => {
 				resolve(webSocket);
+				webSocket.onerror = null;
 			};
 			webSocket.onerror = () => {
 				reject();
+				webSocket.onerror = null;
 			};
 		});
 
