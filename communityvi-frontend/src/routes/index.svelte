@@ -3,7 +3,6 @@
 </script>
 
 <script lang="ts">
-	import Hello from '$lib/components/Hello.svelte';
 	import Registration from '$lib/components/Registration.svelte';
 	import {WebSocketTransport} from '$lib/client/transport';
 	import {Client} from '$lib/client/client';
@@ -19,6 +18,5 @@
 
 <section>
 	<Notifications />
-	<Hello name="User" />
 	<Registration {client} />
 </section>
