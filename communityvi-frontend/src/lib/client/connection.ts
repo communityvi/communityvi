@@ -9,48 +9,43 @@ import {
 } from '$lib/client/response';
 
 export interface Connection {
+	setDelegate(delegate: ConnectionDelegate): void;
 	performRequest(request: ClientRequest): Promise<SuccessMessage>;
 	disconnect(): void;
 }
 
 export class WebSocketConnection implements Connection {
 	private readonly webSocket: WebSocket;
-	private readonly broadcastCallback: BroadcastCallback;
-	private readonly unassignableResponseCallback: UnassignableResponseCallback;
-	private readonly closedCallback: ClosedCallback;
+
+	private delegate?: ConnectionDelegate;
 
 	private pendingResponses: PendingResponses = {};
 	private nextRequestId = 0;
 
-	constructor(
-		webSocket: WebSocket,
-		broadcastCallback: BroadcastCallback,
-		unassignableErrorCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback,
-	) {
-		this.broadcastCallback = broadcastCallback;
-		this.unassignableResponseCallback = unassignableErrorCallback;
-		this.closedCallback = closedCallback;
-
+	constructor(webSocket: WebSocket) {
 		webSocket.onmessage = messageEvent => {
-			console.log('Received message:', messageEvent);
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
 		};
-		webSocket.onclose = this.closedCallback;
+		webSocket.onclose = () => {
+			this.delegate?.connectionDidClose();
+		};
 
 		this.webSocket = webSocket;
+	}
+
+	setDelegate(delegate: ConnectionDelegate): void {
+		this.delegate = delegate;
 	}
 
 	private handleMessage(serverResponse: ServerResponse, event: MessageEvent): void {
 		switch (serverResponse.type) {
 			case ResponseType.Success: {
-				console.log('Success received:', serverResponse);
 				const successResponse = serverResponse as SuccessResponse;
 
 				const pendingResponse = this.takePendingResponse(successResponse.request_id);
 				if (!pendingResponse) {
-					this.unassignableResponseCallback(successResponse);
+					this.delegate?.connectionDidReceiveUnassignableResponse(successResponse);
 					break;
 				}
 
@@ -58,12 +53,11 @@ export class WebSocketConnection implements Connection {
 				break;
 			}
 			case ResponseType.Error: {
-				console.log('Error received:', serverResponse);
 				const errorResponse = serverResponse as ErrorResponse;
 
 				const pendingResponse = this.takePendingResponse(errorResponse.request_id);
 				if (!pendingResponse) {
-					this.unassignableResponseCallback(errorResponse);
+					this.delegate?.connectionDidReceiveUnassignableResponse(errorResponse);
 					break;
 				}
 
@@ -71,8 +65,7 @@ export class WebSocketConnection implements Connection {
 				break;
 			}
 			case ResponseType.Broadcast: {
-				console.log('Broadcast received:', serverResponse);
-				this.broadcastCallback(serverResponse);
+				this.delegate?.connectionDidReceiveBroadcast(serverResponse);
 				break;
 			}
 		}
@@ -113,9 +106,11 @@ export class WebSocketConnection implements Connection {
 	}
 }
 
-export type BroadcastCallback = (broadcast: ServerResponse) => void;
-export type UnassignableResponseCallback = (response: ServerResponse) => void;
-export type ClosedCallback = (event: CloseEvent) => void;
+export interface ConnectionDelegate {
+	connectionDidReceiveBroadcast(broadcast: ServerResponse): void;
+	connectionDidReceiveUnassignableResponse(response: ServerResponse): void;
+	connectionDidClose(): void;
+}
 
 type PendingResponses = Record<number, PendingResponse>;
 

@@ -1,17 +1,7 @@
-import {
-	BroadcastCallback,
-	ClosedCallback,
-	Connection,
-	UnassignableResponseCallback,
-	WebSocketConnection,
-} from '$lib/client/connection';
+import {Connection, WebSocketConnection} from '$lib/client/connection';
 
 export interface Transport {
-	connect(
-		broadcastCallback: BroadcastCallback,
-		unassignableResponseCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback,
-	): Promise<Connection>;
+	connect(): Promise<Connection>;
 }
 
 export class WebSocketTransport implements Transport {
@@ -21,23 +11,17 @@ export class WebSocketTransport implements Transport {
 		this.endpoint = endpoint;
 	}
 
-	async connect(
-		broadcastCallback: BroadcastCallback,
-		unassignableResponseCallback: UnassignableResponseCallback,
-		closedCallback: ClosedCallback,
-	): Promise<Connection> {
+	async connect(): Promise<Connection> {
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
 			const webSocket = new WebSocket(this.endpoint);
-			webSocket.onopen = event => {
-				console.log('Opening WebSocket succeeded:', event);
+			webSocket.onopen = () => {
 				resolve(webSocket);
 			};
-			webSocket.onerror = event => {
-				console.log('Failed to open WebSocket:', event);
+			webSocket.onerror = () => {
 				reject();
 			};
 		});
 
-		return new WebSocketConnection(webSocket, broadcastCallback, unassignableResponseCallback, closedCallback);
+		return new WebSocketConnection(webSocket);
 	}
 }

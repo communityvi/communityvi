@@ -1,7 +1,7 @@
-import type {HelloMessage} from '$lib/client/response';
+import type {HelloMessage, ServerResponse} from '$lib/client/response';
 import {RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
-import type {Connection} from '$lib/client/connection';
+import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 
 export class Client {
 	readonly transport: Transport;
@@ -11,7 +11,7 @@ export class Client {
 	}
 
 	async register(name: string): Promise<RegisteredClient> {
-		const connection = await this.transport.connect(console.log, console.warn, console.warn);
+		const connection = await this.transport.connect();
 
 		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
 
@@ -19,7 +19,7 @@ export class Client {
 	}
 }
 
-export class RegisteredClient {
+export class RegisteredClient implements ConnectionDelegate {
 	readonly id: number;
 	readonly name: string;
 
@@ -29,9 +29,23 @@ export class RegisteredClient {
 		this.id = id;
 		this.name = name;
 		this.connection = connection;
+
+		this.connection.setDelegate(this);
 	}
 
 	logout(): void {
 		this.connection.disconnect();
+	}
+
+	connectionDidReceiveBroadcast(broadcast: ServerResponse): void {
+		console.info('Received broadcast:', broadcast);
+	}
+
+	connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
+		console.warn('Received unassignable response:', response);
+	}
+
+	connectionDidClose(): void {
+		console.warn('Connection closed.');
 	}
 }
