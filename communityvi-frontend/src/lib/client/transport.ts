@@ -20,12 +20,29 @@ export class WebSocketTransport implements Transport {
 				resolve(webSocket);
 				webSocket.onerror = null;
 			};
-			webSocket.onerror = () => {
-				reject();
+			webSocket.onerror = error => {
+				reject(new ConnectionFailedError(this.endpoint, error));
 				webSocket.onerror = null;
 			};
 		});
 
 		return new WebSocketConnection(webSocket, this.timeoutInMilliseconds);
+	}
+}
+
+class ConnectionFailedError extends Error {
+	readonly endpoint: string;
+	readonly cause: Event | ErrorEvent;
+
+	constructor(endpoint: string, cause: Event | ErrorEvent) {
+		if (cause instanceof ErrorEvent) {
+			super(`Could not connect to WebSocket at '${endpoint}', error was: '${cause.message}'`);
+		} else {
+			super(`Could not connect to WebSocket at '${endpoint}'.`);
+		}
+
+		this.name = ConnectionFailedError.name;
+		this.endpoint = endpoint;
+		this.cause = cause;
 	}
 }
