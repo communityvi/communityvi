@@ -1,6 +1,7 @@
 import type {ClientRequest, ClientRequestWithId} from '$lib/client/request';
 import {
 	ErrorResponse,
+	ResponseError,
 	ResponseType,
 	ServerResponse,
 	SuccessMessage,
@@ -81,7 +82,7 @@ export class WebSocketConnection implements Connection {
 					break;
 				}
 
-				pendingResponse.reject(errorResponse);
+				pendingResponse.reject(new ResponseError(errorResponse));
 				break;
 			}
 			case ResponseType.Broadcast: {
@@ -103,10 +104,10 @@ export class WebSocketConnection implements Connection {
 	}
 
 	performRequest(request: ClientRequest): Promise<SuccessMessage> {
-		const requestWithId = {
+		const requestWithId = <ClientRequestWithId>{
 			request_id: ++this.nextRequestId,
 			...request,
-		} as ClientRequestWithId;
+		};
 
 		const pending = new Promise<SuccessMessage>((resolve, reject) => {
 			this.pendingResponses[requestWithId.request_id] = {
@@ -151,5 +152,5 @@ type PendingResponses = Record<number, PendingResponse>;
 interface PendingResponse {
 	readonly requestType: string;
 	readonly resolve: (message: TimestampedSuccessMessage) => void;
-	readonly reject: (error: ErrorResponse) => void;
+	readonly reject: (error: ResponseError) => void;
 }

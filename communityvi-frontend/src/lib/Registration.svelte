@@ -1,24 +1,23 @@
 <script lang="ts">
 	import type {Client} from '$lib/client/client';
 	import {registeredClient} from '$lib/stores';
-	import {onDestroy} from 'svelte';
 	import {CloseReason} from './client/connection';
 
 	export let client: Client;
 
-	let registeredName: string;
-
+	$: registeredName = $registeredClient?.name ?? '';
 	$: isRegistered = $registeredClient !== undefined;
-
-	const unsubscribe = registeredClient.subscribe(registeredClient => {
-		registeredName = registeredClient?.name ?? '';
-	});
 
 	async function submit() {
 		if (isRegistered) {
 			$registeredClient?.logout();
-		} else {
+			return;
+		}
+
+		try {
 			$registeredClient = await client.register(registeredName.trim(), onClose);
+		} catch (error) {
+			alert(error);
 		}
 	}
 
@@ -40,8 +39,6 @@
 
 		$registeredClient = undefined;
 	}
-
-	onDestroy(unsubscribe);
 </script>
 
 <form on:submit|preventDefault={submit}>

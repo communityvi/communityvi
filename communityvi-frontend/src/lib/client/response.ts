@@ -28,8 +28,24 @@ export interface SuccessResponse extends ServerResponse {
 	readonly message: SuccessMessage;
 }
 
+export interface ErrorResponse extends ServerResponse {
+	readonly request_id?: number;
+	readonly message: ErrorMessage;
+}
+
+export class ResponseError extends Error {
+	readonly error: ErrorMessage;
+
+	constructor(errorResponse: ErrorResponse) {
+		super(`[${errorResponse.message.error}] '${errorResponse.message.message}'`);
+
+		this.name = ResponseError.name;
+		this.error = errorResponse.message;
+	}
+}
+
 export interface ErrorMessage {
-	readonly type: ErrorMessageType;
+	readonly error: ErrorMessageType;
 	readonly message: string;
 }
 
@@ -39,11 +55,6 @@ enum ErrorMessageType {
 	InternalServerError = 'internal_server_error',
 	IncorrectMediumVersion = 'incorrect_medium_version',
 	EmptyChatMessage = 'empty_chat_message',
-}
-
-export interface ErrorResponse extends ServerResponse {
-	readonly request_id?: number;
-	readonly message: ErrorMessage;
 }
 
 export interface ServerResponse {

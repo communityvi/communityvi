@@ -30,7 +30,7 @@ export class WebSocketTransport implements Transport {
 	}
 }
 
-class ConnectionFailedError extends Error {
+export class ConnectionFailedError extends Error {
 	readonly endpoint: URL;
 	readonly cause: Event | ErrorEvent;
 
