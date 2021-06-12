@@ -19,9 +19,16 @@ export class Client {
 	}
 }
 
-export class RegisteredClient implements ConnectionDelegate {
+export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
+
+	private readonly connectionDelegate: ConnectionDelegate = {
+		connectionDidReceiveBroadcast: this.connectionDidReceiveBroadcast,
+		connectionDidReceiveUnassignableResponse: this.connectionDidReceiveUnassignableResponse,
+		connectionDidClose: this.connectionDidClose,
+		connectionDidEncounterError: this.connectionDidEncounterError,
+	};
 
 	private readonly connection: Connection;
 
@@ -30,26 +37,26 @@ export class RegisteredClient implements ConnectionDelegate {
 		this.name = name;
 		this.connection = connection;
 
-		this.connection.setDelegate(this);
+		this.connection.setDelegate(this.connectionDelegate);
 	}
 
 	logout(): void {
 		this.connection.disconnect();
 	}
 
-	connectionDidReceiveBroadcast(broadcast: ServerResponse): void {
+	private connectionDidReceiveBroadcast(broadcast: ServerResponse): void {
 		console.info('Received broadcast:', broadcast);
 	}
 
-	connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
+	private connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
 		console.warn('Received unassignable response:', response);
 	}
 
-	connectionDidClose(): void {
+	private connectionDidClose(): void {
 		console.warn('Connection closed.');
 	}
 
-	connectionDidEncounterError(error: Event | ErrorEvent): void {
+	private connectionDidEncounterError(error: Event | ErrorEvent): void {
 		console.error('Received error:', error);
 	}
 }
