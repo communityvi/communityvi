@@ -3,9 +3,13 @@
 </script>
 
 <script lang="ts">
-	import Fa from 'svelte-fa/src/fa.svelte';
-	import {faHouseUser} from '@fortawesome/free-solid-svg-icons';
-	import Hello from '$lib/Hello.svelte';
+	import Registration from '$lib/components/Registration.svelte';
+	import {WebSocketTransport} from '$lib/client/transport';
+	import {Client} from '$lib/client/client';
+	import Notifications from '$lib/components/Notifications.svelte';
+
+	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
+	const client = new Client(transport);
 </script>
 
 <svelte:head>
@@ -13,6 +17,6 @@
 </svelte:head>
 
 <section>
-	<Fa icon={faHouseUser} />
-	<Hello name="User" />
+	<Notifications />
+	<Registration {client} />
 </section>
