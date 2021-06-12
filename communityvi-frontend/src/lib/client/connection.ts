@@ -108,7 +108,9 @@ export class WebSocketConnection implements Connection {
 	}
 
 	disconnect(): void {
-		this.webSocket.close();
+		// See: https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
+		const normalClosure = 1000;
+		this.webSocket.close(normalClosure, 'Goodbye!');
 	}
 }
 
