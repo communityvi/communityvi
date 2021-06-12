@@ -18,6 +18,7 @@ export interface Connection {
 export class WebSocketConnection implements Connection {
 	private readonly webSocket: WebSocket;
 	private readonly timeoutInMilliseconds: number;
+	private intendedClose = false;
 
 	private delegate?: ConnectionDelegate;
 
@@ -32,12 +33,25 @@ export class WebSocketConnection implements Connection {
 			const message: ServerResponse = JSON.parse(messageEvent.data);
 			this.handleMessage(message, messageEvent);
 		};
-		webSocket.onclose = () => {
-			this.delegate?.connectionDidClose();
+		webSocket.onclose = closeEvent => {
+			const reason = this.determineCloseReasonFromCloseEvent(closeEvent);
+			this.delegate?.connectionDidClose(reason);
 		};
 
 		this.webSocket = webSocket;
 		this.timeoutInMilliseconds = timeoutInMilliseconds;
+	}
+
+	private determineCloseReasonFromCloseEvent(closeEvent: CloseEvent): CloseReason {
+		if (!closeEvent.wasClean) {
+			return CloseReason.ERROR;
+		}
+
+		if (!this.intendedClose) {
+			return CloseReason.KICKED_FROM_SERVER;
+		}
+
+		return CloseReason.CLIENT_LEFT;
 	}
 
 	setDelegate(delegate: ConnectionDelegate): void {
@@ -111,6 +125,8 @@ export class WebSocketConnection implements Connection {
 	}
 
 	disconnect(): void {
+		this.intendedClose = true;
+
 		// See: https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent#status_codes
 		const normalClosure = 1000;
 		this.webSocket.close(normalClosure, 'Goodbye!');
@@ -121,7 +137,13 @@ export interface ConnectionDelegate {
 	connectionDidEncounterError(error: Event | ErrorEvent): void;
 	connectionDidReceiveBroadcast(broadcast: ServerResponse): void;
 	connectionDidReceiveUnassignableResponse(response: ServerResponse): void;
-	connectionDidClose(): void;
+	connectionDidClose(reason: CloseReason): void;
+}
+
+export enum CloseReason {
+	CLIENT_LEFT,
+	KICKED_FROM_SERVER,
+	ERROR,
 }
 
 type PendingResponses = Record<number, PendingResponse>;

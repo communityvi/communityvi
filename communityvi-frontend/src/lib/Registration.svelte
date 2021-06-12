@@ -2,6 +2,7 @@
 	import type {Client} from '$lib/client/client';
 	import {registeredClient} from '$lib/stores';
 	import {onDestroy} from 'svelte';
+	import {CloseReason} from './client/connection';
 
 	export let client: Client;
 
@@ -17,11 +18,27 @@
 		if (isRegistered) {
 			$registeredClient?.logout();
 		} else {
-			$registeredClient = await client.register(registeredName.trim(), () => {
-				console.info('Client disconnected.');
-				$registeredClient = undefined;
-			});
+			$registeredClient = await client.register(registeredName.trim(), onClose);
 		}
+	}
+
+	function onClose(reason: CloseReason) {
+		switch (reason) {
+			case CloseReason.CLIENT_LEFT:
+				console.info('Client disconnected.');
+				break;
+			case CloseReason.KICKED_FROM_SERVER:
+				console.warn('User was kicked from server.');
+				break;
+			case CloseReason.ERROR:
+				console.warn('The connection was closed due to a connection error.');
+				break;
+			default:
+				console.error('Unknown close reason:', reason);
+				break;
+		}
+
+		$registeredClient = undefined;
 	}
 
 	onDestroy(unsubscribe);

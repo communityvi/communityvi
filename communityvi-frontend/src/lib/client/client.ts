@@ -1,7 +1,7 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
 import {RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
-import type {Connection} from '$lib/client/connection';
+import type {Connection, CloseReason} from '$lib/client/connection';
 
 export class Client {
 	readonly transport: Transport;
@@ -35,7 +35,7 @@ export class RegisteredClient {
 		this.connection.setDelegate({
 			connectionDidReceiveBroadcast: response => this.connectionDidReceiveBroadcast(response),
 			connectionDidReceiveUnassignableResponse: response => this.connectionDidReceiveUnassignableResponse(response),
-			connectionDidClose: () => this.connectionDidClose(),
+			connectionDidClose: reason => this.connectionDidClose(reason),
 			connectionDidEncounterError: error => this.connectionDidEncounterError(error),
 		});
 	}
@@ -52,8 +52,8 @@ export class RegisteredClient {
 		console.warn('Received unassignable response:', response);
 	}
 
-	private connectionDidClose(): void {
-		this.disconnectCallback();
+	private connectionDidClose(reason: CloseReason): void {
+		this.disconnectCallback(reason);
 	}
 
 	private connectionDidEncounterError(error: Event | ErrorEvent): void {
@@ -61,4 +61,4 @@ export class RegisteredClient {
 	}
 }
 
-export type DisconnectCallback = () => void;
+export type DisconnectCallback = (reason: CloseReason) => void;
