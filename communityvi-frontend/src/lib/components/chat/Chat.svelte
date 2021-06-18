@@ -3,10 +3,17 @@
 	import {ChatMessage} from '$lib/client/model';
 	import {registeredClient} from '$lib/stores';
 	import {OwnMessage} from '$lib/components/chat/own_message';
+	import {onDestroy} from 'svelte';
 
 	let messages = new Array<OwnMessage | ChatMessage>();
 
-	$: $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+	$: unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+
+	onDestroy(() => {
+		if (unsubscribe !== undefined) {
+			unsubscribe();
+		}
+	});
 
 	function onChatMessageReceived(message: ChatMessage) {
 		messages = [...messages, message];

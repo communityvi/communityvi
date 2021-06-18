@@ -1,5 +1,5 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
-import {ChatBroadcast, BroadcastMessage, BroadcastType} from '$lib/client/broadcast';
+import {BroadcastMessage, BroadcastType, ChatBroadcast} from '$lib/client/broadcast';
 import {ChatRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
@@ -51,8 +51,17 @@ export class RegisteredClient {
 		await this.connection.performRequest(new ChatRequest(message));
 	}
 
-	subscribeToChatMessages(callback: ChatMessageCallback): void {
+	subscribeToChatMessages(callback: ChatMessageCallback): () => void {
 		this.chatMessageCallbacks.push(callback);
+
+		return () => {
+			const index = this.chatMessageCallbacks.indexOf(callback);
+			if (index === -1) {
+				return;
+			}
+
+			this.chatMessageCallbacks.slice(index, 1);
+		};
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
