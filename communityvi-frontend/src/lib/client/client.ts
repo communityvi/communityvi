@@ -1,5 +1,5 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
-import {RegisterRequest} from '$lib/client/request';
+import {ChatRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {Connection, CloseReason} from '$lib/client/connection';
 
@@ -42,6 +42,10 @@ export class RegisteredClient {
 
 	logout(): void {
 		this.connection.disconnect();
+	}
+
+	async sendChatMessage(message: string): Promise<void> {
+		await this.connection.performRequest(new ChatRequest(message));
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: ServerResponse): void {

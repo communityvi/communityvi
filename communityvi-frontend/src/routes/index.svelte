@@ -6,6 +6,7 @@
 	import Registration from '$lib/components/Registration.svelte';
 	import {WebSocketTransport} from '$lib/client/transport';
 	import {Client} from '$lib/client/client';
+	import Chat from '$lib/components/chat/Chat.svelte';
 
 	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
@@ -18,3 +19,5 @@
 <section>
 	<Registration {client} />
 </section>
+
+<Chat />
