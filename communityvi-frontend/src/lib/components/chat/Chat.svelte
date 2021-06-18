@@ -1,11 +1,12 @@
 <script lang="ts">
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
-	import {ChatMessage} from '$lib/client/model';
+	import type {ChatMessage as ChatMessageModel} from '$lib/client/model';
 	import {registeredClient} from '$lib/stores';
 	import {OwnMessage} from '$lib/components/chat/own_message';
 	import {onDestroy} from 'svelte';
+	import ChatMessage from './ChatMessage.svelte';
 
-	let messages = new Array<OwnMessage | ChatMessage>();
+	let messages = new Array<OwnMessage | ChatMessageModel>();
 
 	$: unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
 
@@ -15,7 +16,7 @@
 		}
 	});
 
-	function onChatMessageReceived(message: ChatMessage) {
+	function onChatMessageReceived(message: ChatMessageModel) {
 		messages = [...messages, message];
 	}
 
@@ -28,8 +29,8 @@
 		messages = [...messages, new OwnMessage(message, $registeredClient.id, $registeredClient.name)];
 	}
 
-	function onChatMessageAcknowledged(acknowlegdedEvent: CustomEvent) {
-		const message = acknowlegdedEvent.detail as string;
+	function onChatMessageAcknowledged(acknowledgedEvent: CustomEvent) {
+		const message = acknowledgedEvent.detail as string;
 		// Array.map is used here because svelte needs an assignment to message to trigger a DOM update
 		messages = messages.map(existingMessage => {
 			if (!(existingMessage instanceof OwnMessage)) {
@@ -50,38 +51,24 @@
 	}
 </script>
 
-<section id="chat">
-	<table>
+<section id="chat" class="table-container">
+	<table class="table">
 		<thead>
 			<tr>
-				<td>ID</td>
-				<td>Name</td>
-				<td>Message</td>
+				<th>Name</th>
+				<th>Message</th>
 			</tr>
 		</thead>
 
 		<tbody>
 			{#each messages as message}
 				{#if message instanceof ChatMessage}
-					<tr>
-						<td>{message.senderId}</td>
-						<td>{message.senderName}</td>
-						<td>{message.message}</td>
-					</tr>
-				{:else}
-					<tr class:pendingMessage={!message.acknowledged}>
-						<td>{message.senderId}</td>
-						<td>{message.senderName}</td>
-						<td>{message.message}</td>
-					</tr>
+					<ChatMessage message={message.message} senderName={message.senderName} />
+				{:else if message instanceof OwnMessage}
+					<ChatMessage message={message.message} senderName={message.senderName} acknowledged={message.acknowledged} />
 				{/if}
 			{/each}
 		</tbody>
 	</table>
 	<ChatInput on:chatMessageSent={onChatMessageSent} on:chatMessageAcknowledged={onChatMessageAcknowledged} />
 </section>
-
-<style lang="sass">
-.pendingMessage
-	color: gray
-</style>
