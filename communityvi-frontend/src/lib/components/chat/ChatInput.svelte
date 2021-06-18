@@ -1,14 +1,19 @@
 <script lang="ts">
-	import {registeredClient} from '$lib/stores';
+	import {registeredClient, errorBag} from '$lib/stores';
 
 	$: isNotRegistered = $registeredClient === undefined;
 
 	let message = '';
 	$: isMessageEmpty = message.trim().length === 0;
 
-	function sendChatMessage() {
-		$registeredClient.sendChatMessage(message);
-		message = '';
+	async function sendChatMessage() {
+		try {
+			await $registeredClient.sendChatMessage(message);
+			message = '';
+		} catch (error) {
+			console.error('Error while sending chat message:', error);
+			errorBag.reportError(new Error('Chat message sending failed!'));
+		}
 	}
 </script>
 
