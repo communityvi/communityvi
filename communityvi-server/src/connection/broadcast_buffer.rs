@@ -104,7 +104,6 @@ impl Inner {
 	///
 	/// This means we can calculate the maximum count of messages by taking the worst case scenario
 	/// (see `worst_count_of_messages_to_keep_alive`)
-	#[allow(clippy::filter_map)]
 	fn collect_garbage(&mut self) {
 		let mut seen_chat_messages = 0;
 		let mut last_seen_medium_index = None;
