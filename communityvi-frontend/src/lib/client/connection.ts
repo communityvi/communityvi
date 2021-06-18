@@ -8,6 +8,7 @@ import {
 	SuccessResponse,
 	TimestampedSuccessMessage,
 } from '$lib/client/response';
+import type {BroadcastMessage, BroadcastResponse} from '$lib/client/broadcast';
 import {promiseWithTimout} from '$lib/client/promises';
 
 export interface Connection {
@@ -86,7 +87,8 @@ export class WebSocketConnection implements Connection {
 				break;
 			}
 			case ResponseType.Broadcast: {
-				this.delegate?.connectionDidReceiveBroadcast(serverResponse);
+				const broadcastResponse = serverResponse as BroadcastResponse;
+				this.delegate?.connectionDidReceiveBroadcast(broadcastResponse.message);
 				break;
 			}
 		}
@@ -136,7 +138,7 @@ export class WebSocketConnection implements Connection {
 
 export interface ConnectionDelegate {
 	connectionDidEncounterError(error: Event | ErrorEvent): void;
-	connectionDidReceiveBroadcast(broadcast: ServerResponse): void;
+	connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void;
 	connectionDidReceiveUnassignableResponse(response: ServerResponse): void;
 	connectionDidClose(reason: CloseReason): void;
 }

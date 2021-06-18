@@ -7,6 +7,15 @@ export class RegisterRequest implements ClientRequest {
 	}
 }
 
+export class ChatRequest implements ClientRequest {
+	type = RequestType.Chat;
+	readonly message: string;
+
+	constructor(message: string) {
+		this.message = message;
+	}
+}
+
 export interface ClientRequestWithId extends ClientRequest {
 	readonly request_id: number;
 }
@@ -17,4 +26,5 @@ export interface ClientRequest {
 
 enum RequestType {
 	Register = 'register',
+	Chat = 'chat',
 }
