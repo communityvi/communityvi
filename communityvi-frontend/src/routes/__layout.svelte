@@ -3,7 +3,9 @@
 	import '../app.sass';
 </script>
 
-<Header />
+<header>
+	<Header />
+</header>
 
 <main>
 	<slot />

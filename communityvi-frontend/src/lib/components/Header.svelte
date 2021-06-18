@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {page} from '$app/stores';
+	import Notifications from '$lib/components/Notifications.svelte';
 
 	let isBurgerMenuExpanded = false;
 
@@ -35,6 +36,8 @@
 		</div>
 	</div>
 </nav>
+
+<Notifications />
 
 <style type="text/sass">
 	.is-teaser

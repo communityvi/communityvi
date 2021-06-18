@@ -6,7 +6,6 @@
 	import Registration from '$lib/components/Registration.svelte';
 	import {WebSocketTransport} from '$lib/client/transport';
 	import {Client} from '$lib/client/client';
-	import Notifications from '$lib/components/Notifications.svelte';
 
 	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
@@ -17,6 +16,5 @@
 </svelte:head>
 
 <section>
-	<Notifications />
 	<Registration {client} />
 </section>
