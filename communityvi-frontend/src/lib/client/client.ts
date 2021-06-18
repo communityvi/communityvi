@@ -1,7 +1,9 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
+import {ChatBroadcast, BroadcastMessage, BroadcastType} from '$lib/client/broadcast';
 import {ChatRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
-import type {Connection, CloseReason} from '$lib/client/connection';
+import type {CloseReason, Connection} from '$lib/client/connection';
+import {ChatMessage} from '$lib/client/model';
 
 export class Client {
 	readonly transport: Transport;
@@ -25,6 +27,7 @@ export class RegisteredClient {
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
+	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 
 	constructor(id: number, name: string, connection: Connection, disconnectCallback: DisconnectCallback) {
 		this.id = id;
@@ -48,8 +51,29 @@ export class RegisteredClient {
 		await this.connection.performRequest(new ChatRequest(message));
 	}
 
-	private connectionDidReceiveBroadcast(broadcast: ServerResponse): void {
+	subscribeToChatMessages(callback: ChatMessageCallback): void {
+		this.chatMessageCallbacks.push(callback);
+	}
+
+	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
 		console.info('Received broadcast:', broadcast);
+
+		switch (broadcast.type) {
+			case BroadcastType.Chat: {
+				const chatBroadcast = broadcast as ChatBroadcast;
+				if (chatBroadcast.sender_id === this.id) {
+					// we already know what message we've sent ourselves
+					return;
+				}
+
+				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
+				for (const chatMessageCallback of this.chatMessageCallbacks) {
+					chatMessageCallback(chatMessage);
+				}
+
+				break;
+			}
+		}
 	}
 
 	private connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
@@ -66,3 +90,4 @@ export class RegisteredClient {
 }
 
 export type DisconnectCallback = (reason: CloseReason) => void;
+export type ChatMessageCallback = (message: ChatMessage) => void;
