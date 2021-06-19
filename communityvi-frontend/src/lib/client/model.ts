@@ -63,12 +63,6 @@ export class Medium {
 	readonly playbackSkipped: boolean;
 	readonly playbackState: PlayingPlaybackState | PausedPlaybackState;
 
-	get lengthInMinutes(): number {
-		// FIXME: This should probably become Intl.NumberFormat in the future.
-		// See:https://developer.mozilla.org/de/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat
-		return Math.round(this.lengthInMilliseconds / 1000 / 60);
-	}
-
 	static fromVersionedMediumResponse(response: VersionedMediumResponse): Medium | undefined {
 		switch (response.type) {
 			case MediumType.FixedLength: {

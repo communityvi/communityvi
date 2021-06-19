@@ -67,8 +67,8 @@ export class RegisteredClient {
 		return this.currentMediumState;
 	}
 
-	async insertFixedLengthMedium(name: string, durationInSeconds: number): Promise<void> {
-		const medium = new FixedLengthMedium(name, durationInSeconds);
+	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
+		const medium = new FixedLengthMedium(name, lengthInMilliseconds);
 		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, medium));
 	}
 

@@ -14,9 +14,9 @@ export class FixedLengthMedium implements Medium {
 	readonly name: string;
 	readonly length_in_milliseconds: number;
 
-	constructor(name: string, length_in_seconds: number) {
+	constructor(name: string, length_in_milliseconds: number) {
 		this.name = name;
-		this.length_in_milliseconds = Math.round(length_in_seconds * 1000);
+		this.length_in_milliseconds = Math.round(length_in_milliseconds);
 	}
 }
 
