@@ -67,16 +67,12 @@ export class RegisteredClient {
 		return this.currentMediumState;
 	}
 
-	async insertMedium(previousVersion: number, medium: FixedLengthMedium): Promise<number> {
-		await this.connection.performRequest(new InsertMediumRequest(previousVersion, medium));
-		// FIXME: We anticipate the upcoming improved(tm) REST-API to handle this.
-		return previousVersion + 1;
+	async insertMedium(medium: FixedLengthMedium): Promise<void> {
+		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, medium));
 	}
 
-	async ejectMedium(previousVersion: number): Promise<number> {
-		await this.connection.performRequest(new InsertMediumRequest(previousVersion, new EmptyMedium()));
-		// FIXME: We anticipate the upcoming improved(tm) REST-API to handle this.
-		return previousVersion + 1;
+	async ejectMedium(): Promise<void> {
+		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, new EmptyMedium()));
 	}
 
 	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
