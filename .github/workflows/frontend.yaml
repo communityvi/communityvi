@@ -21,10 +21,8 @@ jobs:
           node-version: 16.x
       - name: Install packages
         run: npm install
-      - name: ESLint & Prettier
+      - name: ESLint & Prettier & Svelte check
         run: npm run lint
-      - name: Svelte check
-        run: npm run validate
   test:
     name: Test
     runs-on: ubuntu-latest

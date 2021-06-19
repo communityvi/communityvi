@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {registeredClient, errorBag} from '$lib/stores';
-	import {Medium, MediumState} from '$lib/client/model';
+	import type {Medium, MediumState} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 
 	$: isRegistered = $registeredClient !== undefined;
@@ -26,7 +26,7 @@
 	let selectedMediumLengthInMilliseconds: number | undefined;
 	let selectedMediumUrl: string | undefined;
 
-	let durationHelper: HTMLMediaElement;
+	let durationHelper: HTMLVideoElement;
 
 	onDestroy(() => {
 		if (unsubscribe !== undefined) {
@@ -41,7 +41,10 @@
 
 	function onMediumSelection(event: Event) {
 		const element = event.target as HTMLInputElement;
-		const medium = element.files[0];
+		const medium = element?.files?.item(0) ?? undefined;
+		if (medium === undefined) {
+			return;
+		}
 
 		selectedMediumName = medium.name;
 		selectedMediumUrl = URL.createObjectURL(medium);
@@ -51,19 +54,27 @@
 	}
 
 	async function onDurationHelperLoadedMetadata() {
+		if ($registeredClient === undefined || selectedMediumName === undefined) {
+			return;
+		}
+
 		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
 
 		try {
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
-			medium = $registeredClient?.getCurrentMediumState().medium;
+			medium = $registeredClient.getCurrentMediumState().medium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
-			errorBag.reportError(new Error(`Inserting new medium name '${name}' failed!`));
+			errorBag.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
 			resetMediumSelection();
 		}
 	}
 
 	async function ejectMedium() {
+		if ($registeredClient === undefined) {
+			return;
+		}
+
 		resetMediumSelection();
 		try {
 			await $registeredClient.ejectMedium();
@@ -99,7 +110,8 @@
 		</div>
 		<video
 			preload="metadata"
-			hidden="hidden"
+			hidden={true}
+			muted={true}
 			bind:this={durationHelper}
 			on:loadedmetadata={onDurationHelperLoadedMetadata}
 		/>
