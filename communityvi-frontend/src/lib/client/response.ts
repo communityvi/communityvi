@@ -1,8 +1,41 @@
+import type {MediumType} from '$lib/client/request';
+
 export interface HelloMessage extends SuccessMessage {
 	readonly id: number;
 	readonly clients: Array<number>;
-	// FIXME: Left out for now, needs `VersionedMedium` type.
-	//readonly current_medium:
+	readonly current_medium: VersionedMediumResponse;
+}
+
+export interface VersionedMediumResponse {
+	readonly version: number;
+	readonly medium: MediumResponse;
+}
+
+export interface FixedLengthMediumResponse extends MediumResponse {
+	readonly name: string;
+	readonly length_in_milliseconds: number;
+	readonly playback_state: PlaybackStateResponse;
+}
+
+export interface MediumResponse {
+	readonly type: MediumType;
+}
+
+export interface PlayingPlaybackStateResponse extends PlaybackStateResponse {
+	readonly start_time_in_milliseconds: number;
+}
+
+export interface PausedPlaybackStateResponse extends PlaybackStateResponse {
+	readonly position_in_milliseconds: number;
+}
+
+export interface PlaybackStateResponse {
+	readonly type: PlaybackStateType;
+}
+
+export enum PlaybackStateType {
+	Playing = 'playing',
+	Paused = 'paused',
 }
 
 export interface ReferenceTimeMessage extends SuccessMessage {
