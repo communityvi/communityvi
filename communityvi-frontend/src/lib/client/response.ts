@@ -8,17 +8,13 @@ export interface HelloMessage extends SuccessMessage {
 
 export interface VersionedMediumResponse {
 	readonly version: number;
-	readonly medium: MediumResponse;
+	readonly type: MediumType;
 }
 
-export interface FixedLengthMediumResponse extends MediumResponse {
+export interface FixedLengthVersionedMediumResponse extends VersionedMediumResponse {
 	readonly name: string;
 	readonly length_in_milliseconds: number;
 	readonly playback_state: PlaybackStateResponse;
-}
-
-export interface MediumResponse {
-	readonly type: MediumType;
 }
 
 export interface PlayingPlaybackStateResponse extends PlaybackStateResponse {

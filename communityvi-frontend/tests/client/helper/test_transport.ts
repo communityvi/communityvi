@@ -2,7 +2,7 @@ import type {Transport} from '$lib/client/transport';
 import {WebSocketTransport} from '$lib/client/transport';
 import type {Connection} from '$lib/client/connection';
 import {mock} from 'jest-mock-extended';
-import {HelloMessage, MediumResponse, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
+import {HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
 import {MediumType} from '$lib/client/request';
 
 export default class TestTransport implements Transport {
@@ -37,10 +37,8 @@ export default class TestTransport implements Transport {
 			id: ++this.id,
 			clients: [...this.clients],
 			current_medium: <VersionedMediumResponse>{
+				type: MediumType.Empty,
 				version: 0,
-				medium: <MediumResponse>{
-					type: MediumType.Empty,
-				},
 			},
 		});
 		this.clients.push(this.id);

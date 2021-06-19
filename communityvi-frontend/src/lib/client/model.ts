@@ -1,13 +1,12 @@
 import type {
 	ChatBroadcast,
 	FixedLengthMediumBroadcast,
-	MediumBroadcast,
 	MediumStateChangedBroadcast,
+	VersionedMediumBroadcast,
 } from '$lib/client/broadcast';
 import {MediumType} from '$lib/client/request';
 import type {
-	FixedLengthMediumResponse,
-	MediumResponse,
+	FixedLengthVersionedMediumResponse,
 	PausedPlaybackStateResponse,
 	PlaybackStateResponse,
 	PlayingPlaybackStateResponse,
@@ -41,12 +40,12 @@ export class MediumState {
 	readonly medium?: Medium;
 
 	static fromVersionedMediumResponse(response: VersionedMediumResponse): MediumState {
-		const medium = Medium.fromMediumResponse(response.medium);
+		const medium = Medium.fromVersionedMediumResponse(response);
 		return new MediumState(response.version, undefined, undefined, medium);
 	}
 
 	static fromMediumStateChangedBroadcast(broadcast: MediumStateChangedBroadcast): MediumState {
-		const medium = Medium.fromMediumBroadcast(broadcast.medium.medium);
+		const medium = Medium.fromVersionedMediumBroadcast(broadcast.medium);
 		return new MediumState(broadcast.medium.version, broadcast.changed_by_name, broadcast.changed_by_id, medium);
 	}
 
@@ -64,10 +63,10 @@ export class Medium {
 	readonly playbackSkipped: boolean;
 	readonly playbackState: PlayingPlaybackState | PausedPlaybackState;
 
-	static fromMediumResponse(response: MediumResponse): Medium | undefined {
+	static fromVersionedMediumResponse(response: VersionedMediumResponse): Medium | undefined {
 		switch (response.type) {
 			case MediumType.FixedLength: {
-				const fixedLength = response as FixedLengthMediumResponse;
+				const fixedLength = response as FixedLengthVersionedMediumResponse;
 				return new Medium(
 					fixedLength.name,
 					fixedLength.length_in_milliseconds,
@@ -82,7 +81,7 @@ export class Medium {
 		}
 	}
 
-	static fromMediumBroadcast(broadcast: MediumBroadcast): Medium | undefined {
+	static fromVersionedMediumBroadcast(broadcast: VersionedMediumBroadcast): Medium | undefined {
 		switch (broadcast.type) {
 			case MediumType.FixedLength: {
 				const fixedLength = broadcast as FixedLengthMediumBroadcast;

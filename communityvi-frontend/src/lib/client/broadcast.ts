@@ -8,19 +8,15 @@ export interface MediumStateChangedBroadcast extends BroadcastMessage {
 }
 
 export interface VersionedMediumBroadcast {
+	readonly type: MediumType;
 	readonly version: number;
-	readonly medium: MediumBroadcast;
 }
 
-export interface FixedLengthMediumBroadcast extends MediumBroadcast {
+export interface FixedLengthMediumBroadcast extends VersionedMediumBroadcast {
 	readonly name: string;
 	readonly length_in_milliseconds: number;
 	readonly playback_skipped: boolean;
 	readonly playback_state: PlaybackStateResponse;
-}
-
-export interface MediumBroadcast {
-	readonly type: MediumType;
 }
 
 export interface ChatBroadcast extends BroadcastMessage {
