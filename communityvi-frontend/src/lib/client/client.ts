@@ -55,10 +55,6 @@ export class RegisteredClient {
 		});
 	}
 
-	logout(): void {
-		this.connection.disconnect();
-	}
-
 	async sendChatMessage(message: string): Promise<void> {
 		await this.connection.performRequest(new ChatRequest(message));
 	}
@@ -98,6 +94,10 @@ export class RegisteredClient {
 
 			callbackList.slice(index, 1);
 		};
+	}
+
+	logout(): void {
+		this.connection.disconnect();
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
