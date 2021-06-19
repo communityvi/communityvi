@@ -1,9 +1,9 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
-import {BroadcastMessage, BroadcastType, ChatBroadcast} from '$lib/client/broadcast';
-import {ChatRequest, RegisterRequest} from '$lib/client/request';
+import {BroadcastMessage, BroadcastType, ChatBroadcast, MediumStateChangedBroadcast} from '$lib/client/broadcast';
+import {ChatRequest, EmptyMedium, FixedLengthMedium, InsertMediumRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
-import {ChatMessage} from '$lib/client/model';
+import {ChatMessage, MediumState} from '$lib/client/model';
 
 export class Client {
 	readonly transport: Transport;
@@ -16,22 +16,34 @@ export class Client {
 		const connection = await this.transport.connect();
 
 		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
+		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
 
-		return new RegisteredClient(response.id, name, connection, disconnectCallback);
+		return new RegisteredClient(response.id, name, mediumState, connection, disconnectCallback);
 	}
 }
 
 export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
+	private currentMediumState: MediumState;
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
-	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 
-	constructor(id: number, name: string, connection: Connection, disconnectCallback: DisconnectCallback) {
+	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
+	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
+
+	constructor(
+		id: number,
+		name: string,
+		currentMediumState: MediumState,
+		connection: Connection,
+		disconnectCallback: DisconnectCallback,
+	) {
 		this.id = id;
 		this.name = name;
+		this.currentMediumState = currentMediumState;
+
 		this.connection = connection;
 		this.disconnectCallback = disconnectCallback;
 
@@ -43,25 +55,46 @@ export class RegisteredClient {
 		});
 	}
 
-	logout(): void {
-		this.connection.disconnect();
-	}
-
 	async sendChatMessage(message: string): Promise<void> {
 		await this.connection.performRequest(new ChatRequest(message));
 	}
 
-	subscribeToChatMessages(callback: ChatMessageCallback): () => void {
-		this.chatMessageCallbacks.push(callback);
+	subscribeToChatMessages(callback: ChatMessageCallback): Unsubscriber {
+		return RegisteredClient.subscribe(callback, this.chatMessageCallbacks);
+	}
+
+	getCurrentMediumState(): MediumState {
+		return this.currentMediumState;
+	}
+
+	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
+		const medium = new FixedLengthMedium(name, lengthInMilliseconds);
+		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, medium));
+	}
+
+	async ejectMedium(): Promise<void> {
+		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, new EmptyMedium()));
+	}
+
+	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
+		return RegisteredClient.subscribe(callback, this.mediumStateChangedCallbacks);
+	}
+
+	private static subscribe<Callback>(callback: Callback, callbackList: Array<Callback>): Unsubscriber {
+		callbackList.push(callback);
 
 		return () => {
-			const index = this.chatMessageCallbacks.indexOf(callback);
+			const index = callbackList.indexOf(callback);
 			if (index === -1) {
 				return;
 			}
 
-			this.chatMessageCallbacks.slice(index, 1);
+			callbackList.slice(index, 1);
 		};
+	}
+
+	logout(): void {
+		this.connection.disconnect();
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
@@ -70,7 +103,7 @@ export class RegisteredClient {
 		switch (broadcast.type) {
 			case BroadcastType.Chat: {
 				const chatBroadcast = broadcast as ChatBroadcast;
-				if (chatBroadcast.sender_id === this.id) {
+				if (this.id === chatBroadcast.sender_id) {
 					// we already know what message we've sent ourselves
 					return;
 				}
@@ -78,6 +111,22 @@ export class RegisteredClient {
 				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
 				for (const chatMessageCallback of this.chatMessageCallbacks) {
 					chatMessageCallback(chatMessage);
+				}
+
+				break;
+			}
+			case BroadcastType.MediumStateChanged: {
+				const mediumStateChangedBroadcast = broadcast as MediumStateChangedBroadcast;
+				const mediumState = MediumState.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
+				this.currentMediumState = mediumState;
+
+				if (this.id === mediumState.changedById) {
+					// we already know about the changes we've made and implicitly updated the state of the client.
+					return;
+				}
+
+				for (const mediumStateChangedCallback of this.mediumStateChangedCallbacks) {
+					mediumStateChangedCallback(mediumState);
 				}
 
 				break;
@@ -100,3 +149,6 @@ export class RegisteredClient {
 
 export type DisconnectCallback = (reason: CloseReason) => void;
 export type ChatMessageCallback = (message: ChatMessage) => void;
+export type MediumStateChangedCallback = (mediumState: MediumState) => void;
+
+export type Unsubscriber = () => void;

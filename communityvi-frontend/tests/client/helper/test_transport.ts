@@ -1,8 +1,9 @@
 import type {Transport} from '$lib/client/transport';
+import {WebSocketTransport} from '$lib/client/transport';
 import type {Connection} from '$lib/client/connection';
 import {mock} from 'jest-mock-extended';
-import {HelloMessage, SuccessMessageType} from '$lib/client/response';
-import {WebSocketTransport} from '$lib/client/transport';
+import {HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
+import {MediumType} from '$lib/client/request';
 
 export default class TestTransport implements Transport {
 	private id = 0;
@@ -35,6 +36,10 @@ export default class TestTransport implements Transport {
 			type: SuccessMessageType.Hello,
 			id: ++this.id,
 			clients: [...this.clients],
+			current_medium: <VersionedMediumResponse>{
+				type: MediumType.Empty,
+				version: 0,
+			},
 		});
 		this.clients.push(this.id);
 
