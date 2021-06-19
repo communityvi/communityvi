@@ -38,10 +38,6 @@ export enum PlaybackStateType {
 	Paused = 'paused',
 }
 
-export interface ReferenceTimeMessage extends SuccessMessage {
-	readonly milliseconds: number;
-}
-
 export interface TimestampedSuccessMessage extends SuccessMessage {
 	readonly arrivalTimestamp: DOMHighResTimeStamp | DOMTimeStamp;
 }
