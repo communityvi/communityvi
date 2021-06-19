@@ -1,5 +1,9 @@
 import type {MediumType} from '$lib/client/request';
 
+export interface ReferenceTimeMessage extends SuccessMessage {
+	readonly milliseconds: number;
+}
+
 export interface HelloMessage extends SuccessMessage {
 	readonly id: number;
 	readonly clients: Array<number>;

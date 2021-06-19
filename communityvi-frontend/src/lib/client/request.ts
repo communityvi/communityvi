@@ -1,3 +1,33 @@
+export class PauseRequest implements ClientRequest {
+	type = RequestType.Pause;
+	readonly previous_version: number;
+	readonly skipped: boolean;
+	readonly position_in_milliseconds: number;
+
+	constructor(previous_version: number, skipped: boolean, position_in_milliseconds: number) {
+		this.previous_version = previous_version;
+		this.skipped = skipped;
+		this.position_in_milliseconds = position_in_milliseconds;
+	}
+}
+
+export class PlayRequest implements ClientRequest {
+	type = RequestType.Play;
+	readonly previous_version: number;
+	readonly skipped: boolean;
+	readonly start_time_in_milliseconds: number;
+
+	constructor(previous_version: number, skipped: boolean, start_time_in_milliseconds: number) {
+		this.previous_version = previous_version;
+		this.skipped = skipped;
+		this.start_time_in_milliseconds = start_time_in_milliseconds;
+	}
+}
+
+export class GetReferenceTimeRequest implements ClientRequest {
+	type = RequestType.GetReferenceTime;
+}
+
 export class InsertMediumRequest implements ClientRequest {
 	type = RequestType.InsertMedium;
 	readonly previous_version: number;
@@ -33,21 +63,21 @@ export enum MediumType {
 	Empty = 'empty',
 }
 
-export class RegisterRequest implements ClientRequest {
-	type = RequestType.Register;
-	readonly name: string;
-
-	constructor(name: string) {
-		this.name = name;
-	}
-}
-
 export class ChatRequest implements ClientRequest {
 	type = RequestType.Chat;
 	readonly message: string;
 
 	constructor(message: string) {
 		this.message = message;
+	}
+}
+
+export class RegisterRequest implements ClientRequest {
+	type = RequestType.Register;
+	readonly name: string;
+
+	constructor(name: string) {
+		this.name = name;
 	}
 }
 
@@ -63,4 +93,7 @@ enum RequestType {
 	Register = 'register',
 	Chat = 'chat',
 	InsertMedium = 'insert_medium',
+	GetReferenceTime = 'get_reference_time',
+	Play = 'play',
+	Pause = 'pause',
 }

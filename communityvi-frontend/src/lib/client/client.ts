@@ -101,6 +101,14 @@ export class RegisteredClient {
 		console.info('Received broadcast:', broadcast);
 
 		switch (broadcast.type) {
+			case BroadcastType.ClientJoined: {
+				// FIXME: Implement.
+				break;
+			}
+			case BroadcastType.ClientLeft: {
+				// FIXME: Implement.
+				break;
+			}
 			case BroadcastType.Chat: {
 				const chatBroadcast = broadcast as ChatBroadcast;
 				if (this.id === chatBroadcast.sender_id) {

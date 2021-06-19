@@ -1,6 +1,22 @@
 import type {PlaybackStateResponse, ServerResponse} from '$lib/client/response';
 import type {MediumType} from '$lib/client/request';
 
+export interface ClientLeftBroadcast extends BroadcastMessage {
+	readonly id: number;
+	readonly name: string;
+	readonly reason: LeftReason;
+}
+
+export enum LeftReason {
+	Closed = 'closed',
+	Timeout = 'timeout',
+}
+
+export interface ClientJoinedBroadcast extends BroadcastMessage {
+	readonly id: number;
+	readonly name: string;
+}
+
 export interface MediumStateChangedBroadcast extends BroadcastMessage {
 	readonly changed_by_name: string;
 	readonly changed_by_id: number;

@@ -1,5 +1,7 @@
 import type {
 	ChatBroadcast,
+	ClientJoinedBroadcast,
+	ClientLeftBroadcast,
 	FixedLengthMediumBroadcast,
 	MediumStateChangedBroadcast,
 	VersionedMediumBroadcast,
@@ -13,6 +15,59 @@ import type {
 	VersionedMediumResponse,
 } from '$lib/client/response';
 import {PlaybackStateType} from '$lib/client/response';
+import {LeftReason} from '$lib/client/broadcast';
+
+export class ClientJoinedMessage implements ClientLifecycleMessage {
+	readonly id: number;
+	readonly name: string;
+
+	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): ClientJoinedMessage {
+		return new ClientJoinedMessage(broadcast.id, broadcast.name);
+	}
+
+	constructor(id: number, name: string) {
+		this.id = id;
+		this.name = name;
+	}
+}
+
+export class ClientLeftMessage implements ClientLifecycleMessage {
+	readonly id: number;
+	readonly name: string;
+	readonly reason: LeaveReason;
+
+	static fromClientLeftBroadcast(broadcast: ClientLeftBroadcast): ClientLeftMessage {
+		let reason: LeaveReason;
+		switch (broadcast.reason) {
+			case LeftReason.Closed:
+				reason = LeaveReason.Closed;
+				break;
+			case LeftReason.Timeout:
+				reason = LeaveReason.Timeout;
+				break;
+			default:
+				throw new Error(`Invalid LeftReason reason: '${broadcast.reason}'`);
+		}
+
+		return new ClientLeftMessage(broadcast.id, broadcast.name, reason);
+	}
+
+	constructor(id: number, name: string, reason: LeaveReason) {
+		this.id = id;
+		this.name = name;
+		this.reason = reason;
+	}
+}
+
+export enum LeaveReason {
+	Closed,
+	Timeout,
+}
+
+export interface ClientLifecycleMessage {
+	readonly id: number;
+	readonly name: string;
+}
 
 export class ChatMessage {
 	readonly message: string;
