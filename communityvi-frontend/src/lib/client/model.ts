@@ -18,12 +18,12 @@ import type {
 import {PlaybackStateType} from '$lib/client/response';
 import {LeftReason} from '$lib/client/broadcast';
 
-export class ClientJoinedMessage implements ClientLifecycleMessage {
+export class PeerJoinedMessage implements PeerLifecycleMessage {
 	readonly peer: Peer;
 
-	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): ClientJoinedMessage {
+	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): PeerJoinedMessage {
 		const peer = Peer.fromClientBroadcast(broadcast);
-		return new ClientJoinedMessage(peer);
+		return new PeerJoinedMessage(peer);
 	}
 
 	constructor(peer: Peer) {
@@ -31,11 +31,11 @@ export class ClientJoinedMessage implements ClientLifecycleMessage {
 	}
 }
 
-export class ClientLeftMessage implements ClientLifecycleMessage {
+export class PeerLeftMessage implements PeerLifecycleMessage {
 	readonly peer: Peer;
 	readonly reason: LeaveReason;
 
-	static fromClientLeftBroadcast(broadcast: ClientLeftBroadcast): ClientLeftMessage {
+	static fromClientLeftBroadcast(broadcast: ClientLeftBroadcast): PeerLeftMessage {
 		let reason: LeaveReason;
 		switch (broadcast.reason) {
 			case LeftReason.Closed:
@@ -49,7 +49,7 @@ export class ClientLeftMessage implements ClientLifecycleMessage {
 		}
 
 		const peer = Peer.fromClientBroadcast(broadcast);
-		return new ClientLeftMessage(peer, reason);
+		return new PeerLeftMessage(peer, reason);
 	}
 
 	constructor(peer: Peer, reason: LeaveReason) {
@@ -63,7 +63,7 @@ export enum LeaveReason {
 	Timeout,
 }
 
-export interface ClientLifecycleMessage {
+export interface PeerLifecycleMessage {
 	readonly peer: Peer;
 }
 
