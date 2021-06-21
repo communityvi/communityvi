@@ -3,7 +3,7 @@ import {BroadcastMessage, BroadcastType, ChatBroadcast, MediumStateChangedBroadc
 import {ChatRequest, EmptyMedium, FixedLengthMedium, InsertMediumRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
-import {ChatMessage, MediumState} from '$lib/client/model';
+import {ChatMessage, MediumState, Peer} from '$lib/client/model';
 
 export class Client {
 	readonly transport: Transport;
@@ -17,8 +17,9 @@ export class Client {
 
 		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
 		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
+		const peers = response.clients.map(Peer.fromClientResponse);
 
-		return new RegisteredClient(response.id, name, mediumState, connection, disconnectCallback);
+		return new RegisteredClient(response.id, name, mediumState, peers, connection, disconnectCallback);
 	}
 }
 
@@ -26,6 +27,7 @@ export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
 	private currentMediumState: MediumState;
+	readonly peers: Array<Peer>;
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
@@ -37,12 +39,14 @@ export class RegisteredClient {
 		id: number,
 		name: string,
 		currentMediumState: MediumState,
+		peers: Array<Peer>,
 		connection: Connection,
 		disconnectCallback: DisconnectCallback,
 	) {
 		this.id = id;
 		this.name = name;
 		this.currentMediumState = currentMediumState;
+		this.peers = peers;
 
 		this.connection = connection;
 		this.disconnectCallback = disconnectCallback;
@@ -53,6 +57,10 @@ export class RegisteredClient {
 			connectionDidClose: reason => this.connectionDidClose(reason),
 			connectionDidEncounterError: error => this.connectionDidEncounterError(error),
 		});
+	}
+
+	asPeer(): Peer {
+		return new Peer(this.id, this.name);
 	}
 
 	async sendChatMessage(message: string): Promise<void> {
@@ -128,7 +136,7 @@ export class RegisteredClient {
 				const mediumState = MediumState.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
 				this.currentMediumState = mediumState;
 
-				if (this.id === mediumState.changedById) {
+				if (this.id === mediumState.changedBy?.id) {
 					// we already know about the changes we've made and implicitly updated the state of the client.
 					return;
 				}

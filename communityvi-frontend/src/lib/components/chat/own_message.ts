@@ -1,13 +1,13 @@
+import type {Peer} from '$lib/client/model';
+
 export class OwnMessage {
 	readonly message: string;
-	readonly senderId: number;
-	readonly senderName: string;
+	readonly sender: Peer;
 
 	acknowledged = false;
 
-	constructor(message: string, senderId: number, senderName: string) {
+	constructor(message: string, sender: Peer) {
 		this.message = message;
-		this.senderId = senderId;
-		this.senderName = senderName;
+		this.sender = sender;
 	}
 }

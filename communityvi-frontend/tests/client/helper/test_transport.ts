@@ -2,12 +2,13 @@ import type {Transport} from '$lib/client/transport';
 import {WebSocketTransport} from '$lib/client/transport';
 import type {Connection} from '$lib/client/connection';
 import {mock} from 'jest-mock-extended';
-import {HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
+import {ClientResponse, HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
 import {MediumType} from '$lib/client/request';
+import {Peer} from '$lib/client/model';
 
 export default class TestTransport implements Transport {
 	private id = 0;
-	private readonly clients = new Array<number>();
+	private readonly peers = new Array<Peer>();
 
 	private readonly webSocketTransport?: WebSocketTransport = undefined;
 
@@ -32,16 +33,18 @@ export default class TestTransport implements Transport {
 
 	private mockedConnection(): Connection {
 		const mockedConnection = mock<Connection>();
+		const clients = this.peers.map(peer => <ClientResponse>{id: peer.id, name: peer.name});
 		mockedConnection.performRequest.mockResolvedValueOnce(<HelloMessage>{
 			type: SuccessMessageType.Hello,
 			id: ++this.id,
-			clients: [...this.clients],
+			clients,
 			current_medium: <VersionedMediumResponse>{
 				type: MediumType.Empty,
 				version: 0,
 			},
 		});
-		this.clients.push(this.id);
+		const peer = new Peer(this.id, `Client: #${this.id}`);
+		this.peers.push(peer);
 
 		return mockedConnection;
 	}

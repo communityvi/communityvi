@@ -1,11 +1,13 @@
 <script lang="ts">
+	import type {Peer} from '$lib/client/model';
+
 	export let message: string;
-	export let senderName: string;
+	export let sender: Peer;
 	export let acknowledged: boolean | undefined = undefined;
 </script>
 
 <tr class:pendingMessage={acknowledged === false}>
-	<td>{senderName}</td>
+	<td>{sender.name}</td>
 	<td>{message}</td>
 </tr>
 
