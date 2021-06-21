@@ -125,8 +125,6 @@ export class RegisteredClient {
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
-		console.info('Received broadcast:', broadcast);
-
 		switch (broadcast.type) {
 			case BroadcastType.ClientJoined: {
 				const clientJoinedBroadcast = broadcast as ClientJoinedBroadcast;
@@ -183,6 +181,8 @@ export class RegisteredClient {
 
 				break;
 			}
+			default:
+				throw new UnknownBroadcastError(broadcast);
 		}
 	}
 
@@ -202,6 +202,16 @@ export class RegisteredClient {
 
 	private connectionDidEncounterError(error: Event | ErrorEvent): void {
 		console.error('Received error:', error);
+	}
+}
+
+class UnknownBroadcastError extends Error {
+	readonly broadcast: BroadcastMessage;
+
+	constructor(broadcast: BroadcastMessage) {
+		super(`Unknown broadcast received: ${broadcast.type}.`);
+
+		this.broadcast = broadcast;
 	}
 }
 
