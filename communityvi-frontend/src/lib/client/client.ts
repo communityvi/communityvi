@@ -125,9 +125,7 @@ export class RegisteredClient {
 				}
 
 				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
-				for (const chatMessageCallback of this.chatMessageCallbacks) {
-					chatMessageCallback(chatMessage);
-				}
+				RegisteredClient.notify(chatMessage, this.chatMessageCallbacks);
 
 				break;
 			}
@@ -141,12 +139,16 @@ export class RegisteredClient {
 					return;
 				}
 
-				for (const mediumStateChangedCallback of this.mediumStateChangedCallbacks) {
-					mediumStateChangedCallback(mediumState);
-				}
+				RegisteredClient.notify(mediumState, this.mediumStateChangedCallbacks);
 
 				break;
 			}
+		}
+	}
+
+	private static notify<Message>(message: Message, callbackList: Array<(message: Message) => void>) {
+		for (const callback of callbackList) {
+			callback(message);
 		}
 	}
 
