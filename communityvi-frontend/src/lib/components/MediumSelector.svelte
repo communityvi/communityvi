@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {registeredClient, errorBag} from '$lib/stores';
+	import {registeredClient, notifications} from '$lib/stores';
 	import type {Medium, MediumState} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 
@@ -65,7 +65,7 @@
 			medium = $registeredClient.getCurrentMediumState().medium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
-			errorBag.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
+			notifications.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
 			resetMediumSelection();
 		}
 	}
@@ -81,7 +81,7 @@
 			medium = undefined;
 		} catch (error) {
 			console.error('Error while ejecting medium:', error);
-			errorBag.reportError(new Error('Ejecting the medium failed!'));
+			notifications.reportError(new Error('Ejecting the medium failed!'));
 		}
 	}
 

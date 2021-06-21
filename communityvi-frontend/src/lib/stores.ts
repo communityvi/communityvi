@@ -1,6 +1,6 @@
 import {Writable, writable} from 'svelte/store';
 import type {RegisteredClient} from '$lib/client/client';
-import {ErrorBag} from '$lib/error_bag';
+import {NotificationStore} from '$lib/components/notification/notification_store';
 
 export const registeredClient: Writable<RegisteredClient | undefined> = writable(undefined);
-export const errorBag = new ErrorBag();
+export const notifications = new NotificationStore();
