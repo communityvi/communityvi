@@ -8,6 +8,7 @@ import type {
 } from '$lib/client/broadcast';
 import {MediumType} from '$lib/client/request';
 import type {
+	ClientResponse,
 	FixedLengthVersionedMediumResponse,
 	PausedPlaybackStateResponse,
 	PlaybackStateResponse,
@@ -109,6 +110,20 @@ export class MediumState {
 		this.changedByName = changedByName;
 		this.changedById = changedById;
 		this.medium = medium;
+	}
+}
+
+export class Peer {
+	readonly id: number;
+	readonly name: string;
+
+	static fromClientResponse(response: ClientResponse): Peer {
+		return new Peer(response.id, response.name);
+	}
+
+	constructor(id: number, name: string) {
+		this.id = id;
+		this.name = name;
 	}
 }
 
