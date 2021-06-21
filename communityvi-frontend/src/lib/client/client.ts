@@ -1,9 +1,23 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
-import {BroadcastMessage, BroadcastType, ChatBroadcast, MediumStateChangedBroadcast} from '$lib/client/broadcast';
+import {
+	BroadcastMessage,
+	BroadcastType,
+	ChatBroadcast,
+	ClientJoinedBroadcast,
+	ClientLeftBroadcast,
+	MediumStateChangedBroadcast,
+} from '$lib/client/broadcast';
 import {ChatRequest, EmptyMedium, FixedLengthMedium, InsertMediumRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
-import {ChatMessage, MediumState, Peer} from '$lib/client/model';
+import {
+	ChatMessage,
+	PeerLeftMessage,
+	MediumState,
+	Peer,
+	PeerLifecycleMessage,
+	PeerJoinedMessage,
+} from '$lib/client/model';
 
 export class Client {
 	readonly transport: Transport;
@@ -32,6 +46,7 @@ export class RegisteredClient {
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
 
+	private readonly peerLifecycleCallbacks = new Array<PeerLifecycleCallback>();
 	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
 
@@ -61,6 +76,10 @@ export class RegisteredClient {
 
 	asPeer(): Peer {
 		return new Peer(this.id, this.name);
+	}
+
+	subscribeToPeerChanges(callback: PeerLifecycleCallback): Unsubscriber {
+		return RegisteredClient.subscribe(callback, this.peerLifecycleCallbacks);
 	}
 
 	async sendChatMessage(message: string): Promise<void> {
@@ -110,11 +129,32 @@ export class RegisteredClient {
 
 		switch (broadcast.type) {
 			case BroadcastType.ClientJoined: {
-				// FIXME: Implement.
+				const clientJoinedBroadcast = broadcast as ClientJoinedBroadcast;
+				if (this.id === clientJoinedBroadcast.id) {
+					// we already know that we've joined ourselves
+					return;
+				}
+
+				this.peers.push(Peer.fromClientBroadcast(clientJoinedBroadcast));
+
+				const peerLifecycleMessage = PeerJoinedMessage.fromClientJoinedBroadcast(clientJoinedBroadcast);
+				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+
 				break;
 			}
 			case BroadcastType.ClientLeft: {
-				// FIXME: Implement.
+				const clientLeftBroadcast = broadcast as ClientLeftBroadcast;
+				const index = this.peers.findIndex(peer => peer.id === clientLeftBroadcast.id);
+				if (index === -1) {
+					console.error('Unknown peer left:', clientLeftBroadcast);
+					return;
+				}
+
+				this.peers.slice(index, 1);
+
+				const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
+				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+
 				break;
 			}
 			case BroadcastType.Chat: {
@@ -166,6 +206,7 @@ export class RegisteredClient {
 }
 
 export type DisconnectCallback = (reason: CloseReason) => void;
+export type PeerLifecycleCallback = (peerChange: PeerLifecycleMessage) => void;
 export type ChatMessageCallback = (message: ChatMessage) => void;
 export type MediumStateChangedCallback = (mediumState: MediumState) => void;
 
