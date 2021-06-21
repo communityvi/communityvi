@@ -211,6 +211,7 @@ class UnknownBroadcastError extends Error {
 	constructor(broadcast: BroadcastMessage) {
 		super(`Unknown broadcast received: ${broadcast.type}.`);
 
+		this.name = UnknownBroadcastError.name;
 		this.broadcast = broadcast;
 	}
 }
