@@ -6,8 +6,13 @@ export interface ReferenceTimeMessage extends SuccessMessage {
 
 export interface HelloMessage extends SuccessMessage {
 	readonly id: number;
-	readonly clients: Array<number>;
+	readonly clients: Array<ClientResponse>;
 	readonly current_medium: VersionedMediumResponse;
+}
+
+export interface ClientResponse {
+	readonly id: number;
+	readonly name: string;
 }
 
 export interface VersionedMediumResponse {

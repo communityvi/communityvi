@@ -1,12 +1,12 @@
 <script lang="ts">
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
-	import type {ChatMessage as ChatMessageModel} from '$lib/client/model';
+	import {ChatMessage} from '$lib/client/model';
 	import {registeredClient} from '$lib/stores';
 	import {OwnMessage} from '$lib/components/chat/own_message';
 	import {onDestroy} from 'svelte';
-	import ChatMessage from './ChatMessage.svelte';
+	import SingleChatMessage from '$lib/components/chat/SingleChatMessage.svelte';
 
-	let messages = new Array<OwnMessage | ChatMessageModel>();
+	let messages = new Array<OwnMessage | ChatMessage>();
 
 	$: unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
 
@@ -16,7 +16,7 @@
 		}
 	});
 
-	function onChatMessageReceived(message: ChatMessageModel) {
+	function onChatMessageReceived(message: ChatMessage) {
 		messages = [...messages, message];
 	}
 
@@ -26,7 +26,7 @@
 		}
 
 		const message = messageEvent.detail as string;
-		messages = [...messages, new OwnMessage(message, $registeredClient.id, $registeredClient.name)];
+		messages = [...messages, new OwnMessage(message, $registeredClient.asPeer())];
 	}
 
 	function onChatMessageAcknowledged(acknowledgedEvent: CustomEvent) {
@@ -63,9 +63,9 @@
 		<tbody>
 			{#each messages as message}
 				{#if message instanceof ChatMessage}
-					<ChatMessage message={message.message} senderName={message.senderName} />
+					<SingleChatMessage message={message.message} sender={message.sender} />
 				{:else if message instanceof OwnMessage}
-					<ChatMessage message={message.message} senderName={message.senderName} acknowledged={message.acknowledged} />
+					<SingleChatMessage message={message.message} sender={message.sender} acknowledged={message.acknowledged} />
 				{/if}
 			{/each}
 		</tbody>

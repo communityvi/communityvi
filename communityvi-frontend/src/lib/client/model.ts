@@ -8,6 +8,7 @@ import type {
 } from '$lib/client/broadcast';
 import {MediumType} from '$lib/client/request';
 import type {
+	ClientResponse,
 	FixedLengthVersionedMediumResponse,
 	PausedPlaybackStateResponse,
 	PlaybackStateResponse,
@@ -17,26 +18,24 @@ import type {
 import {PlaybackStateType} from '$lib/client/response';
 import {LeftReason} from '$lib/client/broadcast';
 
-export class ClientJoinedMessage implements ClientLifecycleMessage {
-	readonly id: number;
-	readonly name: string;
+export class PeerJoinedMessage implements PeerLifecycleMessage {
+	readonly peer: Peer;
 
-	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): ClientJoinedMessage {
-		return new ClientJoinedMessage(broadcast.id, broadcast.name);
+	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): PeerJoinedMessage {
+		const peer = Peer.fromClientBroadcast(broadcast);
+		return new PeerJoinedMessage(peer);
 	}
 
-	constructor(id: number, name: string) {
-		this.id = id;
-		this.name = name;
+	constructor(peer: Peer) {
+		this.peer = peer;
 	}
 }
 
-export class ClientLeftMessage implements ClientLifecycleMessage {
-	readonly id: number;
-	readonly name: string;
+export class PeerLeftMessage implements PeerLifecycleMessage {
+	readonly peer: Peer;
 	readonly reason: LeaveReason;
 
-	static fromClientLeftBroadcast(broadcast: ClientLeftBroadcast): ClientLeftMessage {
+	static fromClientLeftBroadcast(broadcast: ClientLeftBroadcast): PeerLeftMessage {
 		let reason: LeaveReason;
 		switch (broadcast.reason) {
 			case LeftReason.Closed:
@@ -49,12 +48,12 @@ export class ClientLeftMessage implements ClientLifecycleMessage {
 				throw new Error(`Invalid LeftReason reason: '${broadcast.reason}'`);
 		}
 
-		return new ClientLeftMessage(broadcast.id, broadcast.name, reason);
+		const peer = Peer.fromClientBroadcast(broadcast);
+		return new PeerLeftMessage(peer, reason);
 	}
 
-	constructor(id: number, name: string, reason: LeaveReason) {
-		this.id = id;
-		this.name = name;
+	constructor(peer: Peer, reason: LeaveReason) {
+		this.peer = peer;
 		this.reason = reason;
 	}
 }
@@ -64,24 +63,22 @@ export enum LeaveReason {
 	Timeout,
 }
 
-export interface ClientLifecycleMessage {
-	readonly id: number;
-	readonly name: string;
+export interface PeerLifecycleMessage {
+	readonly peer: Peer;
 }
 
 export class ChatMessage {
 	readonly message: string;
-	readonly senderName: string;
-	readonly senderId: number;
+	readonly sender: Peer;
 
 	static fromChatBroadcast(broadcast: ChatBroadcast): ChatMessage {
-		return new ChatMessage(broadcast.message, broadcast.sender_name, broadcast.sender_id);
+		const sender = Peer.fromChatBroadcast(broadcast);
+		return new ChatMessage(broadcast.message, sender);
 	}
 
-	constructor(message: string, senderName: string, senderId: number) {
+	constructor(message: string, sender: Peer) {
 		this.message = message;
-		this.senderName = senderName;
-		this.senderId = senderId;
+		this.sender = sender;
 	}
 }
 
@@ -89,26 +86,50 @@ export class MediumState {
 	readonly version: number;
 
 	// FIXME: Ideally, the server should keep track who did it last so that this information is always available!
-	readonly changedByName?: string;
-	readonly changedById?: number;
-
+	readonly changedBy?: Peer;
 	readonly medium?: Medium;
 
 	static fromVersionedMediumResponse(response: VersionedMediumResponse): MediumState {
 		const medium = Medium.fromVersionedMediumResponse(response);
-		return new MediumState(response.version, undefined, undefined, medium);
+		return new MediumState(response.version, undefined, medium);
 	}
 
 	static fromMediumStateChangedBroadcast(broadcast: MediumStateChangedBroadcast): MediumState {
 		const medium = Medium.fromVersionedMediumBroadcast(broadcast.medium);
-		return new MediumState(broadcast.medium.version, broadcast.changed_by_name, broadcast.changed_by_id, medium);
+		const peer = Peer.fromMediumStateChangedBroadcast(broadcast);
+		return new MediumState(broadcast.medium.version, peer, medium);
 	}
 
-	constructor(version: number, changedByName?: string, changedById?: number, medium?: Medium) {
+	constructor(version: number, changedBy?: Peer, medium?: Medium) {
 		this.version = version;
-		this.changedByName = changedByName;
-		this.changedById = changedById;
+		this.changedBy = changedBy;
 		this.medium = medium;
+	}
+}
+
+export class Peer {
+	readonly id: number;
+	readonly name: string;
+
+	static fromClientResponse(response: ClientResponse): Peer {
+		return new Peer(response.id, response.name);
+	}
+
+	static fromClientBroadcast(broadcast: ClientLeftBroadcast | ClientJoinedBroadcast): Peer {
+		return new Peer(broadcast.id, broadcast.name);
+	}
+
+	static fromChatBroadcast(broadcast: ChatBroadcast): Peer {
+		return new Peer(broadcast.sender_id, broadcast.sender_name);
+	}
+
+	static fromMediumStateChangedBroadcast(broadcast: MediumStateChangedBroadcast): Peer {
+		return new Peer(broadcast.changed_by_id, broadcast.changed_by_name);
+	}
+
+	constructor(id: number, name: string) {
+		this.id = id;
+		this.name = name;
 	}
 }
 

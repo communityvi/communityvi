@@ -1,9 +1,23 @@
 import type {HelloMessage, ServerResponse} from '$lib/client/response';
-import {BroadcastMessage, BroadcastType, ChatBroadcast, MediumStateChangedBroadcast} from '$lib/client/broadcast';
+import {
+	BroadcastMessage,
+	BroadcastType,
+	ChatBroadcast,
+	ClientJoinedBroadcast,
+	ClientLeftBroadcast,
+	MediumStateChangedBroadcast,
+} from '$lib/client/broadcast';
 import {ChatRequest, EmptyMedium, FixedLengthMedium, InsertMediumRequest, RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
-import {ChatMessage, MediumState} from '$lib/client/model';
+import {
+	ChatMessage,
+	PeerLeftMessage,
+	MediumState,
+	Peer,
+	PeerLifecycleMessage,
+	PeerJoinedMessage,
+} from '$lib/client/model';
 
 export class Client {
 	readonly transport: Transport;
@@ -17,8 +31,9 @@ export class Client {
 
 		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
 		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
+		const peers = response.clients.map(Peer.fromClientResponse);
 
-		return new RegisteredClient(response.id, name, mediumState, connection, disconnectCallback);
+		return new RegisteredClient(response.id, name, mediumState, peers, connection, disconnectCallback);
 	}
 }
 
@@ -26,10 +41,12 @@ export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
 	private currentMediumState: MediumState;
+	readonly peers: Array<Peer>;
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
 
+	private readonly peerLifecycleCallbacks = new Array<PeerLifecycleCallback>();
 	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
 
@@ -37,12 +54,14 @@ export class RegisteredClient {
 		id: number,
 		name: string,
 		currentMediumState: MediumState,
+		peers: Array<Peer>,
 		connection: Connection,
 		disconnectCallback: DisconnectCallback,
 	) {
 		this.id = id;
 		this.name = name;
 		this.currentMediumState = currentMediumState;
+		this.peers = peers;
 
 		this.connection = connection;
 		this.disconnectCallback = disconnectCallback;
@@ -53,6 +72,14 @@ export class RegisteredClient {
 			connectionDidClose: reason => this.connectionDidClose(reason),
 			connectionDidEncounterError: error => this.connectionDidEncounterError(error),
 		});
+	}
+
+	asPeer(): Peer {
+		return new Peer(this.id, this.name);
+	}
+
+	subscribeToPeerChanges(callback: PeerLifecycleCallback): Unsubscriber {
+		return RegisteredClient.subscribe(callback, this.peerLifecycleCallbacks);
 	}
 
 	async sendChatMessage(message: string): Promise<void> {
@@ -89,7 +116,7 @@ export class RegisteredClient {
 				return;
 			}
 
-			callbackList.slice(index, 1);
+			callbackList.splice(index, 1);
 		};
 	}
 
@@ -98,15 +125,34 @@ export class RegisteredClient {
 	}
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
-		console.info('Received broadcast:', broadcast);
-
 		switch (broadcast.type) {
 			case BroadcastType.ClientJoined: {
-				// FIXME: Implement.
+				const clientJoinedBroadcast = broadcast as ClientJoinedBroadcast;
+				if (this.id === clientJoinedBroadcast.id) {
+					// we already know that we've joined ourselves
+					return;
+				}
+
+				this.peers.push(Peer.fromClientBroadcast(clientJoinedBroadcast));
+
+				const peerLifecycleMessage = PeerJoinedMessage.fromClientJoinedBroadcast(clientJoinedBroadcast);
+				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+
 				break;
 			}
 			case BroadcastType.ClientLeft: {
-				// FIXME: Implement.
+				const clientLeftBroadcast = broadcast as ClientLeftBroadcast;
+				const index = this.peers.findIndex(peer => peer.id === clientLeftBroadcast.id);
+				if (index === -1) {
+					console.error('Unknown peer left:', clientLeftBroadcast);
+					return;
+				}
+
+				this.peers.splice(index, 1);
+
+				const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
+				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+
 				break;
 			}
 			case BroadcastType.Chat: {
@@ -117,9 +163,7 @@ export class RegisteredClient {
 				}
 
 				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
-				for (const chatMessageCallback of this.chatMessageCallbacks) {
-					chatMessageCallback(chatMessage);
-				}
+				RegisteredClient.notify(chatMessage, this.chatMessageCallbacks);
 
 				break;
 			}
@@ -128,17 +172,23 @@ export class RegisteredClient {
 				const mediumState = MediumState.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
 				this.currentMediumState = mediumState;
 
-				if (this.id === mediumState.changedById) {
+				if (this.id === mediumState.changedBy?.id) {
 					// we already know about the changes we've made and implicitly updated the state of the client.
 					return;
 				}
 
-				for (const mediumStateChangedCallback of this.mediumStateChangedCallbacks) {
-					mediumStateChangedCallback(mediumState);
-				}
+				RegisteredClient.notify(mediumState, this.mediumStateChangedCallbacks);
 
 				break;
 			}
+			default:
+				throw new UnknownBroadcastError(broadcast);
+		}
+	}
+
+	private static notify<Message>(message: Message, callbackList: Array<(message: Message) => void>) {
+		for (const callback of callbackList) {
+			callback(message);
 		}
 	}
 
@@ -155,7 +205,18 @@ export class RegisteredClient {
 	}
 }
 
+class UnknownBroadcastError extends Error {
+	readonly broadcast: BroadcastMessage;
+
+	constructor(broadcast: BroadcastMessage) {
+		super(`Unknown broadcast received: ${broadcast.type}.`);
+
+		this.broadcast = broadcast;
+	}
+}
+
 export type DisconnectCallback = (reason: CloseReason) => void;
+export type PeerLifecycleCallback = (peerChange: PeerLifecycleMessage) => void;
 export type ChatMessageCallback = (message: ChatMessage) => void;
 export type MediumStateChangedCallback = (mediumState: MediumState) => void;
 

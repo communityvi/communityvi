@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {registeredClient, errorBag} from '$lib/stores';
+	import {registeredClient, notifications} from '$lib/stores';
 	import {createEventDispatcher} from 'svelte';
 
 	$: isNotRegistered = $registeredClient === undefined;
@@ -20,7 +20,7 @@
 			dispatch('chatMessageAcknowledged', messageToSend);
 		} catch (error) {
 			console.error('Error while sending chat message:', error);
-			errorBag.reportError(new Error('Chat message sending failed!'));
+			notifications.reportError(new Error('Chat message sending failed!'));
 		}
 	}
 
