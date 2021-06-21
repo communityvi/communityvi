@@ -8,6 +8,7 @@
 	import {Client} from '$lib/client/client';
 	import Chat from '$lib/components/chat/Chat.svelte';
 	import MediumSelector from '$lib/components/MediumSelector.svelte';
+	import Peers from '$lib/components/Peers.svelte';
 
 	const transport = new WebSocketTransport(new URL('ws://localhost:8000/ws'));
 	const client = new Client(transport);
@@ -22,5 +23,7 @@
 </section>
 
 <MediumSelector />
+
+<Peers />
 
 <Chat />
