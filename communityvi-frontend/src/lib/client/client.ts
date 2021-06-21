@@ -116,7 +116,7 @@ export class RegisteredClient {
 				return;
 			}
 
-			callbackList.slice(index, 1);
+			callbackList.splice(index, 1);
 		};
 	}
 
@@ -150,7 +150,7 @@ export class RegisteredClient {
 					return;
 				}
 
-				this.peers.slice(index, 1);
+				this.peers.splice(index, 1);
 
 				const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
 				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
