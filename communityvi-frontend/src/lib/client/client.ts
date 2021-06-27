@@ -1,4 +1,4 @@
-import type {HelloMessage, ReferenceTimeMessage, ServerResponse, SuccessMessage} from '$lib/client/response';
+import type {HelloMessage, ReferenceTimeMessage, ServerResponse} from '$lib/client/response';
 import {
 	BroadcastMessage,
 	BroadcastType,
@@ -11,6 +11,7 @@ import {
 	ChatRequest,
 	EmptyMedium,
 	FixedLengthMedium,
+	GetReferenceTimeRequest,
 	InsertMediumRequest,
 	RegisterRequest,
 } from '$lib/client/request';
@@ -39,13 +40,24 @@ export class Client {
 		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
 		const peers = response.clients.map(Peer.fromClientResponse);
 
-		return new RegisteredClient(response.id, name, mediumState, peers, connection, disconnectCallback);
+		const initialReferenceTimeOffset = await fetchReferenceTimeAndCalculateOffset(connection);
+
+		return new RegisteredClient(
+			response.id,
+			name,
+			initialReferenceTimeOffset,
+			mediumState,
+			peers,
+			connection,
+			disconnectCallback,
+		);
 	}
 }
 
 export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
+	private referenceTimeOffset: number;
 	private currentMediumState: MediumState;
 	readonly peers: Array<Peer>;
 
@@ -56,9 +68,14 @@ export class RegisteredClient {
 	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
 
+	get currentReferenceTime(): number {
+		return performance.now() + this.referenceTimeOffset;
+	}
+
 	constructor(
 		id: number,
 		name: string,
+		referenceTimeOffset: number,
 		currentMediumState: MediumState,
 		peers: Array<Peer>,
 		connection: Connection,
@@ -66,6 +83,7 @@ export class RegisteredClient {
 	) {
 		this.id = id;
 		this.name = name;
+		this.referenceTimeOffset = referenceTimeOffset;
 		this.currentMediumState = currentMediumState;
 		this.peers = peers;
 
@@ -78,6 +96,13 @@ export class RegisteredClient {
 			connectionDidClose: reason => this.connectionDidClose(reason),
 			connectionDidEncounterError: error => this.connectionDidEncounterError(error),
 		});
+
+		// Schedule reference time updates every 15s
+		setInterval(this.synchronizeReferenceTime, 15_000);
+	}
+
+	private async synchronizeReferenceTime(): Promise<void> {
+		this.referenceTimeOffset = await fetchReferenceTimeAndCalculateOffset(this.connection);
 	}
 
 	asPeer(): Peer {
@@ -209,6 +234,16 @@ export class RegisteredClient {
 	private connectionDidEncounterError(error: Event | ErrorEvent): void {
 		console.error('Received error:', error);
 	}
+}
+
+async function fetchReferenceTimeAndCalculateOffset(connection: Connection): Promise<number> {
+	const response = await connection.performRequest(new GetReferenceTimeRequest());
+
+	// We assume that the request takes the same time to the server as the response takes back to us.
+	// Therefore, the server's reference time represents our time half way the message exchange.
+	const ourTime = response.metadata.sentAt + response.metadata.roundTripTimeInMilliseconds / 2;
+
+	return (response.response as ReferenceTimeMessage).milliseconds - ourTime;
 }
 
 class UnknownBroadcastError extends Error {

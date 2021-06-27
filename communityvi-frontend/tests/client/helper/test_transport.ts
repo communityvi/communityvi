@@ -2,8 +2,14 @@ import type {Transport} from '$lib/client/transport';
 import {WebSocketTransport} from '$lib/client/transport';
 import type {Connection} from '$lib/client/connection';
 import {mock} from 'jest-mock-extended';
-import {ClientResponse, HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
-import {MediumType} from '$lib/client/request';
+import {
+	ClientResponse,
+	HelloMessage,
+	ReferenceTimeMessage,
+	SuccessMessageType,
+	VersionedMediumResponse,
+} from '$lib/client/response';
+import {GetReferenceTimeRequest, MediumType, RegisterRequest} from '$lib/client/request';
 import {Peer} from '$lib/client/model';
 import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
 
@@ -36,7 +42,8 @@ export default class TestTransport implements Transport {
 		const mockedConnection = mock<Connection>();
 
 		const clients = this.peers.map(peer => <ClientResponse>{id: peer.id, name: peer.name});
-		const content = <HelloMessage>{
+
+		const helloMessage = <HelloMessage>{
 			type: SuccessMessageType.Hello,
 			id: ++this.id,
 			clients,
@@ -45,10 +52,27 @@ export default class TestTransport implements Transport {
 				version: 0,
 			},
 		};
-		const metadata = new ResponseMetadata(performance.now(), performance.now() + 1);
-		const assembledResponse = new EnrichedResponse(content, metadata);
+		const helloMessageMetadata = new ResponseMetadata(performance.now(), performance.now() + 1);
+		const helloResponse = new EnrichedResponse(helloMessage, helloMessageMetadata);
 
-		mockedConnection.performRequest.mockResolvedValueOnce(assembledResponse);
+		const referenceTimeMessage = <ReferenceTimeMessage>{
+			type: SuccessMessageType.ReferenceTime,
+			milliseconds: performance.now() - 1,
+		};
+		const referenceTimeMessageMetadata = new ResponseMetadata(performance.now(), performance.now() + 1);
+		const referenceTimeResponse = new EnrichedResponse(referenceTimeMessage, referenceTimeMessageMetadata);
+
+		mockedConnection.performRequest.mockImplementation(request => {
+			if (request instanceof RegisterRequest) {
+				return Promise.resolve(helloResponse);
+			}
+
+			if (request instanceof GetReferenceTimeRequest) {
+				return Promise.resolve(referenceTimeResponse);
+			}
+
+			return Promise.reject(`Don't know how to mock request: '${request.type}'`);
+		});
 		const peer = new Peer(this.id, `Client: #${this.id}`);
 		this.peers.push(peer);
 
