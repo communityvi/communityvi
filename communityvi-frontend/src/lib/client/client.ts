@@ -20,10 +20,13 @@ import type {CloseReason, Connection} from '$lib/client/connection';
 import {
 	ChatMessage,
 	PeerLeftMessage,
-	MediumState,
 	Peer,
 	PeerLifecycleMessage,
 	PeerJoinedMessage,
+	Medium,
+	VersionedMedium,
+	MediumChangedByPeer,
+	MediumTimeAdjusted,
 } from '$lib/client/model';
 
 export class Client {
@@ -37,16 +40,19 @@ export class Client {
 		const connection = await this.transport.connect();
 
 		const response = (await connection.performRequest(new RegisterRequest(name))).response as HelloMessage;
-		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
 		const peers = response.clients.map(Peer.fromClientResponse);
 
 		const initialReferenceTimeOffset = await fetchReferenceTimeAndCalculateOffset(connection);
+		const versionedMedium = VersionedMedium.fromVersionedMediumResponseAndReferenceTimeOffset(
+			response.current_medium,
+			initialReferenceTimeOffset,
+		);
 
 		return new RegisteredClient(
 			response.id,
 			name,
 			initialReferenceTimeOffset,
-			mediumState,
+			versionedMedium,
 			peers,
 			connection,
 			disconnectCallback,
@@ -58,7 +64,7 @@ export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
 	private referenceTimeOffset: number;
-	private currentMediumState: MediumState;
+	private versionedMedium: VersionedMedium;
 	readonly peers: Array<Peer>;
 
 	private readonly connection: Connection;
@@ -69,15 +75,15 @@ export class RegisteredClient {
 	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
 	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
 
-	get currentReferenceTime(): number {
-		return performance.now() + this.referenceTimeOffset;
+	get currentMedium(): Medium | undefined {
+		return this.versionedMedium.medium;
 	}
 
 	constructor(
 		id: number,
 		name: string,
 		referenceTimeOffset: number,
-		currentMediumState: MediumState,
+		versionedMedium: VersionedMedium,
 		peers: Array<Peer>,
 		connection: Connection,
 		disconnectCallback: DisconnectCallback,
@@ -85,7 +91,7 @@ export class RegisteredClient {
 		this.id = id;
 		this.name = name;
 		this.referenceTimeOffset = referenceTimeOffset;
-		this.currentMediumState = currentMediumState;
+		this.versionedMedium = versionedMedium;
 		this.peers = peers;
 
 		this.connection = connection;
@@ -122,17 +128,13 @@ export class RegisteredClient {
 		return RegisteredClient.subscribe(callback, this.chatMessageCallbacks);
 	}
 
-	getCurrentMediumState(): MediumState {
-		return this.currentMediumState;
-	}
-
 	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
 		const medium = new FixedLengthMedium(name, lengthInMilliseconds);
-		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, medium));
+		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, medium));
 	}
 
 	async ejectMedium(): Promise<void> {
-		await this.connection.performRequest(new InsertMediumRequest(this.currentMediumState.version, new EmptyMedium()));
+		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, new EmptyMedium()));
 	}
 
 	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
@@ -201,15 +203,22 @@ export class RegisteredClient {
 			}
 			case BroadcastType.MediumStateChanged: {
 				const mediumStateChangedBroadcast = broadcast as MediumStateChangedBroadcast;
-				const mediumState = MediumState.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
-				this.currentMediumState = mediumState;
+				const versionedMedium = VersionedMedium.fromVersionedMediumBroadcastAndReferenceTimeOffset(
+					mediumStateChangedBroadcast.medium,
+					this.referenceTimeOffset,
+				);
+				this.versionedMedium = versionedMedium;
 
-				if (this.id === mediumState.changedBy?.id) {
+				if (this.id === mediumStateChangedBroadcast.changed_by_id) {
 					// we already know about the changes we've made and implicitly updated the state of the client.
 					return;
 				}
 
-				RegisteredClient.notify(mediumState, this.mediumStateChangedCallbacks);
+				const changer = Peer.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
+				RegisteredClient.notify(
+					new MediumChangedByPeer(changer, versionedMedium.medium),
+					this.mediumStateChangedCallbacks,
+				);
 
 				break;
 			}
@@ -262,6 +271,6 @@ class UnknownBroadcastError extends Error {
 export type DisconnectCallback = (reason: CloseReason) => void;
 export type PeerLifecycleCallback = (peerChange: PeerLifecycleMessage) => void;
 export type ChatMessageCallback = (message: ChatMessage) => void;
-export type MediumStateChangedCallback = (mediumState: MediumState) => void;
+export type MediumStateChangedCallback = (change: MediumChangedByPeer | MediumTimeAdjusted) => void;
 
 export type Unsubscriber = () => void;

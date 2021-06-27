@@ -1,12 +1,13 @@
 <script lang="ts">
 	import {registeredClient, notifications} from '$lib/stores';
-	import type {Medium, MediumState} from '$lib/client/model';
+	import type {Medium} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
+	import {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 
 	$: isRegistered = $registeredClient !== undefined;
 
 	let medium: Medium | undefined;
-	$: medium = $registeredClient?.getCurrentMediumState().medium;
+	$: medium = $registeredClient?.currentMedium;
 	$: mediumTitle = selectedMediumName ?? medium?.name ?? 'n/a';
 
 	let formattedMediumLength: string;
@@ -34,9 +35,9 @@
 		}
 	});
 
-	function onMediumStateChanged(mediumState: MediumState): void {
+	function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): void {
 		resetMediumSelection();
-		medium = mediumState.medium;
+		medium = change.medium;
 	}
 
 	function onMediumSelection(event: Event) {
@@ -62,7 +63,7 @@
 
 		try {
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
-			medium = $registeredClient.getCurrentMediumState().medium;
+			medium = $registeredClient.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
 			notifications.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
