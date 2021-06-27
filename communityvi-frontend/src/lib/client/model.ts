@@ -217,7 +217,7 @@ abstract class PlaybackState {
 		switch (response.type) {
 			case PlaybackStateType.Playing: {
 				const playing = response as PlayingPlaybackStateResponse;
-				return PlayingPlaybackState.fromStartTimeAddingReferenceTimeOffset(
+				return PlayingPlaybackState.fromStartTimeSubtractingReferenceTimeOffset(
 					playing.start_time_in_milliseconds,
 					referenceTimeOffset,
 				);
@@ -235,14 +235,14 @@ abstract class PlaybackState {
 export class PlayingPlaybackState {
 	readonly localStartTimeInMilliseconds: number;
 
-	static fromStartTimeAddingReferenceTimeOffset(
+	static fromStartTimeSubtractingReferenceTimeOffset(
 		referenceStartTimeInMilliseconds: number,
 		offset: number,
 	): PlayingPlaybackState {
-		return new PlayingPlaybackState(referenceStartTimeInMilliseconds + offset);
+		return new PlayingPlaybackState(referenceStartTimeInMilliseconds - offset);
 	}
 
-	private constructor(localStartTimeInMilliseconds: number) {
+	constructor(localStartTimeInMilliseconds: number) {
 		this.localStartTimeInMilliseconds = localStartTimeInMilliseconds;
 	}
 }

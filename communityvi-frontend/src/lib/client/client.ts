@@ -255,7 +255,7 @@ async function fetchReferenceTimeAndCalculateOffset(connection: Connection): Pro
 	const ourTime = response.metadata.sentAt + response.metadata.roundTripTimeInMilliseconds / 2;
 	const referenceTime = (response.response as ReferenceTimeMessage).milliseconds;
 
-	return ourTime - referenceTime;
+	return referenceTime - ourTime;
 }
 
 class UnknownBroadcastError extends Error {
