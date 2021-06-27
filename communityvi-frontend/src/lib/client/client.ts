@@ -1,4 +1,4 @@
-import type {HelloMessage, ServerResponse} from '$lib/client/response';
+import type {HelloMessage, ReferenceTimeMessage, ServerResponse, SuccessMessage} from '$lib/client/response';
 import {
 	BroadcastMessage,
 	BroadcastType,
@@ -7,7 +7,13 @@ import {
 	ClientLeftBroadcast,
 	MediumStateChangedBroadcast,
 } from '$lib/client/broadcast';
-import {ChatRequest, EmptyMedium, FixedLengthMedium, InsertMediumRequest, RegisterRequest} from '$lib/client/request';
+import {
+	ChatRequest,
+	EmptyMedium,
+	FixedLengthMedium,
+	InsertMediumRequest,
+	RegisterRequest,
+} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
 import type {CloseReason, Connection} from '$lib/client/connection';
 import {
@@ -29,7 +35,7 @@ export class Client {
 	async register(name: string, disconnectCallback: DisconnectCallback): Promise<RegisteredClient> {
 		const connection = await this.transport.connect();
 
-		const response = (await connection.performRequest(new RegisterRequest(name))) as HelloMessage;
+		const response = (await connection.performRequest(new RegisterRequest(name))).response as HelloMessage;
 		const mediumState = MediumState.fromVersionedMediumResponse(response.current_medium);
 		const peers = response.clients.map(Peer.fromClientResponse);
 

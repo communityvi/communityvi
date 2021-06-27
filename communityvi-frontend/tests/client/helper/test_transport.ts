@@ -5,6 +5,7 @@ import {mock} from 'jest-mock-extended';
 import {ClientResponse, HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
 import {MediumType} from '$lib/client/request';
 import {Peer} from '$lib/client/model';
+import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
 
 export default class TestTransport implements Transport {
 	private id = 0;
@@ -33,8 +34,9 @@ export default class TestTransport implements Transport {
 
 	private mockedConnection(): Connection {
 		const mockedConnection = mock<Connection>();
+
 		const clients = this.peers.map(peer => <ClientResponse>{id: peer.id, name: peer.name});
-		mockedConnection.performRequest.mockResolvedValueOnce(<HelloMessage>{
+		const content = <HelloMessage>{
 			type: SuccessMessageType.Hello,
 			id: ++this.id,
 			clients,
@@ -42,7 +44,11 @@ export default class TestTransport implements Transport {
 				type: MediumType.Empty,
 				version: 0,
 			},
-		});
+		};
+		const metadata = new ResponseMetadata(performance.now(), performance.now() + 1);
+		const assembledResponse = new EnrichedResponse(content, metadata);
+
+		mockedConnection.performRequest.mockResolvedValueOnce(assembledResponse);
 		const peer = new Peer(this.id, `Client: #${this.id}`);
 		this.peers.push(peer);
 

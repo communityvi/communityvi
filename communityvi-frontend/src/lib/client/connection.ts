@@ -4,16 +4,15 @@ import {
 	ResponseError,
 	ResponseType,
 	ServerResponse,
-	SuccessMessage,
 	SuccessResponse,
-	TimestampedSuccessMessage,
+	SuccessMessage,
 } from '$lib/client/response';
 import type {BroadcastMessage, BroadcastResponse} from '$lib/client/broadcast';
 import {promiseWithTimout} from '$lib/client/promises';
 
 export interface Connection {
 	setDelegate(delegate: ConnectionDelegate): void;
-	performRequest(request: ClientRequest): Promise<SuccessMessage>;
+	performRequest(request: ClientRequest): Promise<EnrichedResponse>;
 	disconnect(): void;
 }
 
@@ -71,7 +70,8 @@ export class WebSocketConnection implements Connection {
 					break;
 				}
 
-				pendingResponse.resolve({arrivalTimestamp: event.timeStamp, ...successResponse.message});
+				const metadata = new ResponseMetadata(pendingResponse.sentAt, event.timeStamp);
+				pendingResponse.resolve(new EnrichedResponse(successResponse.message, metadata));
 				break;
 			}
 			case ResponseType.Error: {
@@ -105,15 +105,16 @@ export class WebSocketConnection implements Connection {
 		return pendingResponse;
 	}
 
-	performRequest(request: ClientRequest): Promise<SuccessMessage> {
+	performRequest(request: ClientRequest): Promise<EnrichedResponse> {
 		const requestWithId = <ClientRequestWithId>{
 			request_id: ++this.nextRequestId,
 			...request,
 		};
 
-		const pending = new Promise<SuccessMessage>((resolve, reject) => {
+		const pending = new Promise<EnrichedResponse>((resolve, reject) => {
 			this.pendingResponses[requestWithId.request_id] = {
 				requestType: request.type,
+				sentAt: performance.now(),
 				resolve,
 				reject,
 			};
@@ -153,6 +154,33 @@ type PendingResponses = Record<number, PendingResponse>;
 
 interface PendingResponse {
 	readonly requestType: string;
-	readonly resolve: (message: TimestampedSuccessMessage) => void;
+	readonly sentAt: TimeStamp;
+	readonly resolve: (response: EnrichedResponse) => void;
 	readonly reject: (error: ResponseError) => void;
 }
+
+export class EnrichedResponse {
+	readonly response: SuccessMessage;
+	readonly metadata: ResponseMetadata;
+
+	constructor(response: SuccessMessage, metadata: ResponseMetadata) {
+		this.response = response;
+		this.metadata = metadata;
+	}
+}
+
+export class ResponseMetadata {
+	readonly sentAt: TimeStamp;
+	readonly receivedAt: TimeStamp;
+
+	get roundTripTimeInMilliseconds(): number {
+		return this.receivedAt - this.sentAt;
+	}
+
+	constructor(sentAt: TimeStamp, receivedAt: TimeStamp) {
+		this.sentAt = sentAt;
+		this.receivedAt = receivedAt;
+	}
+}
+
+export type TimeStamp = DOMHighResTimeStamp | DOMTimeStamp;
