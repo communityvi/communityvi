@@ -4,3 +4,4 @@ import {NotificationStore} from '$lib/components/notification/notification_store
 
 export const registeredClient: Writable<RegisteredClient | undefined> = writable(undefined);
 export const notifications = new NotificationStore();
+export const videoUrl: Writable<string | undefined> = writable(undefined);

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import {registeredClient, notifications} from '$lib/stores';
+	import {registeredClient, notifications, videoUrl} from '$lib/stores';
 	import type {Medium} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
-	import {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
+	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 
 	$: isRegistered = $registeredClient !== undefined;
 
@@ -60,6 +60,7 @@
 		}
 
 		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
+		$videoUrl = durationHelper.src;
 
 		try {
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
