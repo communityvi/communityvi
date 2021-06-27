@@ -253,8 +253,9 @@ async function fetchReferenceTimeAndCalculateOffset(connection: Connection): Pro
 	// We assume that the request takes the same time to the server as the response takes back to us.
 	// Therefore, the server's reference time represents our time half way the message exchange.
 	const ourTime = response.metadata.sentAt + response.metadata.roundTripTimeInMilliseconds / 2;
+	const referenceTime = (response.response as ReferenceTimeMessage).milliseconds;
 
-	return (response.response as ReferenceTimeMessage).milliseconds - ourTime;
+	return ourTime - referenceTime;
 }
 
 class UnknownBroadcastError extends Error {
