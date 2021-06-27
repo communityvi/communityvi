@@ -63,6 +63,7 @@ export class RegisteredClient {
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
+	private readonly referenceTimeUpdateIntervalId: NodeJS.Timeout;
 
 	private readonly peerLifecycleCallbacks = new Array<PeerLifecycleCallback>();
 	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
@@ -98,7 +99,7 @@ export class RegisteredClient {
 		});
 
 		// Schedule reference time updates every 15s
-		setInterval(this.synchronizeReferenceTime, 15_000);
+		this.referenceTimeUpdateIntervalId = setInterval(() => this.synchronizeReferenceTime(), 15_000);
 	}
 
 	private async synchronizeReferenceTime(): Promise<void> {
@@ -228,6 +229,7 @@ export class RegisteredClient {
 	}
 
 	private connectionDidClose(reason: CloseReason): void {
+		clearInterval(this.referenceTimeUpdateIntervalId);
 		this.disconnectCallback(reason);
 	}
 
