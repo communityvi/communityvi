@@ -27,6 +27,7 @@ import {
 	VersionedMedium,
 	MediumChangedByPeer,
 	MediumTimeAdjusted,
+	PlayingPlaybackState,
 } from '$lib/client/model';
 
 export class Client {
@@ -109,7 +110,32 @@ export class RegisteredClient {
 	}
 
 	private async synchronizeReferenceTime(): Promise<void> {
-		this.referenceTimeOffset = await fetchReferenceTimeAndCalculateOffset(this.connection);
+		// FIXME: This is far from ideal. Think about how to make this more cohesive and less ad-hoc.
+		console.log('Reference time offset updated:', this.referenceTimeOffset);
+		const newOffset = await fetchReferenceTimeAndCalculateOffset(this.connection);
+		if (this.referenceTimeOffset === newOffset) {
+			console.info('Reference time did not need updating.');
+			return;
+		}
+
+		const oldOffset = this.referenceTimeOffset;
+		this.referenceTimeOffset = newOffset;
+
+		const medium = this.versionedMedium.medium;
+		const playbackState = medium?.playbackState;
+		if (medium !== undefined && playbackState instanceof PlayingPlaybackState) {
+			const newStartTime = playbackState.localStartTimeInMilliseconds + (newOffset - oldOffset);
+			const newPlayingPlaybackState = new PlayingPlaybackState(newStartTime);
+			const newMedium = new Medium(
+				medium.name,
+				medium.lengthInMilliseconds,
+				medium.playbackSkipped,
+				newPlayingPlaybackState,
+			);
+			this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
+
+			RegisteredClient.notify(new MediumTimeAdjusted(newMedium), this.mediumStateChangedCallbacks);
+		}
 	}
 
 	asPeer(): Peer {
