@@ -13,6 +13,8 @@ import {
 	FixedLengthMedium,
 	GetReferenceTimeRequest,
 	InsertMediumRequest,
+	PauseRequest,
+	PlayRequest,
 	RegisterRequest,
 } from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
@@ -157,6 +159,17 @@ export class RegisteredClient {
 	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
 		const medium = new FixedLengthMedium(name, lengthInMilliseconds);
 		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, medium));
+	}
+
+	async play(localStartTimeInMilliseconds: number): Promise<void> {
+		const referenceStartTimeInMilliseconds = localStartTimeInMilliseconds + this.referenceTimeOffset;
+		const playRequest = new PlayRequest(this.versionedMedium.version, false, referenceStartTimeInMilliseconds);
+		await this.connection.performRequest(playRequest);
+	}
+
+	async pause(positionInMilliseconds: number): Promise<void> {
+		const pauseRequest = new PauseRequest(this.versionedMedium.version, false, positionInMilliseconds);
+		await this.connection.performRequest(pauseRequest);
 	}
 
 	async ejectMedium(): Promise<void> {
