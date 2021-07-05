@@ -9,11 +9,6 @@
 	let player: HTMLVideoElement;
 	let lastStartTimeInMilliseconds = 0;
 	let lastPositionInMilliseconds = 0;
-	// REALLY BAD!!!! hack to work around our inability to determine if an event has been triggered by
-	// ourselves (because of assignments to currentTime or calling play/pause) or by the user.
-	// This works by assigning 1 for every operation we do ourselves that we anticipate to trigger an event.
-	let ignoreNextPlay = 0;
-	let ignoreNextPause = 0;
 
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
@@ -29,9 +24,7 @@
 			lastStartTimeInMilliseconds = playbackState.localStartTimeInMilliseconds;
 			player.currentTime = (performance.now() - playbackState.localStartTimeInMilliseconds) / 1000;
 			console.log('playing at current time:', player.currentTime);
-			ignoreNextPlay = 1;
 			if (player.paused) {
-				ignoreNextPlay = 2;
 				console.log('about to start player');
 				await player.play();
 			}
@@ -43,16 +36,15 @@
 			player.currentTime = playbackState.positionInMilliseconds / 1000;
 			console.log('paused at current time:', player.currentTime);
 			if (!player.paused) {
-				ignoreNextPause = 1;
 				player.pause();
 			}
 		}
 	}
 
-	async function onPlaying() {
-		console.log('ignoreNextPlay', ignoreNextPlay);
-		if (ignoreNextPlay > 0) {
-			ignoreNextPlay--;
+	async function onPlay() {
+		if (player.seeking) {
+			// If this pause event was triggered by seeking, ignore it because it is not an actual user
+			// triggered pause.
 			return;
 		}
 
@@ -66,9 +58,9 @@
 	}
 
 	async function onPause() {
-		console.log('ignoreNextPause', ignoreNextPause);
-		if (ignoreNextPause > 0) {
-			ignoreNextPause--;
+		if (player.seeking) {
+			// If this pause event was triggered by seeking, ignore it because it is not an actual user
+			// triggered pause.
 			return;
 		}
 
@@ -91,7 +83,6 @@
 		if (medium.playbackState instanceof PausedPlaybackState) {
 			player.currentTime = lastPositionInMilliseconds / 1000;
 			if (!player.paused) {
-				ignoreNextPause = 1;
 				player.pause();
 			}
 			return;
@@ -99,17 +90,11 @@
 
 		if (medium.playbackState instanceof PlayingPlaybackState) {
 			player.currentTime = (performance.now() - lastStartTimeInMilliseconds) / 1000;
-			ignoreNextPlay = 1;
 			if (player.paused) {
-				ignoreNextPlay = 2;
 				await player.play();
 			}
 			return;
 		}
-	}
-
-	function onSeeked(event: Event) {
-		console.log('seeked', event);
 	}
 </script>
 
@@ -123,8 +108,7 @@
 			muted={true}
 			bind:this={player}
 			on:pause={onPause}
-			on:playing={onPlaying}
-			on:seeked={onSeeked}
+			on:play={onPlay}
 		/>
 	</section>
 {/if}
