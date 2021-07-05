@@ -10,6 +10,9 @@
 	let lastStartTimeInMilliseconds = 0;
 	let lastPositionInMilliseconds = 0;
 
+	// If true, the next seek was most likely caused by us, not the user, so ignore it.
+	let anticipatingSeek = false;
+
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
 	onDestroy(() => {
@@ -22,10 +25,8 @@
 		const playbackState = change.medium?.playbackState;
 		if (playbackState instanceof PlayingPlaybackState) {
 			lastStartTimeInMilliseconds = playbackState.localStartTimeInMilliseconds;
-			player.currentTime = (performance.now() - playbackState.localStartTimeInMilliseconds) / 1000;
-			console.log('playing at current time:', player.currentTime);
+			setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
 			if (player.paused) {
-				console.log('about to start player');
 				await player.play();
 			}
 			return;
@@ -33,8 +34,7 @@
 
 		if (playbackState instanceof PausedPlaybackState) {
 			lastPositionInMilliseconds = playbackState.positionInMilliseconds;
-			player.currentTime = playbackState.positionInMilliseconds / 1000;
-			console.log('paused at current time:', player.currentTime);
+			setPlayerPosition(playbackState.positionInMilliseconds);
 			if (!player.paused) {
 				player.pause();
 			}
@@ -72,6 +72,26 @@
 		}
 	}
 
+	async function onSeeked() {
+		if (anticipatingSeek) {
+			anticipatingSeek = false;
+			return;
+		}
+
+		try {
+			if (player.paused) {
+				await $registeredClient?.pause(player.currentTime * 1000, true);
+				return;
+			}
+
+			const localStartTimeInMilliseconds = performance.now() - player.currentTime * 1000;
+			await $registeredClient?.play(localStartTimeInMilliseconds, true);
+		} catch (error) {
+			notifications.reportError(error);
+			await resetPlaybackState();
+		}
+	}
+
 	async function resetPlaybackState() {
 		notifications.inform('Resetting playback state.');
 
@@ -81,7 +101,8 @@
 		}
 
 		if (medium.playbackState instanceof PausedPlaybackState) {
-			player.currentTime = lastPositionInMilliseconds / 1000;
+			setPlayerPosition(lastPositionInMilliseconds);
+
 			if (!player.paused) {
 				player.pause();
 			}
@@ -89,26 +110,26 @@
 		}
 
 		if (medium.playbackState instanceof PlayingPlaybackState) {
-			player.currentTime = (performance.now() - lastStartTimeInMilliseconds) / 1000;
+			setPlayerPosition(performance.now() - lastStartTimeInMilliseconds);
 			if (player.paused) {
 				await player.play();
 			}
 			return;
 		}
 	}
+
+	function setPlayerPosition(milliseconds: number) {
+		// Assigning to player.currentTime always seems to trigger a seeked event
+		// So we need to ignore the next one in order to differentiate it from
+		// user triggered seeks.
+		anticipatingSeek = true;
+		player.currentTime = milliseconds / 1000;
+	}
 </script>
 
 {#if $videoUrl !== undefined}
+	<!-- svelte-ignore a11y-media-has-caption -->
 	<section id="player">
-		<video
-			width="640"
-			height="360"
-			controls
-			src={$videoUrl}
-			muted={true}
-			bind:this={player}
-			on:pause={onPause}
-			on:play={onPlay}
-		/>
+		<video controls src={$videoUrl} bind:this={player} on:pause={onPause} on:play={onPlay} on:seeked={onSeeked} />
 	</section>
 {/if}
