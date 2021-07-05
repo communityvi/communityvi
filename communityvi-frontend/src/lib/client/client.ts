@@ -161,14 +161,14 @@ export class RegisteredClient {
 		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, medium));
 	}
 
-	async play(localStartTimeInMilliseconds: number): Promise<void> {
+	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
 		const referenceStartTimeInMilliseconds = localStartTimeInMilliseconds + this.referenceTimeOffset;
-		const playRequest = new PlayRequest(this.versionedMedium.version, false, referenceStartTimeInMilliseconds);
+		const playRequest = new PlayRequest(this.versionedMedium.version, skipped, referenceStartTimeInMilliseconds);
 		await this.connection.performRequest(playRequest);
 	}
 
-	async pause(positionInMilliseconds: number): Promise<void> {
-		const pauseRequest = new PauseRequest(this.versionedMedium.version, false, positionInMilliseconds);
+	async pause(positionInMilliseconds: number, skipped = false): Promise<void> {
+		const pauseRequest = new PauseRequest(this.versionedMedium.version, skipped, positionInMilliseconds);
 		await this.connection.performRequest(pauseRequest);
 	}
 
