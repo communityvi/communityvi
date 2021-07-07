@@ -29,7 +29,7 @@ import {
 	VersionedMedium,
 	MediumChangedByPeer,
 	MediumTimeAdjusted,
-	PlayingPlaybackState, PausedPlaybackState,
+	PlayingPlaybackState,
 } from '$lib/client/model';
 
 export class Client {

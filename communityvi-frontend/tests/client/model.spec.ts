@@ -28,7 +28,7 @@ describe('Medium', () => {
 			const wargames = new Medium('WarGames', 114 * 60 * 1000);
 
 			const birdmanWargamesComparison = Medium.haveEqualMetadata(birdman, wargames);
-			const wargamesBirdmanComparison= Medium.haveEqualMetadata(wargames, birdman);
+			const wargamesBirdmanComparison = Medium.haveEqualMetadata(wargames, birdman);
 
 			expect(birdmanWargamesComparison).toBe(false);
 			expect(wargamesBirdmanComparison).toBe(false);

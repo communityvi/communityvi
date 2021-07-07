@@ -8,7 +8,7 @@
 
 	let medium: Medium | undefined;
 	$: medium = $registeredClient?.currentMedium;
-	$: mediumIsOutdated = (medium !== undefined) && ($videoUrl === undefined);
+	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
 
 	let formattedMediumLength: string | undefined;
 	$: {
@@ -62,7 +62,11 @@
 		}
 
 		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
-		if (mediumIsOutdated && (medium !== undefined) && ((selectedMediumName !== medium.name) || (selectedMediumLengthInMilliseconds != medium.lengthInMilliseconds))) {
+		if (
+			mediumIsOutdated &&
+			medium !== undefined &&
+			(selectedMediumName !== medium.name || selectedMediumLengthInMilliseconds != medium.lengthInMilliseconds)
+		) {
 			notifications.error('Wrong medium selected');
 			return;
 		}
@@ -118,7 +122,7 @@
 						<i class="fas fa-upload" />
 					</span>
 					<span class="file-label">
-						{#if mediumIsOutdated}
+						{#if mediumIsOutdated && medium?.name !== undefined}
 							Select file for "{medium.name}"
 						{:else}
 							Insert New Medium…

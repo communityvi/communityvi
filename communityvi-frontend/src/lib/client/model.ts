@@ -217,7 +217,7 @@ export class Medium {
 			return false;
 		}
 
-		return (one.name === another.name) && (one.lengthInMilliseconds === another.lengthInMilliseconds);
+		return one.name === another.name && one.lengthInMilliseconds === another.lengthInMilliseconds;
 	}
 }
 

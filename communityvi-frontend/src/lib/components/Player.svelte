@@ -141,6 +141,14 @@
 {#if $videoUrl !== undefined}
 	<!-- svelte-ignore a11y-media-has-caption -->
 	<section id="player">
-		<video controls src={$videoUrl} bind:this={player} on:loadeddata={onLoadedData} on:pause={onPause} on:play={onPlay} on:seeked={onSeeked} />
+		<video
+			controls
+			src={$videoUrl}
+			bind:this={player}
+			on:loadeddata={onLoadedData}
+			on:pause={onPause}
+			on:play={onPlay}
+			on:seeked={onSeeked}
+		/>
 	</section>
 {/if}
