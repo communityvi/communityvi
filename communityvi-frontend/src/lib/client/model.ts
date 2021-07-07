@@ -207,6 +207,18 @@ export class Medium {
 		this.playbackSkipped = playbackSkipped;
 		this.playbackState = playbackState;
 	}
+
+	static haveEqualMetadata(one?: Medium, another?: Medium): boolean {
+		if (one === undefined) {
+			return another === undefined;
+		}
+
+		if (another === undefined) {
+			return false;
+		}
+
+		return (one.name === another.name) && (one.lengthInMilliseconds === another.lengthInMilliseconds);
+	}
 }
 
 abstract class PlaybackState {
