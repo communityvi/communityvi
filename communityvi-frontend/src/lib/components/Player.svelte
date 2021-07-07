@@ -11,7 +11,7 @@
 	let lastPositionInMilliseconds = 0;
 
 	// If true, the next seek was most likely caused by us, not the user, so ignore it.
-	let anticipatingSeek = false;
+	let ignoreNextSeek = false;
 
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
@@ -73,8 +73,8 @@
 	}
 
 	async function onSeeked() {
-		if (anticipatingSeek) {
-			anticipatingSeek = false;
+		if (ignoreNextSeek) {
+			ignoreNextSeek = false;
 			return;
 		}
 
@@ -119,10 +119,10 @@
 	}
 
 	function setPlayerPosition(milliseconds: number) {
-		// Assigning to player.currentTime always seems to trigger a seeked event
-		// So we need to ignore the next one in order to differentiate it from
+		// Assigning to player.currentTime always seems to trigger a 'seeked' event
+		// so we need to ignore the next one in order to differentiate it from
 		// user triggered seeks.
-		anticipatingSeek = true;
+		ignoreNextSeek = true;
 		player.currentTime = milliseconds / 1000;
 	}
 </script>
