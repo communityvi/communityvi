@@ -6,7 +6,7 @@
 
 	// NOTE: currentTime needs to be accessed via the player itself because the binding provided by svelte
 	// as of 3.38.3 neither reads the currentTime reliably, nor sets it reliably.
-	let player: HTMLVideoElement;
+	let player: HTMLVideoElement | undefined;
 	let lastStartTimeInMilliseconds = 0;
 	let lastPositionInMilliseconds = 0;
 
@@ -22,6 +22,10 @@
 	});
 
 	async function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): Promise<void> {
+		if (player === undefined) {
+			return;
+		}
+
 		await syncPlaybackPosition(change.medium?.playbackState);
 	}
 
