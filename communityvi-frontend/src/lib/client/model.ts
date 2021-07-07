@@ -199,8 +199,8 @@ export class Medium {
 	constructor(
 		name: string,
 		lengthInMilliseconds: number,
-		playbackSkipped: boolean,
-		playbackState: PlayingPlaybackState | PausedPlaybackState,
+		playbackSkipped = false,
+		playbackState: PlayingPlaybackState | PausedPlaybackState = new PausedPlaybackState(0),
 	) {
 		this.name = name;
 		this.lengthInMilliseconds = lengthInMilliseconds;

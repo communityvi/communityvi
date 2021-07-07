@@ -161,7 +161,7 @@ export class RegisteredClient {
 		const version = this.versionedMedium.version;
 		await this.connection.performRequest(new InsertMediumRequest(version, medium));
 
-		const insertedMedium = new Medium(name, lengthInMilliseconds, false, new PausedPlaybackState(0));
+		const insertedMedium = new Medium(name, lengthInMilliseconds);
 		if (this.versionedMedium.version > version) {
 			// The medium has already been updated in the meantime during the await.
 			return;
