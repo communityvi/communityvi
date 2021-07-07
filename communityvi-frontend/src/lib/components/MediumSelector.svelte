@@ -61,7 +61,7 @@
 			return;
 		}
 
-		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
+		selectedMediumLengthInMilliseconds = Math.round(durationHelper.duration * 1000);
 		if (
 			mediumIsOutdated &&
 			medium !== undefined &&
