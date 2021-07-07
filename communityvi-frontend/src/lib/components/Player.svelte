@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {registeredClient, videoUrl, notifications} from '$lib/stores';
+	import {notifications, registeredClient, videoUrl} from '$lib/stores';
 	import {onDestroy} from 'svelte';
 	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 	import {PausedPlaybackState, PlayingPlaybackState} from '$lib/client/model';
@@ -22,7 +22,18 @@
 	});
 
 	async function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): Promise<void> {
-		const playbackState = change.medium?.playbackState;
+		await syncPlaybackPosition(change.medium?.playbackState);
+	}
+
+	async function onLoadedData() {
+		await syncPlaybackPosition($registeredClient?.currentMedium?.playbackState);
+	}
+
+	async function syncPlaybackPosition(playbackState?: PlayingPlaybackState | PausedPlaybackState) {
+		if (playbackState === undefined) {
+			return;
+		}
+
 		if (playbackState instanceof PlayingPlaybackState) {
 			lastStartTimeInMilliseconds = playbackState.localStartTimeInMilliseconds;
 			setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
@@ -130,6 +141,6 @@
 {#if $videoUrl !== undefined}
 	<!-- svelte-ignore a11y-media-has-caption -->
 	<section id="player">
-		<video controls src={$videoUrl} bind:this={player} on:pause={onPause} on:play={onPlay} on:seeked={onSeeked} />
+		<video controls src={$videoUrl} bind:this={player} on:loadeddata={onLoadedData} on:pause={onPause} on:play={onPlay} on:seeked={onSeeked} />
 	</section>
 {/if}
