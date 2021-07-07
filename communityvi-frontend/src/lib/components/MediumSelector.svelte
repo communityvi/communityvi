@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {registeredClient, notifications, videoUrl} from '$lib/stores';
-	import type {Medium} from '$lib/client/model';
+	import {Medium} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 
@@ -37,6 +37,9 @@
 
 	function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): void {
 		resetMediumSelection();
+		if (!Medium.haveEqualMetadata(medium, change.medium)) {
+			$videoUrl = undefined;
+		}
 		medium = change.medium;
 	}
 
@@ -81,6 +84,7 @@
 		try {
 			await $registeredClient.ejectMedium();
 			medium = undefined;
+			$videoUrl = undefined;
 		} catch (error) {
 			console.error('Error while ejecting medium:', error);
 			notifications.reportError(new Error('Ejecting the medium failed!'));
