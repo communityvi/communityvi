@@ -64,8 +64,6 @@
 
 		try {
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
-			// FIXME: This will never succeed. currentMedium is always undefined, so we must find a way to set it after we've
-			// sent out the request to change it.
 			medium = $registeredClient.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);

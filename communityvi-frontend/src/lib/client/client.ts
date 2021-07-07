@@ -29,7 +29,7 @@ import {
 	VersionedMedium,
 	MediumChangedByPeer,
 	MediumTimeAdjusted,
-	PlayingPlaybackState,
+	PlayingPlaybackState, PausedPlaybackState,
 } from '$lib/client/model';
 
 export class Client {
@@ -158,7 +158,16 @@ export class RegisteredClient {
 
 	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
 		const medium = new FixedLengthMedium(name, lengthInMilliseconds);
-		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, medium));
+		const version = this.versionedMedium.version;
+		await this.connection.performRequest(new InsertMediumRequest(version, medium));
+
+		const insertedMedium = new Medium(name, lengthInMilliseconds, false, new PausedPlaybackState(0));
+		if (this.versionedMedium.version > version) {
+			// The medium has already been updated in the meantime during the await.
+			return;
+		}
+
+		this.versionedMedium = new VersionedMedium(version + 1, insertedMedium);
 	}
 
 	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
@@ -173,7 +182,15 @@ export class RegisteredClient {
 	}
 
 	async ejectMedium(): Promise<void> {
+		const version = this.versionedMedium.version;
 		await this.connection.performRequest(new InsertMediumRequest(this.versionedMedium.version, new EmptyMedium()));
+
+		if (this.versionedMedium.version > version) {
+			// The medium has already been updated in the meantime during the await.
+			return;
+		}
+
+		this.versionedMedium = new VersionedMedium(version + 1, undefined);
 	}
 
 	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
