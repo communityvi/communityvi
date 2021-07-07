@@ -1,22 +1,32 @@
 <script lang="ts">
-	import {registeredClient, notifications} from '$lib/stores';
-	import type {Medium, MediumState} from '$lib/client/model';
+	import {registeredClient, notifications, videoUrl} from '$lib/stores';
+	import {Medium} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
+	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 
 	$: isRegistered = $registeredClient !== undefined;
 
 	let medium: Medium | undefined;
-	$: medium = $registeredClient?.getCurrentMediumState().medium;
-	$: mediumTitle = selectedMediumName ?? medium?.name ?? 'n/a';
-
-	let formattedMediumLength: string;
 	$: {
-		const mediumLengthInMilliseconds = selectedMediumLengthInMilliseconds ?? medium?.lengthInMilliseconds;
+		if ($registeredClient !== undefined) {
+			if (!Medium.haveEqualMetadata(medium, $registeredClient.currentMedium)) {
+				// Update the medium in case of relogin
+				medium = $registeredClient.currentMedium;
+				selectedMediumName = medium?.name;
+				selectedMediumLengthInMilliseconds = medium?.lengthInMilliseconds;
+				$videoUrl = undefined;
+			}
+		}
+	}
+	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
+
+	let formattedMediumLength: string | undefined;
+	$: {
+		const mediumLengthInMilliseconds = medium?.lengthInMilliseconds;
+		formattedMediumLength = undefined;
 		if (mediumLengthInMilliseconds !== undefined) {
 			const lengthInMinutes = mediumLengthInMilliseconds / 1000 / 60;
 			formattedMediumLength = `${Math.round(lengthInMinutes)} min.`;
-		} else {
-			formattedMediumLength = 'n/a';
 		}
 	}
 
@@ -34,9 +44,12 @@
 		}
 	});
 
-	function onMediumStateChanged(mediumState: MediumState): void {
+	function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): void {
 		resetMediumSelection();
-		medium = mediumState.medium;
+		if (!Medium.haveEqualMetadata(medium, change.medium)) {
+			$videoUrl = undefined;
+		}
+		medium = change.medium;
 	}
 
 	function onMediumSelection(event: Event) {
@@ -58,11 +71,24 @@
 			return;
 		}
 
-		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
+		selectedMediumLengthInMilliseconds = Math.round(durationHelper.duration * 1000);
+		if (
+			mediumIsOutdated &&
+			medium !== undefined &&
+			(selectedMediumName !== medium.name || selectedMediumLengthInMilliseconds != medium.lengthInMilliseconds)
+		) {
+			notifications.error('Wrong medium selected');
+			return;
+		}
+
+		$videoUrl = durationHelper.src;
 
 		try {
+			if (mediumIsOutdated) {
+				return;
+			}
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
-			medium = $registeredClient.getCurrentMediumState().medium;
+			medium = $registeredClient.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
 			notifications.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
@@ -79,6 +105,7 @@
 		try {
 			await $registeredClient.ejectMedium();
 			medium = undefined;
+			$videoUrl = undefined;
 		} catch (error) {
 			console.error('Error while ejecting medium:', error);
 			notifications.reportError(new Error('Ejecting the medium failed!'));
@@ -94,8 +121,8 @@
 
 {#if isRegistered}
 	<section id="medium-selection">
-		<span class="medium-title">{mediumTitle}</span>
-		<span class="medium-duration">&nbsp;({formattedMediumLength})</span>
+		<span class="medium-title">{medium?.name ?? 'n/a'}</span>
+		<span class="medium-duration">&nbsp;({formattedMediumLength ?? 'n/a'})</span>
 
 		<div class="file">
 			<label class="file-label">
@@ -104,7 +131,13 @@
 					<span class="file-icon">
 						<i class="fas fa-upload" />
 					</span>
-					<span class="file-label">Insert Medium… </span>
+					<span class="file-label">
+						{#if mediumIsOutdated && medium?.name !== undefined}
+							Select file for "{medium.name}"
+						{:else}
+							Insert New Medium…
+						{/if}
+					</span>
 				</span>
 			</label>
 		</div>

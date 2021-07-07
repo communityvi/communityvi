@@ -7,7 +7,7 @@ export class PauseRequest implements ClientRequest {
 	constructor(previous_version: number, skipped: boolean, position_in_milliseconds: number) {
 		this.previous_version = previous_version;
 		this.skipped = skipped;
-		this.position_in_milliseconds = position_in_milliseconds;
+		this.position_in_milliseconds = Math.round(position_in_milliseconds);
 	}
 }
 
@@ -20,7 +20,7 @@ export class PlayRequest implements ClientRequest {
 	constructor(previous_version: number, skipped: boolean, start_time_in_milliseconds: number) {
 		this.previous_version = previous_version;
 		this.skipped = skipped;
-		this.start_time_in_milliseconds = start_time_in_milliseconds;
+		this.start_time_in_milliseconds = Math.round(start_time_in_milliseconds);
 	}
 }
 

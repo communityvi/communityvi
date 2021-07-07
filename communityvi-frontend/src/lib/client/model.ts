@@ -82,31 +82,6 @@ export class ChatMessage {
 	}
 }
 
-export class MediumState {
-	readonly version: number;
-
-	// FIXME: Ideally, the server should keep track who did it last so that this information is always available!
-	readonly changedBy?: Peer;
-	readonly medium?: Medium;
-
-	static fromVersionedMediumResponse(response: VersionedMediumResponse): MediumState {
-		const medium = Medium.fromVersionedMediumResponse(response);
-		return new MediumState(response.version, undefined, medium);
-	}
-
-	static fromMediumStateChangedBroadcast(broadcast: MediumStateChangedBroadcast): MediumState {
-		const medium = Medium.fromVersionedMediumBroadcast(broadcast.medium);
-		const peer = Peer.fromMediumStateChangedBroadcast(broadcast);
-		return new MediumState(broadcast.medium.version, peer, medium);
-	}
-
-	constructor(version: number, changedBy?: Peer, medium?: Medium) {
-		this.version = version;
-		this.changedBy = changedBy;
-		this.medium = medium;
-	}
-}
-
 export class Peer {
 	readonly id: number;
 	readonly name: string;
@@ -133,67 +108,131 @@ export class Peer {
 	}
 }
 
+export class MediumChangedByPeer {
+	readonly changedBy: Peer;
+	readonly medium?: Medium;
+
+	constructor(changedBy: Peer, medium?: Medium) {
+		this.changedBy = changedBy;
+		this.medium = medium;
+	}
+}
+
+export class MediumTimeAdjusted {
+	readonly medium: Medium;
+
+	constructor(medium: Medium) {
+		this.medium = medium;
+	}
+}
+
+export class VersionedMedium {
+	readonly version: number;
+	readonly medium?: Medium;
+
+	static fromVersionedMediumResponseAndReferenceTimeOffset(
+		response: VersionedMediumResponse,
+		referenceTimeOffset: number,
+	): VersionedMedium {
+		switch (response.type) {
+			case MediumType.FixedLength: {
+				const fixedLength = response as FixedLengthVersionedMediumResponse;
+				const medium = new Medium(
+					fixedLength.name,
+					fixedLength.length_in_milliseconds,
+					false,
+					PlaybackState.fromPlaybackStateResponseAndReferenceTimeOffset(
+						fixedLength.playback_state,
+						referenceTimeOffset,
+					),
+				);
+				return new VersionedMedium(fixedLength.version, medium);
+			}
+			case MediumType.Empty: {
+				const empty = response as VersionedMediumResponse;
+				return new VersionedMedium(empty.version);
+			}
+			default:
+				throw new Error(`Invalid MediumResponse type: '${response.type}'`);
+		}
+	}
+
+	static fromVersionedMediumBroadcastAndReferenceTimeOffset(
+		broadcast: VersionedMediumBroadcast,
+		referenceTimeOffset: number,
+	): VersionedMedium {
+		switch (broadcast.type) {
+			case MediumType.FixedLength: {
+				const fixedLength = broadcast as FixedLengthMediumBroadcast;
+				const medium = new Medium(
+					fixedLength.name,
+					fixedLength.length_in_milliseconds,
+					fixedLength.playback_skipped,
+					PlaybackState.fromPlaybackStateResponseAndReferenceTimeOffset(
+						fixedLength.playback_state,
+						referenceTimeOffset,
+					),
+				);
+				return new VersionedMedium(fixedLength.version, medium);
+			}
+			case MediumType.Empty: {
+				const empty = broadcast as VersionedMediumBroadcast;
+				return new VersionedMedium(empty.version);
+			}
+			default:
+				throw new Error(`Invalid MediumBroadcast type: '${broadcast.type}'`);
+		}
+	}
+
+	constructor(version: number, medium?: Medium) {
+		this.version = version;
+		this.medium = medium;
+	}
+}
+
 export class Medium {
 	readonly name: string;
 	readonly lengthInMilliseconds: number;
 	readonly playbackSkipped: boolean;
 	readonly playbackState: PlayingPlaybackState | PausedPlaybackState;
 
-	static fromVersionedMediumResponse(response: VersionedMediumResponse): Medium | undefined {
-		switch (response.type) {
-			case MediumType.FixedLength: {
-				const fixedLength = response as FixedLengthVersionedMediumResponse;
-				return new Medium(
-					fixedLength.name,
-					fixedLength.length_in_milliseconds,
-					false,
-					PlaybackState.fromPlaybackStateResponse(fixedLength.playback_state),
-				);
-			}
-			case MediumType.Empty:
-				return undefined;
-			default:
-				throw new Error(`Invalid MediumResponse type: '${response.type}'`);
-		}
-	}
-
-	static fromVersionedMediumBroadcast(broadcast: VersionedMediumBroadcast): Medium | undefined {
-		switch (broadcast.type) {
-			case MediumType.FixedLength: {
-				const fixedLength = broadcast as FixedLengthMediumBroadcast;
-				return new Medium(
-					fixedLength.name,
-					fixedLength.length_in_milliseconds,
-					fixedLength.playback_skipped,
-					PlaybackState.fromPlaybackStateResponse(fixedLength.playback_state),
-				);
-			}
-			case MediumType.Empty:
-				return undefined;
-			default:
-				throw new Error(`Invalid MediumBroadcast type: '${broadcast.type}'`);
-		}
-	}
-
 	constructor(
 		name: string,
 		lengthInMilliseconds: number,
-		playbackSkipped: boolean,
-		playbackState: PlayingPlaybackState | PausedPlaybackState,
+		playbackSkipped = false,
+		playbackState: PlayingPlaybackState | PausedPlaybackState = new PausedPlaybackState(0),
 	) {
 		this.name = name;
 		this.lengthInMilliseconds = lengthInMilliseconds;
 		this.playbackSkipped = playbackSkipped;
 		this.playbackState = playbackState;
 	}
+
+	static haveEqualMetadata(one?: Medium, another?: Medium): boolean {
+		if (one === undefined) {
+			return another === undefined;
+		}
+
+		if (another === undefined) {
+			return false;
+		}
+
+		return one.name === another.name && one.lengthInMilliseconds === another.lengthInMilliseconds;
+	}
 }
 
 abstract class PlaybackState {
-	static fromPlaybackStateResponse(response: PlaybackStateResponse): PlayingPlaybackState | PausedPlaybackState {
+	static fromPlaybackStateResponseAndReferenceTimeOffset(
+		response: PlaybackStateResponse,
+		referenceTimeOffset: number,
+	): PlayingPlaybackState | PausedPlaybackState {
 		switch (response.type) {
 			case PlaybackStateType.Playing: {
 				const playing = response as PlayingPlaybackStateResponse;
-				return new PlayingPlaybackState(playing.start_time_in_milliseconds);
+				return PlayingPlaybackState.fromStartTimeSubtractingReferenceTimeOffset(
+					playing.start_time_in_milliseconds,
+					referenceTimeOffset,
+				);
 			}
 			case PlaybackStateType.Paused: {
 				const paused = response as PausedPlaybackStateResponse;
@@ -205,15 +244,22 @@ abstract class PlaybackState {
 	}
 }
 
-class PlayingPlaybackState {
-	readonly startTimeInMilliseconds: number;
+export class PlayingPlaybackState {
+	readonly localStartTimeInMilliseconds: number;
 
-	constructor(startTimeInMilliseconds: number) {
-		this.startTimeInMilliseconds = startTimeInMilliseconds;
+	static fromStartTimeSubtractingReferenceTimeOffset(
+		referenceStartTimeInMilliseconds: number,
+		offset: number,
+	): PlayingPlaybackState {
+		return new PlayingPlaybackState(referenceStartTimeInMilliseconds - offset);
+	}
+
+	constructor(localStartTimeInMilliseconds: number) {
+		this.localStartTimeInMilliseconds = localStartTimeInMilliseconds;
 	}
 }
 
-class PausedPlaybackState {
+export class PausedPlaybackState {
 	readonly positionInMilliseconds: number;
 
 	constructor(positionInMilliseconds: number) {

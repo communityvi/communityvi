@@ -43,10 +43,6 @@ export enum PlaybackStateType {
 	Paused = 'paused',
 }
 
-export interface TimestampedSuccessMessage extends SuccessMessage {
-	readonly arrivalTimestamp: DOMHighResTimeStamp | DOMTimeStamp;
-}
-
 export interface SuccessMessage {
 	readonly type: SuccessMessageType;
 }

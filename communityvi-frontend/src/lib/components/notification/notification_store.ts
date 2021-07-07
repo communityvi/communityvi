@@ -17,6 +17,11 @@ export class NotificationStore implements Readable<IdentifiableNotifications> {
 		this.notify(notification);
 	}
 
+	error(message: string): void {
+		const notification = new IdentifiableNotification(++this.count, NotificationType.DANGER, message);
+		this.notify(notification);
+	}
+
 	private notify(notification: IdentifiableNotification): void {
 		this.notifications.push(notification);
 		this.notifyAllSubscribers();
