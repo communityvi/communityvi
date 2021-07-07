@@ -7,7 +7,17 @@
 	$: isRegistered = $registeredClient !== undefined;
 
 	let medium: Medium | undefined;
-	$: medium = $registeredClient?.currentMedium;
+	$: {
+		if ($registeredClient !== undefined) {
+			if (!Medium.haveEqualMetadata(medium, $registeredClient.currentMedium)) {
+				// Update the medium in case of relogin
+				medium = $registeredClient.currentMedium;
+				selectedMediumName = medium?.name;
+				selectedMediumLengthInMilliseconds = medium?.lengthInMilliseconds;
+				$videoUrl = undefined;
+			}
+		}
+	}
 	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
 
 	let formattedMediumLength: string | undefined;

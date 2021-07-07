@@ -13,6 +13,11 @@
 	// If true, the next seek was most likely caused by us, not the user, so ignore it.
 	let ignoreNextSeek = false;
 
+	$: {
+		// Ensure the playback position is synchronized after reconnect
+		syncPlaybackPosition($registeredClient?.currentMedium?.playbackState);
+	}
+
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
 	onDestroy(() => {
@@ -34,7 +39,7 @@
 	}
 
 	async function syncPlaybackPosition(playbackState?: PlayingPlaybackState | PausedPlaybackState) {
-		if (playbackState === undefined) {
+		if (playbackState === undefined || player === undefined) {
 			return;
 		}
 
@@ -57,6 +62,10 @@
 	}
 
 	async function onPlay() {
+		if (player === undefined) {
+			return;
+		}
+
 		if (player.seeking) {
 			// If this pause event was triggered by seeking, ignore it because it is not an actual user
 			// triggered pause.
@@ -73,6 +82,10 @@
 	}
 
 	async function onPause() {
+		if (player === undefined) {
+			return;
+		}
+
 		if (player.seeking) {
 			// If this pause event was triggered by seeking, ignore it because it is not an actual user
 			// triggered pause.
@@ -93,6 +106,10 @@
 			return;
 		}
 
+		if (player === undefined) {
+			return;
+		}
+
 		try {
 			if (player.paused) {
 				await $registeredClient?.pause(player.currentTime * 1000, true);
@@ -108,6 +125,10 @@
 	}
 
 	async function resetPlaybackState() {
+		if (player === undefined) {
+			return;
+		}
+
 		notifications.inform('Resetting playback state.');
 
 		const medium = $registeredClient?.currentMedium;
@@ -134,6 +155,10 @@
 	}
 
 	function setPlayerPosition(milliseconds: number) {
+		if (player === undefined) {
+			return;
+		}
+
 		// Assigning to player.currentTime always seems to trigger a 'seeked' event
 		// so we need to ignore the next one in order to differentiate it from
 		// user triggered seeks.
