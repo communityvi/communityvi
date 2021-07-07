@@ -8,16 +8,15 @@
 
 	let medium: Medium | undefined;
 	$: medium = $registeredClient?.currentMedium;
-	$: mediumTitle = selectedMediumName ?? medium?.name ?? 'n/a';
+	$: mediumIsOutdated = (medium !== undefined) && ($videoUrl === undefined);
 
-	let formattedMediumLength: string;
+	let formattedMediumLength: string | undefined;
 	$: {
-		const mediumLengthInMilliseconds = selectedMediumLengthInMilliseconds ?? medium?.lengthInMilliseconds;
+		const mediumLengthInMilliseconds = medium?.lengthInMilliseconds;
+		formattedMediumLength = undefined;
 		if (mediumLengthInMilliseconds !== undefined) {
 			const lengthInMinutes = mediumLengthInMilliseconds / 1000 / 60;
 			formattedMediumLength = `${Math.round(lengthInMinutes)} min.`;
-		} else {
-			formattedMediumLength = 'n/a';
 		}
 	}
 
@@ -63,9 +62,17 @@
 		}
 
 		selectedMediumLengthInMilliseconds = durationHelper.duration * 1000;
+		if (mediumIsOutdated && (medium !== undefined) && ((selectedMediumName !== medium.name) || (selectedMediumLengthInMilliseconds != medium.lengthInMilliseconds))) {
+			notifications.error('Wrong medium selected');
+			return;
+		}
+
 		$videoUrl = durationHelper.src;
 
 		try {
+			if (mediumIsOutdated) {
+				return;
+			}
 			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
 			medium = $registeredClient.currentMedium;
 		} catch (error) {
@@ -100,8 +107,8 @@
 
 {#if isRegistered}
 	<section id="medium-selection">
-		<span class="medium-title">{mediumTitle}</span>
-		<span class="medium-duration">&nbsp;({formattedMediumLength})</span>
+		<span class="medium-title">{medium?.name ?? 'n/a'}</span>
+		<span class="medium-duration">&nbsp;({formattedMediumLength ?? 'n/a'})</span>
 
 		<div class="file">
 			<label class="file-label">
@@ -110,7 +117,13 @@
 					<span class="file-icon">
 						<i class="fas fa-upload" />
 					</span>
-					<span class="file-label">Insert Medium… </span>
+					<span class="file-label">
+						{#if mediumIsOutdated}
+							Select file for "{medium.name}"
+						{:else}
+							Insert New Medium…
+						{/if}
+					</span>
 				</span>
 			</label>
 		</div>
