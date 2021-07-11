@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {registeredClient, notifications, videoUrl} from '$lib/stores';
-	import {Medium} from '$lib/client/model';
+	import {Medium, MediumChangedByOurself} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 
@@ -44,7 +44,11 @@
 		}
 	});
 
-	function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): void {
+	function onMediumStateChanged(change: MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted): void {
+		if (change instanceof MediumChangedByOurself) {
+			return;
+		}
+
 		resetMediumSelection();
 		if (!Medium.haveEqualMetadata(medium, change.medium)) {
 			$videoUrl = undefined;
