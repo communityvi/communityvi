@@ -6,7 +6,7 @@
 
 	// NOTE: currentTime needs to be accessed via the player itself because the binding provided by svelte
 	// as of 3.38.3 neither reads the currentTime reliably, nor sets it reliably.
-	let player: HTMLVideoElement | undefined;
+	let player: HTMLVideoElement | null | undefined;
 	let lastStartTimeInMilliseconds = 0;
 	let lastPositionInMilliseconds = 0;
 
@@ -27,7 +27,7 @@
 	});
 
 	async function onMediumStateChanged(change: MediumChangedByPeer | MediumTimeAdjusted): Promise<void> {
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
@@ -39,7 +39,7 @@
 	}
 
 	async function syncPlaybackPosition(playbackState?: PlayingPlaybackState | PausedPlaybackState) {
-		if (playbackState === undefined || player === undefined) {
+		if (playbackState === undefined || !player) {
 			return;
 		}
 
@@ -62,7 +62,7 @@
 	}
 
 	async function onPlay() {
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
@@ -82,7 +82,7 @@
 	}
 
 	async function onPause() {
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
@@ -106,7 +106,7 @@
 			return;
 		}
 
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
@@ -125,7 +125,7 @@
 	}
 
 	async function resetPlaybackState() {
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
@@ -155,7 +155,7 @@
 	}
 
 	function setPlayerPosition(milliseconds: number) {
-		if (player === undefined) {
+		if (!player) {
 			return;
 		}
 
