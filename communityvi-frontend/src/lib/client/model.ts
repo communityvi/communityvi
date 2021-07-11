@@ -118,6 +118,14 @@ export class MediumChangedByPeer {
 	}
 }
 
+export class MediumChangedByOurself {
+	readonly medium?: Medium;
+
+	constructor(medium?: Medium) {
+		this.medium = medium;
+	}
+}
+
 export class MediumTimeAdjusted {
 	readonly medium: Medium;
 

@@ -30,6 +30,7 @@ import {
 	MediumChangedByPeer,
 	MediumTimeAdjusted,
 	PlayingPlaybackState,
+	MediumChangedByOurself,
 } from '$lib/client/model';
 
 export class Client {
@@ -168,6 +169,8 @@ export class RegisteredClient {
 		}
 
 		this.versionedMedium = new VersionedMedium(version + 1, insertedMedium);
+
+		RegisteredClient.notify(new MediumChangedByOurself(insertedMedium), this.mediumStateChangedCallbacks);
 	}
 
 	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
@@ -328,6 +331,8 @@ class UnknownBroadcastError extends Error {
 export type DisconnectCallback = (reason: CloseReason) => void;
 export type PeerLifecycleCallback = (peerChange: PeerLifecycleMessage) => void;
 export type ChatMessageCallback = (message: ChatMessage) => void;
-export type MediumStateChangedCallback = (change: MediumChangedByPeer | MediumTimeAdjusted) => void;
+export type MediumStateChangedCallback = (
+	change: MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted,
+) => void;
 
 export type Unsubscriber = () => void;
