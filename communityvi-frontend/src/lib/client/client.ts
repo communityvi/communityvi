@@ -194,6 +194,8 @@ export class RegisteredClient {
 		}
 
 		this.versionedMedium = new VersionedMedium(version + 1, undefined);
+
+		RegisteredClient.notify(new MediumChangedByOurself(undefined), this.mediumStateChangedCallbacks);
 	}
 
 	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
