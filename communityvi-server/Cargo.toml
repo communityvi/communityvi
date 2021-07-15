@@ -26,7 +26,7 @@ sha1 = "0.6"
 structopt = "0.3"
 tokio = {version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"]}
 tokio-stream = {version = "0.1", features = ["sync"]}
-tokio-tungstenite = "0.14"
+tokio-tungstenite = "0.15"
 toml = "0.5"
 typed-builder = "0.9"
 unicode_skeleton = "0.1"
