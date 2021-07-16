@@ -104,8 +104,7 @@
 
 		<div class="file">
 			<label class="file-label">
-				<!-- FIXME: The player seems to behave differently when working with audio :-( -->
-				<input class="file-input" type="file" accept="video/*" on:change={onMediumSelection} />
+				<input class="file-input" type="file" accept="video/*,audio/*" on:change={onMediumSelection} />
 				<span class="file-cta">
 					<span class="file-icon">
 						<i class="fas fa-upload" />

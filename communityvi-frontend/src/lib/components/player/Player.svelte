@@ -84,7 +84,6 @@
 	}
 </script>
 
-<!-- FIXME: This player seems to behave differently when working with audio :-( -->
 <!-- FIXME: Need debouncing! -->
 <!-- svelte-ignore a11y-media-has-caption -->
 <section id="player" class:is-hidden={$videoUrl === undefined}>
