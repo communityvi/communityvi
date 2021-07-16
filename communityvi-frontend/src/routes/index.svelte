@@ -7,7 +7,7 @@
 	import {WebSocketTransport} from '$lib/client/transport';
 	import {Client} from '$lib/client/client';
 	import Chat from '$lib/components/chat/Chat.svelte';
-	import MediumSelector from '$lib/components/MediumSelector.svelte';
+	import MediumSelector from '$lib/components/medium_selector/MediumSelector.svelte';
 	import Peers from '$lib/components/Peers.svelte';
 	import Player from '$lib/components/player/Player.svelte';
 

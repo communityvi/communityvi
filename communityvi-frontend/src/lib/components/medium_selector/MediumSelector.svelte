@@ -3,7 +3,8 @@
 	import {Medium, MediumChangedByOurself} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
-	import MetadataLoader from '$lib/components/metadata_loader';
+	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
+	import MetadataLoader from '$lib/components/medium_selector/metadata_loader';
 
 	$: isRegistered = $registeredClient !== undefined;
 
@@ -19,20 +20,10 @@
 	}
 	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
 
-	let formattedMediumLength: string | undefined;
-	$: {
-		const mediumLengthInMilliseconds = medium?.lengthInMilliseconds;
-		formattedMediumLength = undefined;
-		if (mediumLengthInMilliseconds !== undefined) {
-			const lengthInMinutes = mediumLengthInMilliseconds / 1000 / 60;
-			formattedMediumLength = `${Math.round(lengthInMinutes)} min.`;
-		}
-	}
-
-	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
-
 	let durationHelper: HTMLVideoElement | undefined;
 	$: metadataLoader = durationHelper ? new MetadataLoader(durationHelper) : undefined;
+
+	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
 	onDestroy(() => {
 		if (unsubscribe !== undefined) {
@@ -74,12 +65,13 @@
 
 		$videoUrl = URL.createObjectURL(selectedFile);
 
+		if (mediumIsOutdated || $registeredClient === undefined) {
+			return;
+		}
+
 		try {
-			if (mediumIsOutdated) {
-				return;
-			}
-			await $registeredClient?.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
-			medium = $registeredClient?.currentMedium;
+			await $registeredClient.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
+			medium = $registeredClient.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
 			notifications.reportError(new Error(`Inserting new medium name '${selectedMedium.name}' failed!`));
@@ -108,7 +100,7 @@
 {#if isRegistered}
 	<section id="medium-selection">
 		<span class="medium-title">{medium?.name ?? 'n/a'}</span>
-		<span class="medium-duration">&nbsp;({formattedMediumLength ?? 'n/a'})</span>
+		<span class="medium-duration">&nbsp;({medium ? formatMediumLength(medium) : 'n/a'})</span>
 
 		<div class="file">
 			<label class="file-label">
