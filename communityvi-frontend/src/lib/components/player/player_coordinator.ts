@@ -5,6 +5,9 @@ export default class PlayerCoordinator {
 
 	private lastPlaybackState: PlayingPlaybackState | PausedPlaybackState;
 
+	private timeOfLastCall = performance.now() - 1000;
+	private pendingTimeout?: NodeJS.Timeout;
+
 	// If true, the next seek was most likely caused by us, not the user, so ignore it.
 	private ignoreNextSeek = false;
 
@@ -66,6 +69,8 @@ export default class PlayerCoordinator {
 	}
 
 	private async syncPlaybackPosition(playbackState: PlayingPlaybackState | PausedPlaybackState): Promise<void> {
+		this.replacePendingTimeout();
+
 		if (playbackState instanceof PlayingPlaybackState) {
 			this.setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
 			if (this.player.paused) {
@@ -122,11 +127,37 @@ export default class PlayerCoordinator {
 
 	private notifyPlayCallback(skipped: boolean): void {
 		const startTimeInMilliseconds = performance.now() - this.player.currentTime * 1000;
-		this.playCallback(startTimeInMilliseconds, skipped);
+		this.callWithRateLimit(() => this.playCallback(startTimeInMilliseconds, skipped));
 	}
 
 	private notifyPauseCallback(skipped: boolean): void {
-		this.pauseCallback(this.player.currentTime * 1000, skipped);
+		const positionInMilliseconds = this.player.currentTime * 1000;
+		this.callWithRateLimit(() => this.pauseCallback(positionInMilliseconds, skipped));
+	}
+
+	private callWithRateLimit(call: () => void) {
+		const INTERVAL = 1000;
+		const callAndUpdateTimeOfLastCall = () => {
+			call();
+			this.timeOfLastCall = performance.now();
+		};
+
+		if (performance.now() - this.timeOfLastCall > INTERVAL) {
+			this.replacePendingTimeout();
+			callAndUpdateTimeOfLastCall();
+			return;
+		}
+
+		const timeout = setTimeout(callAndUpdateTimeOfLastCall, INTERVAL);
+		this.replacePendingTimeout(timeout);
+	}
+
+	private replacePendingTimeout(newTimeout?: NodeJS.Timeout) {
+		if (this.pendingTimeout !== undefined) {
+			clearTimeout(this.pendingTimeout);
+		}
+
+		this.pendingTimeout = newTimeout;
 	}
 }
 
