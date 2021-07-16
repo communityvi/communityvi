@@ -3,6 +3,7 @@
 	import {Medium, MediumChangedByOurself} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
+	import MetadataLoader from '$lib/components/metadata_loader';
 
 	$: isRegistered = $registeredClient !== undefined;
 
@@ -12,8 +13,6 @@
 			if (!Medium.haveEqualMetadata(medium, $registeredClient.currentMedium)) {
 				// Update the medium in case of relogin
 				medium = $registeredClient.currentMedium;
-				selectedMediumName = medium?.name;
-				selectedMediumLengthInMilliseconds = medium?.lengthInMilliseconds;
 				$videoUrl = undefined;
 			}
 		}
@@ -32,11 +31,8 @@
 
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
-	let selectedMediumName: string | undefined;
-	let selectedMediumLengthInMilliseconds: number | undefined;
-	let selectedMediumUrl: string | undefined;
-
-	let durationHelper: HTMLVideoElement;
+	let durationHelper: HTMLVideoElement | undefined;
+	$: metadataLoader = durationHelper ? new MetadataLoader(durationHelper) : undefined;
 
 	onDestroy(() => {
 		if (unsubscribe !== undefined) {
@@ -49,54 +45,44 @@
 			return;
 		}
 
-		resetMediumSelection();
 		if (!Medium.haveEqualMetadata(medium, change.medium)) {
 			$videoUrl = undefined;
 		}
 		medium = change.medium;
 	}
 
-	function onMediumSelection(event: Event) {
-		const element = event.target as HTMLInputElement;
-		const medium = element?.files?.item(0) ?? undefined;
-		if (medium === undefined) {
+	async function onMediumSelection(event: Event) {
+		const fileSelector = event.target as HTMLInputElement;
+		const selectedFile = fileSelector?.files?.item(0) ?? undefined;
+		if (selectedFile === undefined || metadataLoader === undefined) {
 			return;
 		}
 
-		selectedMediumName = medium.name;
-		selectedMediumUrl = URL.createObjectURL(medium);
-
-		durationHelper.src = selectedMediumUrl;
-		durationHelper.load();
-	}
-
-	async function onDurationHelperLoadedMetadata() {
-		if ($registeredClient === undefined || selectedMediumName === undefined) {
+		let selectedMedium: Medium;
+		try {
+			selectedMedium = await metadataLoader.mediumFromFile(selectedFile);
+		} catch (error) {
+			console.error('Error while loading medium:', error);
+			notifications.reportError(error);
 			return;
 		}
 
-		selectedMediumLengthInMilliseconds = Math.round(durationHelper.duration * 1000);
-		if (
-			mediumIsOutdated &&
-			medium !== undefined &&
-			(selectedMediumName !== medium.name || selectedMediumLengthInMilliseconds != medium.lengthInMilliseconds)
-		) {
+		if (mediumIsOutdated && medium !== undefined && !Medium.haveEqualMetadata(medium, selectedMedium)) {
 			notifications.error('Wrong medium selected');
 			return;
 		}
 
-		$videoUrl = durationHelper.src;
+		$videoUrl = URL.createObjectURL(selectedFile);
 
 		try {
 			if (mediumIsOutdated) {
 				return;
 			}
-			await $registeredClient.insertFixedLengthMedium(selectedMediumName, selectedMediumLengthInMilliseconds);
-			medium = $registeredClient.currentMedium;
+			await $registeredClient?.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
+			medium = $registeredClient?.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
-			notifications.reportError(new Error(`Inserting new medium name '${selectedMediumName}' failed!`));
-			resetMediumSelection();
+			notifications.reportError(new Error(`Inserting new medium name '${selectedMedium.name}' failed!`));
 		}
 	}
 
@@ -105,7 +91,6 @@
 			return;
 		}
 
-		resetMediumSelection();
 		try {
 			await $registeredClient.ejectMedium();
 			medium = undefined;
@@ -115,13 +100,10 @@
 			notifications.reportError(new Error('Ejecting the medium failed!'));
 		}
 	}
-
-	function resetMediumSelection() {
-		selectedMediumName = undefined;
-		selectedMediumLengthInMilliseconds = undefined;
-		selectedMediumUrl = undefined;
-	}
 </script>
+
+<!-- Hidden video element for parsing file metadata -->
+<video hidden={true} muted={true} bind:this={durationHelper} />
 
 {#if isRegistered}
 	<section id="medium-selection">
@@ -146,13 +128,6 @@
 				</span>
 			</label>
 		</div>
-		<video
-			preload="metadata"
-			hidden={true}
-			muted={true}
-			bind:this={durationHelper}
-			on:loadedmetadata={onDurationHelperLoadedMetadata}
-		/>
 
 		{#if medium !== undefined}
 			<button on:click={ejectMedium}>Eject Medium</button>
