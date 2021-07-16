@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/communityvi/communityvi"
+resolver = "2"
 
 [dependencies]
 anyhow = "1"
