@@ -4,13 +4,14 @@ version = "0.1.0"
 authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/communityvi/communityvi"
+resolver = "2"
 
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.13"
 chrono = {version = "0.4", features = ["serde"]}
-env_logger = "0.8"
+env_logger = "0.9"
 futures = "0.3"
 gotham = {version = "0.6", default-features = false}
 governor = {version = "0.3", default-features = false, features = ["std", "jitter"]}
@@ -26,7 +27,7 @@ sha1 = "0.6"
 structopt = "0.3"
 tokio = {version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"]}
 tokio-stream = {version = "0.1", features = ["sync"]}
-tokio-tungstenite = "0.14"
+tokio-tungstenite = "0.15"
 toml = "0.5"
 typed-builder = "0.9"
 unicode_skeleton = "0.1"
