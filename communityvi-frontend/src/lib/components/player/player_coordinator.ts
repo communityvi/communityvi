@@ -1,15 +1,15 @@
 import {PausedPlaybackState, PlayingPlaybackState} from '$lib/client/model';
+import RateLimiter from '$lib/utils/rate_limiter';
 
 export default class PlayerCoordinator {
 	private readonly player: HTMLMediaElement;
 
 	private lastPlaybackState: PlayingPlaybackState | PausedPlaybackState;
 
-	private timeOfLastCall = performance.now() - 1000;
-	private pendingTimeout?: NodeJS.Timeout;
-
 	// If true, the next seek was most likely caused by us, not the user, so ignore it.
 	private ignoreNextSeek = false;
+
+	private readonly rateLimiter = new RateLimiter(1000);
 
 	private readonly playCallback: PlayCallback;
 	private readonly pauseCallback: PauseCallback;
@@ -69,7 +69,9 @@ export default class PlayerCoordinator {
 	}
 
 	private async syncPlaybackPosition(playbackState: PlayingPlaybackState | PausedPlaybackState): Promise<void> {
-		this.replacePendingTimeout();
+		// Resetting the rate limiter is really important so that local operations can never be
+		// reordered to happen after an operation broadcast from the server.
+		this.rateLimiter.reset();
 
 		if (playbackState instanceof PlayingPlaybackState) {
 			this.setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
@@ -127,37 +129,12 @@ export default class PlayerCoordinator {
 
 	private notifyPlayCallback(skipped: boolean): void {
 		const startTimeInMilliseconds = performance.now() - this.player.currentTime * 1000;
-		this.callWithRateLimit(() => this.playCallback(startTimeInMilliseconds, skipped));
+		this.rateLimiter.call(() => this.playCallback(startTimeInMilliseconds, skipped));
 	}
 
 	private notifyPauseCallback(skipped: boolean): void {
 		const positionInMilliseconds = this.player.currentTime * 1000;
-		this.callWithRateLimit(() => this.pauseCallback(positionInMilliseconds, skipped));
-	}
-
-	private callWithRateLimit(call: () => void) {
-		const INTERVAL = 1000;
-		const callAndUpdateTimeOfLastCall = () => {
-			call();
-			this.timeOfLastCall = performance.now();
-		};
-
-		if (performance.now() - this.timeOfLastCall > INTERVAL) {
-			this.replacePendingTimeout();
-			callAndUpdateTimeOfLastCall();
-			return;
-		}
-
-		const timeout = setTimeout(callAndUpdateTimeOfLastCall, INTERVAL);
-		this.replacePendingTimeout(timeout);
-	}
-
-	private replacePendingTimeout(newTimeout?: NodeJS.Timeout) {
-		if (this.pendingTimeout !== undefined) {
-			clearTimeout(this.pendingTimeout);
-		}
-
-		this.pendingTimeout = newTimeout;
+		this.rateLimiter.call(() => this.pauseCallback(positionInMilliseconds, skipped));
 	}
 }
 
