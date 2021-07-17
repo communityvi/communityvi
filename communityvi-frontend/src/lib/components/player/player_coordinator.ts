@@ -1,4 +1,5 @@
 import {PausedPlaybackState, PlayingPlaybackState} from '$lib/client/model';
+import RateLimiter from '$lib/utils/rate_limiter';
 
 export default class PlayerCoordinator {
 	private readonly player: HTMLMediaElement;
@@ -7,6 +8,8 @@ export default class PlayerCoordinator {
 
 	// If true, the next seek was most likely caused by us, not the user, so ignore it.
 	private ignoreNextSeek = false;
+
+	private readonly rateLimiter = new RateLimiter(1000);
 
 	private readonly playCallback: PlayCallback;
 	private readonly pauseCallback: PauseCallback;
@@ -66,6 +69,10 @@ export default class PlayerCoordinator {
 	}
 
 	private async syncPlaybackPosition(playbackState: PlayingPlaybackState | PausedPlaybackState): Promise<void> {
+		// Resetting the rate limiter is really important so that local operations can never be
+		// reordered to happen after an operation broadcast from the server.
+		this.rateLimiter.reset();
+
 		if (playbackState instanceof PlayingPlaybackState) {
 			this.setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
 			if (this.player.paused) {
@@ -122,11 +129,12 @@ export default class PlayerCoordinator {
 
 	private notifyPlayCallback(skipped: boolean): void {
 		const startTimeInMilliseconds = performance.now() - this.player.currentTime * 1000;
-		this.playCallback(startTimeInMilliseconds, skipped);
+		this.rateLimiter.call(() => this.playCallback(startTimeInMilliseconds, skipped));
 	}
 
 	private notifyPauseCallback(skipped: boolean): void {
-		this.pauseCallback(this.player.currentTime * 1000, skipped);
+		const positionInMilliseconds = this.player.currentTime * 1000;
+		this.rateLimiter.call(() => this.pauseCallback(positionInMilliseconds, skipped));
 	}
 }
 
