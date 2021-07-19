@@ -108,6 +108,8 @@ export class Peer {
 	}
 }
 
+export type MediumStateChanged = MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted;
+
 export class MediumChangedByPeer {
 	readonly changedBy: Peer;
 	readonly medium?: Medium;
