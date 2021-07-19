@@ -31,7 +31,9 @@ import {
 	MediumTimeAdjusted,
 	PlayingPlaybackState,
 	MediumChangedByOurself,
+	MediumStateChanged,
 } from '$lib/client/model';
+import MessageBroker, {Subscriber, Unsubscriber} from '$lib/client/message_broker';
 
 export class Client {
 	readonly transport: Transport;
@@ -75,9 +77,9 @@ export class RegisteredClient {
 	private readonly disconnectCallback: DisconnectCallback;
 	private readonly referenceTimeUpdateIntervalId: NodeJS.Timeout;
 
-	private readonly peerLifecycleCallbacks = new Array<PeerLifecycleCallback>();
-	private readonly chatMessageCallbacks = new Array<ChatMessageCallback>();
-	private readonly mediumStateChangedCallbacks = new Array<MediumStateChangedCallback>();
+	private readonly peerLifecycleMessageBroker = new MessageBroker<PeerLifecycleMessage>();
+	private readonly chatMessageBroker = new MessageBroker<ChatMessage>();
+	private readonly mediumStateChangedMessageBroker = new MessageBroker<MediumStateChanged>();
 
 	get currentMedium(): Medium | undefined {
 		return this.versionedMedium.medium;
@@ -137,7 +139,7 @@ export class RegisteredClient {
 			);
 			this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
 
-			RegisteredClient.notify(new MediumTimeAdjusted(newMedium), this.mediumStateChangedCallbacks);
+			this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium));
 		}
 	}
 
@@ -145,16 +147,16 @@ export class RegisteredClient {
 		return new Peer(this.id, this.name);
 	}
 
-	subscribeToPeerChanges(callback: PeerLifecycleCallback): Unsubscriber {
-		return RegisteredClient.subscribe(callback, this.peerLifecycleCallbacks);
+	subscribeToPeerChanges(subscriber: Subscriber<PeerLifecycleMessage>): Unsubscriber {
+		return this.peerLifecycleMessageBroker.subscribe(subscriber);
 	}
 
 	async sendChatMessage(message: string): Promise<void> {
 		await this.connection.performRequest(new ChatRequest(message));
 	}
 
-	subscribeToChatMessages(callback: ChatMessageCallback): Unsubscriber {
-		return RegisteredClient.subscribe(callback, this.chatMessageCallbacks);
+	subscribeToChatMessages(subscriber: Subscriber<ChatMessage>): Unsubscriber {
+		return this.chatMessageBroker.subscribe(subscriber);
 	}
 
 	async insertFixedLengthMedium(name: string, lengthInMilliseconds: number): Promise<void> {
@@ -170,7 +172,7 @@ export class RegisteredClient {
 
 		this.versionedMedium = new VersionedMedium(version + 1, insertedMedium);
 
-		RegisteredClient.notify(new MediumChangedByOurself(insertedMedium), this.mediumStateChangedCallbacks);
+		this.mediumStateChangedMessageBroker.notify(new MediumChangedByOurself(insertedMedium));
 	}
 
 	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
@@ -195,24 +197,11 @@ export class RegisteredClient {
 
 		this.versionedMedium = new VersionedMedium(version + 1, undefined);
 
-		RegisteredClient.notify(new MediumChangedByOurself(undefined), this.mediumStateChangedCallbacks);
+		this.mediumStateChangedMessageBroker.notify(new MediumChangedByOurself(undefined));
 	}
 
-	subscribeToMediumStateChanges(callback: MediumStateChangedCallback): Unsubscriber {
-		return RegisteredClient.subscribe(callback, this.mediumStateChangedCallbacks);
-	}
-
-	private static subscribe<Callback>(callback: Callback, callbackList: Array<Callback>): Unsubscriber {
-		callbackList.push(callback);
-
-		return () => {
-			const index = callbackList.indexOf(callback);
-			if (index === -1) {
-				return;
-			}
-
-			callbackList.splice(index, 1);
-		};
+	subscribeToMediumStateChanges(subscriber: Subscriber<MediumStateChanged>): Unsubscriber {
+		return this.mediumStateChangedMessageBroker.subscribe(subscriber);
 	}
 
 	logout(): void {
@@ -231,7 +220,7 @@ export class RegisteredClient {
 				this.peers.push(Peer.fromClientBroadcast(clientJoinedBroadcast));
 
 				const peerLifecycleMessage = PeerJoinedMessage.fromClientJoinedBroadcast(clientJoinedBroadcast);
-				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+				this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
 
 				break;
 			}
@@ -246,7 +235,7 @@ export class RegisteredClient {
 				this.peers.splice(index, 1);
 
 				const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
-				RegisteredClient.notify(peerLifecycleMessage, this.peerLifecycleCallbacks);
+				this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
 
 				break;
 			}
@@ -258,7 +247,7 @@ export class RegisteredClient {
 				}
 
 				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
-				RegisteredClient.notify(chatMessage, this.chatMessageCallbacks);
+				this.chatMessageBroker.notify(chatMessage);
 
 				break;
 			}
@@ -276,10 +265,7 @@ export class RegisteredClient {
 				}
 
 				const changer = Peer.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
-				RegisteredClient.notify(
-					new MediumChangedByPeer(changer, versionedMedium.medium),
-					this.mediumStateChangedCallbacks,
-				);
+				this.mediumStateChangedMessageBroker.notify(new MediumChangedByPeer(changer, versionedMedium.medium));
 
 				break;
 			}
@@ -287,13 +273,6 @@ export class RegisteredClient {
 				throw new UnknownBroadcastError(broadcast);
 		}
 	}
-
-	private static notify<Message>(message: Message, callbackList: Array<(message: Message) => void>) {
-		for (const callback of callbackList) {
-			callback(message);
-		}
-	}
-
 	private connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
 		console.warn('Received unassignable response:', response);
 	}
@@ -331,10 +310,3 @@ class UnknownBroadcastError extends Error {
 }
 
 export type DisconnectCallback = (reason: CloseReason) => void;
-export type PeerLifecycleCallback = (peerChange: PeerLifecycleMessage) => void;
-export type ChatMessageCallback = (message: ChatMessage) => void;
-export type MediumStateChangedCallback = (
-	change: MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted,
-) => void;
-
-export type Unsubscriber = () => void;
