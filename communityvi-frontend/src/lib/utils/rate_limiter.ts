@@ -9,6 +9,8 @@ export default class RateLimiter {
 		this.timeOfLastCall = performance.now() - intervalInMilliseconds;
 	}
 
+	// Schedule a call to be called, limited by the configured rate limit.
+	// NOTE: If calls are coming in too fast, only the last one is guaranteed to happen.
 	call(call: () => void): void {
 		const callAndUpdateTimeOfLastCall = () => {
 			call();
