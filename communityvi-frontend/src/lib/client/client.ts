@@ -105,9 +105,9 @@ export class RegisteredClient {
 
 		this.connection.setDelegate({
 			connectionDidReceiveBroadcast: response => this.connectionDidReceiveBroadcast(response),
-			connectionDidReceiveUnassignableResponse: response => this.connectionDidReceiveUnassignableResponse(response),
+			connectionDidReceiveUnassignableResponse: RegisteredClient.connectionDidReceiveUnassignableResponse,
 			connectionDidClose: reason => this.connectionDidClose(reason),
-			connectionDidEncounterError: error => this.connectionDidEncounterError(error),
+			connectionDidEncounterError: RegisteredClient.connectionDidEncounterError,
 		});
 
 		// Schedule reference time updates every 15s
@@ -273,7 +273,8 @@ export class RegisteredClient {
 				throw new UnknownBroadcastError(broadcast);
 		}
 	}
-	private connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
+
+	private static connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
 		console.warn('Received unassignable response:', response);
 	}
 
@@ -282,7 +283,7 @@ export class RegisteredClient {
 		this.disconnectCallback(reason);
 	}
 
-	private connectionDidEncounterError(error: Event | ErrorEvent): void {
+	private static connectionDidEncounterError(error: Event | ErrorEvent): void {
 		console.error('Received error:', error);
 	}
 }
