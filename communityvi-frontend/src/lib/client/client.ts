@@ -1,4 +1,4 @@
-import type {HelloMessage, ReferenceTimeMessage, ServerResponse} from '$lib/client/response';
+import type {HelloMessage, ServerResponse} from '$lib/client/response';
 import {
 	BroadcastMessage,
 	BroadcastType,
@@ -11,7 +11,6 @@ import {
 	ChatRequest,
 	EmptyMedium,
 	FixedLengthMedium,
-	GetReferenceTimeRequest,
 	InsertMediumRequest,
 	PauseRequest,
 	PlayRequest,
@@ -34,6 +33,7 @@ import {
 	MediumStateChanged,
 } from '$lib/client/model';
 import MessageBroker, {Subscriber, Unsubscriber} from '$lib/client/message_broker';
+import ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 
 export class Client {
 	readonly transport: Transport;
@@ -48,16 +48,16 @@ export class Client {
 		const response = (await connection.performRequest(new RegisterRequest(name))).response as HelloMessage;
 		const peers = response.clients.map(Peer.fromClientResponse);
 
-		const initialReferenceTimeOffset = await fetchReferenceTimeAndCalculateOffset(connection);
+		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connection);
 		const versionedMedium = VersionedMedium.fromVersionedMediumResponseAndReferenceTimeOffset(
 			response.current_medium,
-			initialReferenceTimeOffset,
+			referenceTimeSynchronizer.offset,
 		);
 
 		return new RegisteredClient(
 			response.id,
 			name,
-			initialReferenceTimeOffset,
+			referenceTimeSynchronizer,
 			versionedMedium,
 			peers,
 			connection,
@@ -69,13 +69,12 @@ export class Client {
 export class RegisteredClient {
 	readonly id: number;
 	readonly name: string;
-	private referenceTimeOffset: number;
+	private referenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private versionedMedium: VersionedMedium;
 	readonly peers: Array<Peer>;
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
-	private readonly referenceTimeUpdateIntervalId: NodeJS.Timeout;
 
 	private readonly peerLifecycleMessageBroker = new MessageBroker<PeerLifecycleMessage>();
 	private readonly chatMessageBroker = new MessageBroker<ChatMessage>();
@@ -88,7 +87,7 @@ export class RegisteredClient {
 	constructor(
 		id: number,
 		name: string,
-		referenceTimeOffset: number,
+		referenceTimeSynchronizer: ReferenceTimeSynchronizer,
 		versionedMedium: VersionedMedium,
 		peers: Array<Peer>,
 		connection: Connection,
@@ -96,7 +95,7 @@ export class RegisteredClient {
 	) {
 		this.id = id;
 		this.name = name;
-		this.referenceTimeOffset = referenceTimeOffset;
+		this.referenceTimeSynchronizer = referenceTimeSynchronizer;
 		this.versionedMedium = versionedMedium;
 		this.peers = peers;
 
@@ -110,26 +109,16 @@ export class RegisteredClient {
 			connectionDidEncounterError: RegisteredClient.connectionDidEncounterError,
 		});
 
-		// Schedule reference time updates every 15s
-		this.referenceTimeUpdateIntervalId = setInterval(() => this.synchronizeReferenceTime(), 15_000);
+		this.referenceTimeSynchronizer.start((referenceTimeDeltaInMilliseconds: number) =>
+			this.referenceTimeUpdated(referenceTimeDeltaInMilliseconds),
+		);
 	}
 
-	private async synchronizeReferenceTime(): Promise<void> {
-		// FIXME: This is far from ideal. Think about how to make this more cohesive and less ad-hoc.
-		console.log('Reference time offset updated:', this.referenceTimeOffset);
-		const newOffset = await fetchReferenceTimeAndCalculateOffset(this.connection);
-		if (this.referenceTimeOffset === newOffset) {
-			console.info('Reference time did not need updating.');
-			return;
-		}
-
-		const oldOffset = this.referenceTimeOffset;
-		this.referenceTimeOffset = newOffset;
-
+	private referenceTimeUpdated(referenceTimeDeltaInMilliseconds: number): void {
 		const medium = this.versionedMedium.medium;
 		const playbackState = medium?.playbackState;
 		if (medium !== undefined && playbackState instanceof PlayingPlaybackState) {
-			const newStartTime = playbackState.localStartTimeInMilliseconds + (newOffset - oldOffset);
+			const newStartTime = playbackState.localStartTimeInMilliseconds + referenceTimeDeltaInMilliseconds;
 			const newPlayingPlaybackState = new PlayingPlaybackState(newStartTime);
 			const newMedium = new Medium(
 				medium.name,
@@ -139,7 +128,7 @@ export class RegisteredClient {
 			);
 			this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
 
-			this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium));
+			this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium, referenceTimeDeltaInMilliseconds));
 		}
 	}
 
@@ -176,8 +165,8 @@ export class RegisteredClient {
 	}
 
 	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
-		const referenceStartTimeInMilliseconds = localStartTimeInMilliseconds + this.referenceTimeOffset;
-		const playRequest = new PlayRequest(this.versionedMedium.version, skipped, referenceStartTimeInMilliseconds);
+		const startTimeInMs = this.referenceTimeSynchronizer.calculateServerTimeFromLocalTime(localStartTimeInMilliseconds);
+		const playRequest = new PlayRequest(this.versionedMedium.version, skipped, startTimeInMs);
 		await this.connection.performRequest(playRequest);
 	}
 
@@ -255,7 +244,7 @@ export class RegisteredClient {
 				const mediumStateChangedBroadcast = broadcast as MediumStateChangedBroadcast;
 				const versionedMedium = VersionedMedium.fromVersionedMediumBroadcastAndReferenceTimeOffset(
 					mediumStateChangedBroadcast.medium,
-					this.referenceTimeOffset,
+					this.referenceTimeSynchronizer.offset,
 				);
 				this.versionedMedium = versionedMedium;
 
@@ -279,24 +268,13 @@ export class RegisteredClient {
 	}
 
 	private connectionDidClose(reason: CloseReason): void {
-		clearInterval(this.referenceTimeUpdateIntervalId);
+		this.referenceTimeSynchronizer.stop();
 		this.disconnectCallback(reason);
 	}
 
 	private static connectionDidEncounterError(error: Event | ErrorEvent): void {
 		console.error('Received error:', error);
 	}
-}
-
-async function fetchReferenceTimeAndCalculateOffset(connection: Connection): Promise<number> {
-	const response = await connection.performRequest(new GetReferenceTimeRequest());
-
-	// We assume that the request takes the same time to the server as the response takes back to us.
-	// Therefore, the server's reference time represents our time half way the message exchange.
-	const ourTime = response.metadata.sentAt + response.metadata.roundTripTimeInMilliseconds / 2;
-	const referenceTime = (response.response as ReferenceTimeMessage).milliseconds;
-
-	return referenceTime - ourTime;
 }
 
 class UnknownBroadcastError extends Error {

@@ -130,9 +130,11 @@ export class MediumChangedByOurself {
 
 export class MediumTimeAdjusted {
 	readonly medium: Medium;
+	readonly adjustmentInMilliseconds: number;
 
-	constructor(medium: Medium) {
+	constructor(medium: Medium, adjustmentInMilliseconds: number) {
 		this.medium = medium;
+		this.adjustmentInMilliseconds = adjustmentInMilliseconds;
 	}
 }
 
