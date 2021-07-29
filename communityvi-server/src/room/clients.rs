@@ -77,7 +77,7 @@ impl Clients {
 
 		let existing_clients = self.clients_by_id.iter().map(|(_id, client)| client.clone()).collect();
 		if self.clients_by_id.insert(client_id, client.clone()).is_some() {
-			unreachable!("There must never be two clients with the same id!")
+			unreachable!("There must never be two clients with the same id!");
 		}
 
 		Ok((client, existing_clients))

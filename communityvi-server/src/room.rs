@@ -96,7 +96,7 @@ impl Room {
 	}
 
 	fn eject_medium(&self) {
-		self.inner.medium.lock().update(Medium::Empty)
+		self.inner.medium.lock().update(Medium::Empty);
 	}
 
 	pub fn medium(&self) -> VersionedMedium {
