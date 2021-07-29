@@ -147,7 +147,7 @@ impl Stream for TestInterval {
 		let receive_poll = self.as_mut().receiver.poll_next_unpin(context);
 		match receive_poll {
 			Poll::Ready(Some(time_delta)) => {
-				self.as_mut().current_time += time_delta.expect("Failed to receive current time.")
+				self.as_mut().current_time += time_delta.expect("Failed to receive current time.");
 			}
 			Poll::Ready(None) => return Poll::Ready(None),
 			Poll::Pending => {}

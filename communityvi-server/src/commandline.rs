@@ -47,14 +47,14 @@ impl Commandline {
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
 					application_context.configuration.address
 				);
-				run_server(&application_context, false).await
+				run_server(&application_context, false).await;
 			}
 			BaseCommand::Demo => {
 				info!(
 					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
 					application_context.configuration.address
 				);
-				run_server(&application_context, true).await
+				run_server(&application_context, true).await;
 			}
 			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
 		}

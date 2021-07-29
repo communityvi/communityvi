@@ -108,5 +108,5 @@ fn bad_request() -> Response<Body> {
 
 async fn run_client_connection(application_context: ApplicationContext, room: Room, websocket: WebSocket) {
 	let (message_sender, message_receiver) = split_websocket(websocket);
-	run_client(application_context, room, message_sender, message_receiver).await
+	run_client(application_context, room, message_sender, message_receiver).await;
 }
