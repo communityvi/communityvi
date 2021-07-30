@@ -1,5 +1,6 @@
-import {Client, RegisteredClient} from '$lib/client/client';
+import Client from '$lib/client/client';
 import TestTransport from './helper/test_transport';
+import RegisteredClient from '$lib/client/registered_client';
 
 describe('Client registrations', () => {
 	// eslint-disable-next-line @typescript-eslint/no-empty-function
