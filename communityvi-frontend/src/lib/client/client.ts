@@ -199,68 +199,76 @@ export class RegisteredClient {
 
 	private connectionDidReceiveBroadcast(broadcast: BroadcastMessage): void {
 		switch (broadcast.type) {
-			case BroadcastType.ClientJoined: {
-				const clientJoinedBroadcast = broadcast as ClientJoinedBroadcast;
-				if (this.id === clientJoinedBroadcast.id) {
-					// we already know that we've joined ourselves
-					return;
-				}
-
-				this.peers.push(Peer.fromClientBroadcast(clientJoinedBroadcast));
-
-				const peerLifecycleMessage = PeerJoinedMessage.fromClientJoinedBroadcast(clientJoinedBroadcast);
-				this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
-
+			case BroadcastType.ClientJoined:
+				this.handleClientJoinedBroadcast(broadcast as ClientJoinedBroadcast);
 				break;
-			}
-			case BroadcastType.ClientLeft: {
-				const clientLeftBroadcast = broadcast as ClientLeftBroadcast;
-				const index = this.peers.findIndex(peer => peer.id === clientLeftBroadcast.id);
-				if (index === -1) {
-					console.error('Unknown peer left:', clientLeftBroadcast);
-					return;
-				}
 
-				this.peers.splice(index, 1);
-
-				const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
-				this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
-
+			case BroadcastType.ClientLeft:
+				this.handleClientLeftBroadcast(broadcast as ClientLeftBroadcast);
 				break;
-			}
-			case BroadcastType.Chat: {
-				const chatBroadcast = broadcast as ChatBroadcast;
-				if (this.id === chatBroadcast.sender_id) {
-					// we already know what message we've sent ourselves
-					return;
-				}
 
-				const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
-				this.chatMessageBroker.notify(chatMessage);
-
+			case BroadcastType.Chat:
+				this.handleChatBroadcast(broadcast as ChatBroadcast);
 				break;
-			}
-			case BroadcastType.MediumStateChanged: {
-				const mediumStateChangedBroadcast = broadcast as MediumStateChangedBroadcast;
-				const versionedMedium = VersionedMedium.fromVersionedMediumBroadcastAndReferenceTimeOffset(
-					mediumStateChangedBroadcast.medium,
-					this.referenceTimeSynchronizer.offset,
-				);
-				this.versionedMedium = versionedMedium;
 
-				if (this.id === mediumStateChangedBroadcast.changed_by_id) {
-					// we already know about the changes we've made and implicitly updated the state of the client.
-					return;
-				}
-
-				const changer = Peer.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
-				this.mediumStateChangedMessageBroker.notify(new MediumChangedByPeer(changer, versionedMedium.medium));
-
+			case BroadcastType.MediumStateChanged:
+				this.handleMediumStateChangedBroadcast(broadcast as MediumStateChangedBroadcast);
 				break;
-			}
+
 			default:
 				throw new UnknownBroadcastError(broadcast);
 		}
+	}
+
+	private handleClientJoinedBroadcast(clientJoinedBroadcast: ClientJoinedBroadcast) {
+		if (this.id === clientJoinedBroadcast.id) {
+			// we already know that we've joined ourselves
+			return;
+		}
+
+		this.peers.push(Peer.fromClientBroadcast(clientJoinedBroadcast));
+
+		const peerLifecycleMessage = PeerJoinedMessage.fromClientJoinedBroadcast(clientJoinedBroadcast);
+		this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
+	}
+
+	private handleClientLeftBroadcast(clientLeftBroadcast: ClientLeftBroadcast) {
+		const index = this.peers.findIndex(peer => peer.id === clientLeftBroadcast.id);
+		if (index === -1) {
+			console.error('Unknown peer left:', clientLeftBroadcast);
+			return;
+		}
+
+		this.peers.splice(index, 1);
+
+		const peerLifecycleMessage = PeerLeftMessage.fromClientLeftBroadcast(clientLeftBroadcast);
+		this.peerLifecycleMessageBroker.notify(peerLifecycleMessage);
+	}
+
+	private handleChatBroadcast(chatBroadcast: ChatBroadcast) {
+		if (this.id === chatBroadcast.sender_id) {
+			// we already know what message we've sent ourselves
+			return;
+		}
+
+		const chatMessage = ChatMessage.fromChatBroadcast(chatBroadcast);
+		this.chatMessageBroker.notify(chatMessage);
+	}
+
+	private handleMediumStateChangedBroadcast(mediumStateChangedBroadcast: MediumStateChangedBroadcast) {
+		const versionedMedium = VersionedMedium.fromVersionedMediumBroadcastAndReferenceTimeOffset(
+			mediumStateChangedBroadcast.medium,
+			this.referenceTimeSynchronizer.offset,
+		);
+		this.versionedMedium = versionedMedium;
+
+		if (this.id === mediumStateChangedBroadcast.changed_by_id) {
+			// we already know about the changes we've made and implicitly updated the state of the client.
+			return;
+		}
+
+		const changer = Peer.fromMediumStateChangedBroadcast(mediumStateChangedBroadcast);
+		this.mediumStateChangedMessageBroker.notify(new MediumChangedByPeer(changer, versionedMedium.medium));
 	}
 
 	private static connectionDidReceiveUnassignableResponse(response: ServerResponse): void {
