@@ -1,8 +1,8 @@
 <script lang="ts">
 	import {registeredClient, notifications, videoUrl} from '$lib/stores';
 	import {Medium, MediumChangedByOurself} from '$lib/client/model';
+	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
-	import type {MediumChangedByPeer, MediumTimeAdjusted} from '$lib/client/model';
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
 	import MetadataLoader from '$lib/components/medium_selector/metadata_loader';
 
@@ -31,7 +31,7 @@
 		}
 	});
 
-	function onMediumStateChanged(change: MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted): void {
+	function onMediumStateChanged(change: MediumStateChanged): void {
 		if (change instanceof MediumChangedByOurself) {
 			return;
 		}

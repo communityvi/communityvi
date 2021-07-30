@@ -108,6 +108,8 @@ export class Peer {
 	}
 }
 
+export type MediumStateChanged = MediumChangedByPeer | MediumChangedByOurself | MediumTimeAdjusted;
+
 export class MediumChangedByPeer {
 	readonly changedBy: Peer;
 	readonly medium?: Medium;
@@ -128,9 +130,11 @@ export class MediumChangedByOurself {
 
 export class MediumTimeAdjusted {
 	readonly medium: Medium;
+	readonly adjustmentInMilliseconds: number;
 
-	constructor(medium: Medium) {
+	constructor(medium: Medium, adjustmentInMilliseconds: number) {
 		this.medium = medium;
+		this.adjustmentInMilliseconds = adjustmentInMilliseconds;
 	}
 }
 

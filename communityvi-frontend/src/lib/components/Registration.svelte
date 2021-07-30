@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type {Client} from '$lib/client/client';
+	import type Client from '$lib/client/client';
 	import {notifications, registeredClient} from '$lib/stores';
 	import {CloseReason} from '$lib/client/connection';
 
