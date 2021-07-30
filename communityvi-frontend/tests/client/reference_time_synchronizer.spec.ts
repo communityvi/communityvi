@@ -38,11 +38,12 @@ describe('The reference time synchronizer', () => {
 			referenceTimeSynchronizer.start(subscriber);
 
 			// 15s passed and server and client are out of sync by 230ms.
-			scheduleReferenceTimeResponse(connectionMock, 16_337 + 230, 15_000, 16_000);
+			const outOfSyncMilliseconds = 230;
+			scheduleReferenceTimeResponse(connectionMock, 16_337 + outOfSyncMilliseconds, 15_000, 16_000);
 			await timeMock.advanceTimeByMilliseconds(15_000);
 
 			expect(setInterval).toHaveBeenCalledTimes(1);
-			expect(subscriber).toHaveBeenCalled();
+			expect(subscriber).toHaveBeenCalledWith(outOfSyncMilliseconds);
 		});
 	});
 
