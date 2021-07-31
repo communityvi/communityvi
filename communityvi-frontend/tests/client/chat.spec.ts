@@ -36,7 +36,7 @@ describe('The registered client chat', () => {
 		expect(mockConnection.performRequest).toHaveBeenCalledWith(new ChatRequest('hello'));
 	});
 
-	it('forwards chat messages', async () => {
+	it('forwards chat messages', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
@@ -63,7 +63,7 @@ describe('The registered client chat', () => {
 		expect(chatMessageCallback).toHaveBeenCalledWith(new ChatMessage('hello', new Peer(1337, 'peer')));
 	});
 
-	it('ignores chat messages from itself', async () => {
+	it('ignores chat messages from itself', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
