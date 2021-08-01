@@ -84,19 +84,21 @@ export default class RegisteredClient {
 	private referenceTimeUpdated(referenceTimeDeltaInMilliseconds: number): void {
 		const medium = this.versionedMedium.medium;
 		const playbackState = medium?.playbackState;
-		if (medium !== undefined && playbackState instanceof PlayingPlaybackState) {
-			const newStartTime = playbackState.localStartTimeInMilliseconds + referenceTimeDeltaInMilliseconds;
-			const newPlayingPlaybackState = new PlayingPlaybackState(newStartTime);
-			const newMedium = new Medium(
-				medium.name,
-				medium.lengthInMilliseconds,
-				medium.playbackSkipped,
-				newPlayingPlaybackState,
-			);
-			this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
-
-			this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium, referenceTimeDeltaInMilliseconds));
+		if (medium === undefined || !(playbackState instanceof PlayingPlaybackState)) {
+			return;
 		}
+
+		const newStartTime = playbackState.localStartTimeInMilliseconds + referenceTimeDeltaInMilliseconds;
+		const newPlayingPlaybackState = new PlayingPlaybackState(newStartTime);
+		const newMedium = new Medium(
+			medium.name,
+			medium.lengthInMilliseconds,
+			medium.playbackSkipped,
+			newPlayingPlaybackState,
+		);
+		this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
+
+		this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium, referenceTimeDeltaInMilliseconds));
 	}
 
 	asPeer(): Peer {
