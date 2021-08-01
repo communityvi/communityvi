@@ -8,7 +8,8 @@ import Faker from 'faker';
 export class RegisteredClientBuilder {
 	private storedID = Faker.datatype.number({min: 0});
 	private storedName = Faker.internet.userName();
-	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer = mock<ReferenceTimeSynchronizer>();
+	private storedReferenceTimeOffset = 0;
+	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private storedVersionedMedium = new VersionedMedium(Faker.datatype.number({min: 0}));
 	private storedPeers = new Array<Peer>();
 	private storedConnection: Connection = mock<Connection>();
@@ -18,8 +19,15 @@ export class RegisteredClientBuilder {
 		return new RegisteredClientBuilder();
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
-	private constructor() {}
+	private constructor() {
+		// We initialize the mock in the constructor to guarantee a non-NaN return value, which is what we want most times.
+		const referenceTimeSynchronizerMock = mock<ReferenceTimeSynchronizer>();
+		referenceTimeSynchronizerMock.calculateServerTimeFromLocalTime.mockImplementation(
+			localTimeInMilliseconds => localTimeInMilliseconds + this.storedReferenceTimeOffset,
+		);
+
+		this.storedReferenceTimeSynchronizer = referenceTimeSynchronizerMock;
+	}
 
 	id(id: number): RegisteredClientBuilder {
 		this.storedID = id;
@@ -29,6 +37,12 @@ export class RegisteredClientBuilder {
 
 	name(name: string): RegisteredClientBuilder {
 		this.storedName = name;
+
+		return this;
+	}
+
+	referenceTimeOffset(offset: number): RegisteredClientBuilder {
+		this.storedReferenceTimeOffset = offset;
 
 		return this;
 	}
