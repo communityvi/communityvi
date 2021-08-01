@@ -1,10 +1,9 @@
-import {LeaveReason, Peer, PeerJoinedMessage, PeerLeftMessage, VersionedMedium} from '$lib/client/model';
-import {CalledWithMock, mock} from 'jest-mock-extended';
+import {LeaveReason, Peer, PeerJoinedMessage, PeerLeftMessage} from '$lib/client/model';
+import {mock} from 'jest-mock-extended';
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
-import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_client';
 import type {ClientJoinedBroadcast, ClientLeftBroadcast} from '$lib/client/broadcast';
 import {BroadcastType, LeftReason} from '$lib/client/broadcast';
-import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
+import {RegisteredClientBuilder} from './helper/registered_client_builder';
 
 describe('The registered client peer tracking', () => {
 	it('adds joined peers to the list of peers', () => {
@@ -12,7 +11,7 @@ describe('The registered client peer tracking', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = registeredClient(mockConnection, [existingPeer]);
+		const client = RegisteredClientBuilder.default().id(42).peer(existingPeer).connection(mockConnection).build();
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientJoinedBroadcast>{
 			type: BroadcastType.ClientJoined,
@@ -27,7 +26,7 @@ describe('The registered client peer tracking', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = registeredClient(mockConnection, []);
+		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
 		const peerLifecycleCallback = jest.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
@@ -45,7 +44,7 @@ describe('The registered client peer tracking', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = registeredClient(mockConnection, [existingPeer]);
+		const client = RegisteredClientBuilder.default().id(42).peer(existingPeer).connection(mockConnection).build();
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientLeftBroadcast>{
 			type: BroadcastType.ClientLeft,
@@ -62,7 +61,7 @@ describe('The registered client peer tracking', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = registeredClient(mockConnection, [existingPeer]);
+		const client = RegisteredClientBuilder.default().id(42).peer(existingPeer).connection(mockConnection).build();
 		const peerLifecycleCallback = jest.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
@@ -80,7 +79,7 @@ describe('The registered client peer tracking', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = registeredClient(mockConnection, []);
+		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
 		const peerLifecycleCallback = jest.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
@@ -94,18 +93,3 @@ describe('The registered client peer tracking', () => {
 		expect(peerLifecycleCallback).not.toHaveBeenCalled();
 	});
 });
-
-function registeredClient(mockConnection: ConnectionMock, peers: Array<Peer>): RegisteredClient {
-	const versionedMedium = new VersionedMedium(0);
-	return new RegisteredClient(
-		42,
-		'test_client',
-		mock<ReferenceTimeSynchronizer>(),
-		versionedMedium,
-		peers,
-		mockConnection,
-		mock<DisconnectCallback>(),
-	);
-}
-
-type ConnectionMock = {setDelegate: CalledWithMock<void, [ConnectionDelegate]>} & Connection;

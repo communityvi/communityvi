@@ -1,27 +1,15 @@
-import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_client';
-import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import {isA, mock} from 'jest-mock-extended';
-import {ChatMessage, Peer, VersionedMedium} from '$lib/client/model';
+import {ChatMessage, Peer} from '$lib/client/model';
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 import {ChatRequest} from '$lib/client/request';
 import {BroadcastType, ChatBroadcast} from '$lib/client/broadcast';
 import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
 import {SuccessMessage, SuccessMessageType} from '$lib/client/response';
+import {RegisteredClientBuilder} from './helper/registered_client_builder';
 
 describe('The registered client chat', () => {
-	const versionedMedium = new VersionedMedium(0);
-
 	it('can send chat messages', async () => {
 		const mockConnection = mock<Connection>();
-		const client = new RegisteredClient(
-			42,
-			'test_client',
-			mock<ReferenceTimeSynchronizer>(),
-			versionedMedium,
-			[],
-			mockConnection,
-			mock<DisconnectCallback>(),
-		);
 		mockConnection.performRequest.calledWith(isA(ChatRequest)).mockResolvedValueOnce(
 			new EnrichedResponse(
 				<SuccessMessage>{
@@ -30,6 +18,7 @@ describe('The registered client chat', () => {
 				new ResponseMetadata(0, 0),
 			),
 		);
+		const client = RegisteredClientBuilder.default().connection(mockConnection).build();
 
 		await client.sendChatMessage('hello');
 
@@ -40,15 +29,7 @@ describe('The registered client chat', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = new RegisteredClient(
-			42,
-			'test_client',
-			mock<ReferenceTimeSynchronizer>(),
-			versionedMedium,
-			[],
-			mockConnection,
-			mock<DisconnectCallback>(),
-		);
+		const client = RegisteredClientBuilder.default().id(0).connection(mockConnection).build();
 		const chatMessageCallback = jest.fn();
 		client.subscribeToChatMessages(chatMessageCallback);
 
@@ -67,22 +48,14 @@ describe('The registered client chat', () => {
 		const mockConnection = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
-		const client = new RegisteredClient(
-			42,
-			'test_client',
-			mock<ReferenceTimeSynchronizer>(),
-			versionedMedium,
-			[],
-			mockConnection,
-			mock<DisconnectCallback>(),
-		);
+		const client = RegisteredClientBuilder.default().connection(mockConnection).build();
 		const chatMessageCallback = jest.fn();
 		client.subscribeToChatMessages(chatMessageCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ChatBroadcast>{
 			type: BroadcastType.Chat,
-			sender_id: 42,
-			sender_name: 'test_client',
+			sender_id: client.id,
+			sender_name: client.name,
 			message: 'irrelevant',
 			counter: 1234,
 		});
