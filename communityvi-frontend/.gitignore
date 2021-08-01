@@ -1,9 +1,10 @@
-.DS_Store
 node_modules
-/.svelte-kit
-/build
-/functions
-.idea/
+coverage
+.svelte-kit
+build
+functions
+.idea
 *.iml
 *.swp
+.DS_Store
 Thumbs.db
