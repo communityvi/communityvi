@@ -254,7 +254,7 @@ export default class RegisteredClient {
 	}
 }
 
-class UnknownBroadcastError extends Error {
+export class UnknownBroadcastError extends Error {
 	readonly broadcast: BroadcastMessage;
 
 	constructor(broadcast: BroadcastMessage) {
