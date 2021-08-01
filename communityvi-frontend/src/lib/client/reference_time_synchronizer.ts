@@ -76,7 +76,7 @@ export default class ReferenceTimeSynchronizer {
 	}
 }
 
-type TimeUpdatedCallback = (referenceTimeDeltaInMilliseconds: number) => void;
+export type TimeUpdatedCallback = (referenceTimeDeltaInMilliseconds: number) => void;
 
 export class AlreadyRunningError extends Error {
 	constructor() {
