@@ -6,7 +6,7 @@ export class NotificationStore implements Readable<IdentifiableNotifications> {
 	private count = 0;
 	private notifications: IdentifiableNotifications = [];
 
-	private messageBroker = new MessageBroker<IdentifiableNotifications>();
+	private readonly messageBroker = new MessageBroker<IdentifiableNotifications>();
 
 	private get copiedNotifications(): IdentifiableNotifications {
 		return [...this.notifications];
