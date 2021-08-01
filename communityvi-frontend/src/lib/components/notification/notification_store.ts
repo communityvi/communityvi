@@ -1,11 +1,16 @@
 import type {Readable, Subscriber, Unsubscriber} from 'svelte/store';
 import {NotificationType} from '$lib/components/notification/notification_type';
+import MessageBroker from '$lib/client/message_broker';
 
 export class NotificationStore implements Readable<IdentifiableNotifications> {
 	private count = 0;
-	private notifications: Array<IdentifiableNotification> = [];
+	private notifications: IdentifiableNotifications = [];
 
-	private readonly subscribers = new Array<Subscriber<IdentifiableNotifications>>();
+	private messageBroker = new MessageBroker<IdentifiableNotifications>();
+
+	private get copiedNotifications(): IdentifiableNotifications {
+		return [...this.notifications];
+	}
 
 	reportError(error: Error): void {
 		const notification = IdentifiableNotification.fromIdAndError(++this.count, error);
@@ -24,39 +29,21 @@ export class NotificationStore implements Readable<IdentifiableNotifications> {
 
 	private notify(notification: IdentifiableNotification): void {
 		this.notifications.push(notification);
-		this.notifyAllSubscribers();
+		this.messageBroker.notify(this.copiedNotifications);
 	}
 
 	deleteWithId(id: number): void {
 		this.notifications = this.notifications.filter(notification => notification.id !== id);
 
-		this.notifyAllSubscribers();
-	}
-
-	private notifyAllSubscribers(): void {
-		const notifications = this.copiedNotifications();
-		this.subscribers.forEach(subscriber => {
-			subscriber(notifications);
-		});
+		this.messageBroker.notify(this.copiedNotifications);
 	}
 
 	subscribe(subscriber: Subscriber<IdentifiableNotifications>): Unsubscriber {
-		this.subscribers.push(subscriber);
+		const unsubscriber = this.messageBroker.subscribe(subscriber);
 
-		subscriber(this.copiedNotifications());
+		subscriber(this.copiedNotifications);
 
-		return () => {
-			const index = this.subscribers.indexOf(subscriber);
-			if (index === -1) {
-				return;
-			}
-
-			this.subscribers.splice(index, 1);
-		};
-	}
-
-	private copiedNotifications(): IdentifiableNotifications {
-		return [...this.notifications];
+		return unsubscriber;
 	}
 }
 
