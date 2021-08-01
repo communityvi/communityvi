@@ -13,7 +13,7 @@ export class RegisteredClientBuilder {
 	private storedVersionedMedium = new VersionedMedium(Faker.datatype.number({min: 0}));
 	private storedPeers = new Array<Peer>();
 	private storedConnection: Connection = mock<Connection>();
-	private storedDisconnectCallback: DisconnectCallback = mock<DisconnectCallback>();
+	private storedDisconnectCallback: DisconnectCallback = jest.fn();
 
 	static default(): RegisteredClientBuilder {
 		return new RegisteredClientBuilder();
