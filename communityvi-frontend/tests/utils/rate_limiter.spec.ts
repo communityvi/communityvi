@@ -64,4 +64,19 @@ describe('The RateLimiter', () => {
 			expect(lastCall).toHaveBeenCalledTimes(1);
 		});
 	});
+
+	it('should stop pending calls when reset', async () => {
+		await TimeMock.run(async (timeMock: TimeMock) => {
+			const call = jest.fn();
+			const rateLimiter = new RateLimiter(INTERVAL);
+
+			rateLimiter.call(call);
+			rateLimiter.call(call);
+			rateLimiter.reset();
+			await timeMock.advanceTimeByMilliseconds(INTERVAL);
+
+			// Reset stops the second call from  happening, that's why we'll see only one call.
+			expect(call).toHaveBeenCalledTimes(1);
+		});
+	});
 });
