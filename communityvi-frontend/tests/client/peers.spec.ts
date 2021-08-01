@@ -39,6 +39,24 @@ describe('The registered client peer tracking', () => {
 		expect(peerLifecycleCallback).toHaveBeenCalledWith(new PeerJoinedMessage(new Peer(0, 'joined')));
 	});
 
+	it('ignores the broadcast that we have joined ourselves', () => {
+		const mockConnection = mock<Connection>();
+		let connectionDelegate: ConnectionDelegate | undefined;
+		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
+		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
+		const peerLifecycleCallback = jest.fn();
+		client.subscribeToPeerChanges(peerLifecycleCallback);
+
+		connectionDelegate?.connectionDidReceiveBroadcast(<ClientJoinedBroadcast>{
+			type: BroadcastType.ClientJoined,
+			id: client.id,
+			name: client.name,
+		});
+
+		expect(peerLifecycleCallback).not.toHaveBeenCalled();
+		expect(client.peers).toEqual([]);
+	});
+
 	it('removes left peers from the list of peers', () => {
 		const existingPeer = new Peer(0, 'existing');
 		const mockConnection = mock<Connection>();
