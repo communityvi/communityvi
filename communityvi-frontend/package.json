@@ -15,7 +15,7 @@
 		"format": "prettier --write --plugin-search-dir=. ."
 	},
 	"devDependencies": {
-		"@fortawesome/fontawesome-free": "^5.15.3",
+		"@fortawesome/fontawesome-free": "^5.15.4",
 		"@sveltejs/adapter-static": "next",
 		"@sveltejs/kit": "next",
 		"@testing-library/jest-dom": "^5.14",
