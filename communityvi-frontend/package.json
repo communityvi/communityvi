@@ -33,7 +33,7 @@
 		"prettier": "~2.3",
 		"prettier-plugin-svelte": "^2.3",
 		"sass": "^1.37",
-		"svelte": "^3.41",
+		"svelte": "^3.42",
 		"svelte-check": "^2.2",
 		"svelte-jester": "^1.5",
 		"svelte-preprocess": "^4.7",
