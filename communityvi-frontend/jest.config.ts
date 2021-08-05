@@ -1,10 +1,12 @@
-const {pathsToModuleNameMapper} = require('ts-jest/utils');
-const {compilerOptions} = require('./tsconfig');
+import {pathsToModuleNameMapper} from 'ts-jest/utils';
+import {compilerOptions} from './tsconfig.json';
 
-module.exports = {
+export default {
 	globals: {
 		'ts-jest': {
 			tsconfig: './tsconfig.json',
+			isolatedModules: true,
+			useESM: true,
 		},
 	},
 	transform: {
@@ -16,6 +18,8 @@ module.exports = {
 		],
 		'^.+\\.ts$': 'ts-jest',
 	},
-	moduleFileExtensions: ['ts', 'js', 'svelte'],
 	moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, {prefix: '<rootDir>/'}),
+	moduleFileExtensions: ['ts', 'js', 'svelte'],
+	extensionsToTreatAsEsm: ['.ts', '.svelte'],
+	testEnvironment: 'node',
 };
