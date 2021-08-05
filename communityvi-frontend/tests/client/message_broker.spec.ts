@@ -1,3 +1,4 @@
+import {jest} from '@jest/globals';
 import MessageBroker from '$lib/client/message_broker';
 
 describe('The message broker', () => {

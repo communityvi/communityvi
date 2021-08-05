@@ -1,3 +1,4 @@
+import {jest} from '@jest/globals';
 import RateLimiter from '$lib/utils/rate_limiter';
 import TimeMock from '../client/helper/time_mock';
 
