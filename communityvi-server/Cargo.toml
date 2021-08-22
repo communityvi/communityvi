@@ -16,8 +16,10 @@ futures = "0.3"
 gotham = {git = "https://github.com/gotham-rs/gotham", default-features = false, features = ["derive"]}
 governor = {version = "0.3", default-features = false, features = ["std", "jitter"]}
 humantime-serde = "1.0"
+include_dir = {version = "0.6", optional = true, default-features = false}
 log = "0.4"
 mime = "0.3"
+mime_guess = "2"
 nonzero_ext = "0.3"
 parking_lot = "0.11"
 pin-project = "1"
@@ -40,4 +42,4 @@ npm_rs = "0.1"
 
 [features]
 default = []
-bundle-frontend = []
+bundle-frontend = ["include_dir"]
