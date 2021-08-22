@@ -18,8 +18,6 @@ pub struct Commandline {
 pub enum BaseCommand {
 	/// Run the communityvi server (websocket mode only)
 	Run,
-	/// Run the communityvi server with demo client on `/reference`
-	Demo,
 	/// Print the configuration
 	Configuration,
 }
@@ -47,14 +45,7 @@ impl Commandline {
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
 					application_context.configuration.address
 				);
-				run_server(&application_context, false).await;
-			}
-			BaseCommand::Demo => {
-				info!(
-					"Starting server in demo mode. Go to 'http://{}/reference' to access the demo.",
-					application_context.configuration.address
-				);
-				run_server(&application_context, true).await;
+				run_server(&application_context).await;
 			}
 			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
 		}

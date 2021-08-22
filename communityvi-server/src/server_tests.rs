@@ -12,7 +12,6 @@ use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
-use gotham::hyper::http::StatusCode;
 use gotham::hyper::Response;
 use gotham::plain::test::AsyncTestServer;
 use std::error::Error;
@@ -24,7 +23,7 @@ const TEST_SERVER_URL: &str = "127.0.0.1:10000";
 
 #[tokio::test]
 async fn should_respond_to_websocket_messages() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let mut test_client = websocket_test_client(&server).await;
 	let client_id = register_client("Ferris", &mut test_client).await;
 	assert_eq!(ClientId::from(0), client_id);
@@ -32,7 +31,7 @@ async fn should_respond_to_websocket_messages() {
 
 #[tokio::test]
 async fn should_not_allow_invalid_messages_during_registration() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let mut test_client = websocket_test_client(&server).await;
 	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 	test_client.send_raw(invalid_message).await;
@@ -48,7 +47,7 @@ async fn should_not_allow_invalid_messages_during_registration() {
 
 #[tokio::test]
 async fn should_not_allow_invalid_messages_after_successful_registration() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let (_client_id, mut test_client) = registered_websocket_test_client("Ferris", &server).await;
 	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 	test_client.send_raw(invalid_message).await;
@@ -63,7 +62,7 @@ async fn should_not_allow_invalid_messages_after_successful_registration() {
 
 #[tokio::test]
 async fn should_broadcast_messages() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let message = r#"Hello everyone \o/"#;
 	let request = ChatRequest {
 		message: message.to_string(),
@@ -105,7 +104,7 @@ async fn should_broadcast_messages() {
 
 #[tokio::test]
 async fn should_broadcast_when_client_leaves_the_room() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &server).await;
 	let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", &server).await;
 
@@ -121,119 +120,6 @@ async fn should_broadcast_when_client_leaves_the_room() {
 	assert_eq!(expected_leave_message, leave_message);
 }
 
-#[tokio::test]
-async fn test_server_should_serve_reference_client_html_if_enabled() {
-	let server = test_server(true).await;
-	let response = server
-		.client()
-		.get(format!("http://{}/reference", TEST_SERVER_URL))
-		.perform()
-		.await
-		.expect("Failed to request reference_client.");
-	assert_eq!(StatusCode::OK, response.status());
-	let content_type = response
-		.headers()
-		.get("content-type")
-		.expect("No content-type header.")
-		.to_str()
-		.expect("Content-Type header is no valid UTF-8");
-	assert_eq!("text/html; charset=utf-8", content_type);
-
-	let cache_control = response
-		.headers()
-		.get("cache-control")
-		.expect("No cache-control header.")
-		.to_str()
-		.expect("Cache-Control header is no valid UTF-8");
-	assert_eq!("no-cache", cache_control);
-
-	let content_security_policy = response
-		.headers()
-		.get("content-security-policy")
-		.expect("No cache-control header.")
-		.to_str()
-		.expect("Cache-Control header is no valid UTF-8");
-	assert_eq!(
-		"default-src 'none'; media-src 'self' blob:; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
-		content_security_policy
-	);
-
-	let response_text = response.read_utf8_body().await.expect("Incorrect response.");
-	assert!(response_text.contains("html"));
-}
-
-#[tokio::test]
-async fn test_server_should_serve_reference_client_css_if_enabled() {
-	let server = test_server(true).await;
-	let response = server
-		.client()
-		.get(format!("http://{}/reference/reference.css", TEST_SERVER_URL))
-		.perform()
-		.await
-		.expect("Failed to request reference client css.");
-	assert_eq!(StatusCode::OK, response.status());
-	let content_type = response
-		.headers()
-		.get("content-type")
-		.expect("No content-type header.")
-		.to_str()
-		.expect("Content-Type header is no valid UTF-8");
-	assert_eq!("text/css; charset=utf-8", content_type);
-
-	let cache_control = response
-		.headers()
-		.get("cache-control")
-		.expect("No cache-control header.")
-		.to_str()
-		.expect("Cache-Control header is no valid UTF-8");
-	assert_eq!("no-cache", cache_control);
-
-	let response_text = response.read_utf8_body().await.expect("Incorrect response.");
-	assert!(response_text.contains("width"));
-}
-
-#[tokio::test]
-async fn test_server_should_serve_reference_client_javascript_if_enabled() {
-	let server = test_server(true).await;
-	let response = server
-		.client()
-		.get(format!("http://{}/reference/reference.js", TEST_SERVER_URL))
-		.perform()
-		.await
-		.expect("Failed to request reference client javascript.");
-	assert_eq!(StatusCode::OK, response.status());
-	let content_type = response
-		.headers()
-		.get("content-type")
-		.expect("No content-type header.")
-		.to_str()
-		.expect("Content-Type header is no valid UTF-8");
-	assert_eq!("application/javascript; charset=utf-8", content_type);
-
-	let cache_control = response
-		.headers()
-		.get("cache-control")
-		.expect("No cache-control header.")
-		.to_str()
-		.expect("Cache-Control header is no valid UTF-8");
-	assert_eq!("no-cache", cache_control);
-
-	let response_text = response.read_utf8_body().await.expect("Incorrect response.");
-	assert!(response_text.contains("use strict"));
-}
-
-#[tokio::test]
-async fn test_server_should_not_serve_reference_client_if_disabled() {
-	let server = test_server(false).await;
-	let response = server
-		.client()
-		.get(format!("http://{}/reference", TEST_SERVER_URL))
-		.perform()
-		.await
-		.expect("Failed to request reference client.");
-	assert_eq!(StatusCode::NOT_FOUND, response.status());
-}
-
 #[derive(Debug)]
 #[allow(clippy::empty_enum)]
 enum ImpossibleError {}
@@ -246,7 +132,7 @@ impl Error for ImpossibleError {}
 
 #[tokio::test]
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
-	let server = test_server(false).await;
+	let server = test_server().await;
 	let mut test_client = websocket_test_client(&server).await;
 	test_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
@@ -304,7 +190,7 @@ async fn websocket_test_client(server: &AsyncTestServer) -> WebsocketTestClient 
 		.into()
 }
 
-async fn test_server(enable_reference_client: bool) -> AsyncTestServer {
+async fn test_server() -> AsyncTestServer {
 	let room = Room::new(10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
@@ -315,7 +201,7 @@ async fn test_server(enable_reference_client: bool) -> AsyncTestServer {
 	};
 	let time_source = TimeSource::test();
 	let application_context = ApplicationContext::new(configuration, time_source);
-	let router = create_router(application_context, room, enable_reference_client);
+	let router = create_router(application_context, room);
 
 	AsyncTestServer::new(router).await.expect("Failed to build test server")
 }

@@ -3,11 +3,11 @@ use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
-use gotham::hyper::http::{header, HeaderMap, Response};
+use gotham::hyper::http::{HeaderMap, Response};
 use gotham::hyper::upgrade::OnUpgrade;
 use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
-use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, ScopeBuilder};
+use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes};
 use gotham::router::Router;
 use gotham::state::{FromState, State};
 use log::error;
@@ -17,63 +17,23 @@ mod websocket_upgrade;
 
 pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
-pub async fn run_server(application_context: &ApplicationContext, enable_reference_client: bool) {
+pub async fn run_server(application_context: &ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
 	let _ = gotham::init_server(
 		application_context.configuration.address,
-		create_router(application_context.clone(), room, enable_reference_client),
+		create_router(application_context.clone(), room),
 	)
 	.await;
 }
 
-pub fn create_router(application_context: ApplicationContext, room: Room, enable_reference_client: bool) -> Router {
+pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
 	build_simple_router(move |route| {
-		if enable_reference_client {
-			route.scope("/reference", reference_client_scope);
-		}
-
 		route
 			.get("/ws")
 			.to_new_handler(UnwindSafeGothamHandler::from(move |state| {
 				websocket_handler(application_context, room, state)
 			}));
 	})
-}
-
-fn reference_client_scope(route: &mut ScopeBuilder<(), ()>) {
-	const REFERENCE_CLIENT_HTML: &str = include_str!("../static/reference.html");
-	const REFERENCE_CLIENT_JAVASCRIPT: &str = include_str!("../static/reference.js");
-	const REFERENCE_CLIENT_CSS: &str = include_str!("../static/reference.css");
-
-	route.get("/").to(|state| {
-		let response = Response::builder()
-			.header(header::CONTENT_TYPE, mime::TEXT_HTML_UTF_8.to_string())
-			.header(header::CACHE_CONTROL, "no-cache")
-			// prevent XSS - FIXME: Make this work in Safari.
-			.header(
-				header::CONTENT_SECURITY_POLICY,
-				"default-src 'none'; media-src 'self' blob:; img-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'",
-			)
-			.body(REFERENCE_CLIENT_HTML.into())
-			.expect("Failed to build reference client HTML response");
-		(state, response)
-	});
-	route.get("/reference.js").to(|state| {
-		let response = Response::builder()
-			.header(header::CONTENT_TYPE, mime::APPLICATION_JAVASCRIPT_UTF_8.to_string())
-			.header(header::CACHE_CONTROL, "no-cache")
-			.body(REFERENCE_CLIENT_JAVASCRIPT.into())
-			.expect("Failed to build reference client JavaScript response");
-		(state, response)
-	});
-	route.get("/reference.css").to(|state| {
-		let response = Response::builder()
-			.header(header::CONTENT_TYPE, mime::TEXT_CSS_UTF_8.to_string())
-			.header(header::CACHE_CONTROL, "no-cache")
-			.body(REFERENCE_CLIENT_CSS.into())
-			.expect("Failed to build reference client CSS response");
-		(state, response)
-	});
 }
 
 fn websocket_handler(application_context: ApplicationContext, room: Room, mut state: State) -> (State, Response<Body>) {
