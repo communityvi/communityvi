@@ -34,3 +34,10 @@ unicode_skeleton = "0.1"
 
 [dev-dependencies]
 rand = "0.8"
+
+[build-dependencies]
+npm_rs = "0.1"
+
+[features]
+default = []
+bundle-frontend = []
