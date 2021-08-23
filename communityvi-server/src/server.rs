@@ -3,18 +3,17 @@ use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
-use gotham::hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use gotham::hyper::http::{HeaderMap, Response};
 use gotham::hyper::upgrade::OnUpgrade;
+use gotham::hyper::Body;
 use gotham::hyper::StatusCode;
-use gotham::hyper::{Body, Uri};
-use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes};
+use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, RouterBuilder};
 use gotham::router::Router;
 use gotham::state::{FromState, State};
-use include_dir::{include_dir, Dir};
 use log::error;
-use mime_guess::MimeGuess;
 
+#[cfg(feature = "bundle-frontend")]
+mod frontend;
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
 
@@ -35,9 +34,17 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 			let application_context = application_context.clone();
 			move |state| websocket_handler(application_context, room, state)
 		}));
-		route.get("/*").to(frontend_handler);
+		add_frontend_handler(route);
 	})
 }
+
+#[cfg(feature = "bundle-frontend")]
+fn add_frontend_handler(route: &mut RouterBuilder<(), ()>) {
+	route.get("/*").to(frontend::frontend_handler);
+}
+
+#[cfg(not(feature = "bundle-frontend"))]
+fn add_frontend_handler(_route: &mut RouterBuilder<(), ()>) {}
 
 fn websocket_handler(application_context: ApplicationContext, room: Room, mut state: State) -> (State, Response<Body>) {
 	let headers = HeaderMap::take_from(&mut state);
@@ -62,42 +69,11 @@ fn websocket_handler(application_context: ApplicationContext, room: Room, mut st
 	(state, response)
 }
 
-const FRONTEND_BUILD: Dir = include_dir!("../communityvi-frontend/build");
-
-fn frontend_handler(state: State) -> (State, Response<Body>) {
-	let uri = state.borrow::<Uri>();
-	let path = uri.path().strip_prefix("/").unwrap_or(uri.path());
-	// TODO: MOAR HEADERS! See gotham's dir-handler as an example.
-	match FRONTEND_BUILD.get_file(path) {
-		Some(file) => {
-			let mime = MimeGuess::from_path(path).first_or_octet_stream();
-			let content = file.contents();
-			(
-				state,
-				Response::builder()
-					.status(StatusCode::OK)
-					.header(CONTENT_TYPE, mime.as_ref())
-					.header(CONTENT_LENGTH, content.len())
-					.body(Body::from(content))
-					.unwrap(),
-			)
-		}
-		None => (state, not_found()),
-	}
-}
-
 fn bad_request() -> Response<Body> {
 	Response::builder()
 		.status(StatusCode::BAD_REQUEST)
 		.body(Body::from("Bad Request"))
 		.expect("Failed to build BAD_REQUEST response.")
-}
-
-fn not_found() -> Response<Body> {
-	Response::builder()
-		.status(StatusCode::NOT_FOUND)
-		.body(Body::from("Not found"))
-		.expect("Failed to build NOT_FOUND response")
 }
 
 async fn run_client_connection(application_context: ApplicationContext, room: Room, websocket: WebSocket) {
