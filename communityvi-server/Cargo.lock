@@ -169,7 +169,7 @@ dependencies = [
  "humantime-serde",
  "log",
  "mime",
- "nonzero_ext",
+ "nonzero_ext 0.3.0",
  "parking_lot",
  "pin-project",
  "rand",
@@ -432,7 +432,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "no-std-compat",
- "nonzero_ext",
+ "nonzero_ext 0.2.0",
  "parking_lot",
  "rand",
  "smallvec",
@@ -710,6 +710,12 @@ name = "nonzero_ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44a1290799eababa63ea60af0cbc3f03363e328e58f32fb0294798ed3e85f444"
+
+[[package]]
+name = "nonzero_ext"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
 
 [[package]]
 name = "ntapi"
