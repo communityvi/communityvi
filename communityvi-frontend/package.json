@@ -21,7 +21,7 @@
 		"@testing-library/jest-dom": "^5.14",
 		"@testing-library/svelte": "^3.0",
 		"@types/faker": "^5.5.8",
-		"@typescript-eslint/eslint-plugin": "^4.29",
+		"@typescript-eslint/eslint-plugin": "^4.30",
 		"@typescript-eslint/parser": "^4.30",
 		"bulma": "^0.9",
 		"eslint": "^7.32",
