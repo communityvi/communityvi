@@ -45,7 +45,7 @@
 		try {
 			await $registeredClient?.play(startTimeInMilliseconds, skipped);
 		} catch (error) {
-			await handleStateChangeError(error, skipped, getPlayStateChangedErrorMessage);
+			await handleStateChangeError(error as Error, skipped, getPlayStateChangedErrorMessage);
 		}
 	}
 
@@ -61,7 +61,7 @@
 		try {
 			await $registeredClient?.pause(positionInMilliseconds, skipped);
 		} catch (error) {
-			await handleStateChangeError(error, skipped, getPauseStateChangedErrorMessage);
+			await handleStateChangeError(error as Error, skipped, getPauseStateChangedErrorMessage);
 		}
 	}
 
