@@ -54,7 +54,7 @@
 			selectedMedium = await metadataLoader.mediumFromFile(selectedFile);
 		} catch (error) {
 			console.error('Error while loading medium:', error);
-			notifications.reportError(error);
+			notifications.reportError(error as Error);
 			return;
 		}
 

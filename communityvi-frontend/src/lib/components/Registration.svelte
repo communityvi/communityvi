@@ -17,7 +17,7 @@
 		try {
 			$registeredClient = await client.register(registeredName.trim(), onClose);
 		} catch (error) {
-			notifications.reportError(error);
+			notifications.reportError(error as Error);
 		}
 	}
 
