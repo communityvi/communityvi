@@ -11,7 +11,7 @@
 #![allow(clippy::used_underscore_binding)]
 use crate::commandline::Commandline;
 use crate::error::CommunityviError;
-use structopt::StructOpt;
+use clap::Clap;
 
 mod commandline;
 mod configuration;
@@ -28,6 +28,6 @@ mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), CommunityviError> {
-	let commandline = Commandline::from_args();
+	let commandline = Commandline::parse();
 	commandline.run().await
 }

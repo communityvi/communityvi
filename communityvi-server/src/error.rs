@@ -27,8 +27,8 @@ impl From<ConfigurationError> for CommunityviError {
 	}
 }
 
-impl From<structopt::clap::Error> for CommunityviError {
-	fn from(clap_error: structopt::clap::Error) -> Self {
+impl From<clap::Error> for CommunityviError {
+	fn from(clap_error: clap::Error) -> Self {
 		CommunityviError::CommandlineError(clap_error.to_string())
 	}
 }
