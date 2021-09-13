@@ -90,7 +90,7 @@ dependencies = [
 [[package]]
 name = "borrow-bag"
 version = "1.1.0"
-source = "git+https://github.com/gotham-rs/gotham#5c2b469747fc7eb0ec7b02d722eb667d8ae8a5e7"
+source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
 
 [[package]]
 name = "bumpalo"
@@ -391,7 +391,7 @@ dependencies = [
 [[package]]
 name = "gotham"
 version = "0.6.0"
-source = "git+https://github.com/gotham-rs/gotham#5c2b469747fc7eb0ec7b02d722eb667d8ae8a5e7"
+source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
 dependencies = [
  "anyhow",
  "base64",
@@ -424,7 +424,7 @@ dependencies = [
 [[package]]
 name = "gotham_derive"
 version = "0.6.0"
-source = "git+https://github.com/gotham-rs/gotham#5c2b469747fc7eb0ec7b02d722eb667d8ae8a5e7"
+source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
 dependencies = [
  "quote",
  "syn",
