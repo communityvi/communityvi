@@ -41,6 +41,7 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 #[cfg(feature = "bundle-frontend")]
 fn add_frontend_handler(route: &mut RouterBuilder<(), ()>) {
 	route.get("/*").to(frontend::frontend_handler);
+	route.get("/").to(frontend::frontend_handler);
 }
 
 #[cfg(not(feature = "bundle-frontend"))]
