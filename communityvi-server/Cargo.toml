@@ -17,6 +17,7 @@ gotham = {git = "https://github.com/gotham-rs/gotham", default-features = false,
 governor = {version = "0.3", default-features = false, features = ["std", "jitter"]}
 humantime-serde = "1.0"
 include_dir = {version = "0.6", optional = true, default-features = false}
+lazy_static = "1"
 log = "0.4"
 mime = "0.3"
 mime_guess = "2"

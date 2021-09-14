@@ -176,6 +176,7 @@ dependencies = [
  "governor",
  "humantime-serde",
  "include_dir",
+ "lazy_static",
  "log",
  "mime",
  "mime_guess",
