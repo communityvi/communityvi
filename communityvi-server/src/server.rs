@@ -1,8 +1,3 @@
-use crate::connection::split_websocket;
-use crate::context::ApplicationContext;
-use crate::lifecycle::run_client;
-use crate::room::Room;
-use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
 use gotham::hyper::http::{HeaderMap, Response};
 use gotham::hyper::upgrade::OnUpgrade;
 use gotham::hyper::Body;
@@ -12,8 +7,14 @@ use gotham::router::Router;
 use gotham::state::{FromState, State};
 use log::error;
 
-#[cfg(feature = "bundle-frontend")]
-mod frontend;
+use crate::connection::split_websocket;
+use crate::context::ApplicationContext;
+use crate::lifecycle::run_client;
+use crate::room::Room;
+use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
+
+mod etag;
+mod file_bundle;
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
 
@@ -40,8 +41,14 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 
 #[cfg(feature = "bundle-frontend")]
 fn add_frontend_handler(route: &mut RouterBuilder<(), ()>) {
-	route.get("/*").to(frontend::frontend_handler);
-	route.get("/").to(frontend::frontend_handler);
+	use file_bundle::BundledFileHandler;
+	use include_dir::{include_dir, Dir};
+
+	const FRONTEND_BUILD: Dir = include_dir!("../communityvi-frontend/build");
+
+	let new_handler = || Ok(BundledFileHandler::from(FRONTEND_BUILD));
+	route.get("/*").to_new_handler(new_handler);
+	route.get("/").to_new_handler(new_handler);
 }
 
 #[cfg(not(feature = "bundle-frontend"))]
