@@ -14,8 +14,6 @@ use crate::utils::time_source::TimeSource;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::Response;
 use gotham::plain::test::AsyncTestServer;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
@@ -119,16 +117,6 @@ async fn should_broadcast_when_client_leaves_the_room() {
 	let leave_message = alice_test_client.receive_broadcast_message().await;
 	assert_eq!(expected_leave_message, leave_message);
 }
-
-#[derive(Debug)]
-#[allow(clippy::empty_enum)]
-enum ImpossibleError {}
-impl Display for ImpossibleError {
-	fn fmt(&self, _formatter: &mut Formatter) -> std::fmt::Result {
-		Ok(())
-	}
-}
-impl Error for ImpossibleError {}
 
 #[tokio::test]
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
