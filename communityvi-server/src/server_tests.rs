@@ -128,6 +128,27 @@ async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	assert!(pong.is_pong());
 }
 
+#[tokio::test]
+#[cfg(feature = "bundle-frontend")]
+async fn test_server_should_serve_bundled_frontend() {
+	use gotham::hyper::StatusCode;
+
+	let server = test_server().await;
+	let client = server.client();
+
+	let response = client
+		.get(format!("http://{}/", TEST_SERVER_URL))
+		.perform()
+		.await
+		.unwrap();
+
+	let status_code = response.status();
+	let content = response.read_utf8_body().await.unwrap();
+
+	assert_eq!(StatusCode::OK, status_code);
+	assert!(content.starts_with("<!DOCTYPE html>"));
+}
+
 async fn registered_websocket_test_client(
 	name: &'static str,
 	server: &AsyncTestServer,
