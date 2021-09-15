@@ -11,7 +11,7 @@ pub struct ETags {
 }
 
 impl ETags {
-	pub fn get(&self, path: &'static Path) -> Option<ETag> {
+	pub fn get(&self, path: &Path) -> Option<ETag> {
 		self.etags_by_path.get(path).copied()
 	}
 
