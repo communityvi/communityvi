@@ -79,6 +79,7 @@ fn not_modified() -> Response<Body> {
 
 #[cfg(test)]
 mod test {
+	use crate::server::frontend::normalize_path;
 	use std::path::PathBuf;
 
 	#[test]
@@ -92,5 +93,13 @@ mod test {
 		assert_eq!(trailing_slash.as_path(), double_slash.as_path());
 		assert_eq!(no_trailing_slash.as_path(), double_slash.as_path());
 		assert_ne!(no_trailing_slash.as_path(), dot_dot.as_path());
+	}
+
+	#[test]
+	fn normalize_path_should_strip_slashes() {
+		assert_eq!("", normalize_path("/"));
+		assert_eq!("index.html", normalize_path("index.html/"));
+		assert_eq!("index.html", normalize_path("/index.html"));
+		assert_eq!("index.html", normalize_path("/index.html/"));
 	}
 }
