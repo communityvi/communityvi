@@ -175,9 +175,12 @@ dependencies = [
  "gotham",
  "governor",
  "humantime-serde",
+ "include_dir",
  "log",
  "mime",
+ "mime_guess",
  "nonzero_ext 0.3.0",
+ "npm_rs",
  "parking_lot",
  "pin-project",
  "rand",
@@ -584,6 +587,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "include_dir"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31a924bd335356c7622dff9ee33d06920afcf7f762a1a991236645e08c8a484b"
+dependencies = [
+ "include_dir_impl",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "include_dir_impl"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afae3917f781921d7c7813992ccadff7e816f7e6ecb4b70a9ec3e740d51da3d6"
+dependencies = [
+ "anyhow",
+ "proc-macro-hack",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -723,6 +749,15 @@ name = "nonzero_ext"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38bf9645c8b145698bb0b18a4637dcacbc421ea49bef2317e4fd8065a387cf21"
+
+[[package]]
+name = "npm_rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecb6192fc578d0be3f2ff020223980e0160068d916cdd2947a9bfbe7153e34c5"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "ntapi"

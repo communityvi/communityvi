@@ -14,8 +14,6 @@ use crate::utils::time_source::TimeSource;
 use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
 use gotham::hyper::Response;
 use gotham::plain::test::AsyncTestServer;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
@@ -120,16 +118,6 @@ async fn should_broadcast_when_client_leaves_the_room() {
 	assert_eq!(expected_leave_message, leave_message);
 }
 
-#[derive(Debug)]
-#[allow(clippy::empty_enum)]
-enum ImpossibleError {}
-impl Display for ImpossibleError {
-	fn fmt(&self, _formatter: &mut Formatter) -> std::fmt::Result {
-		Ok(())
-	}
-}
-impl Error for ImpossibleError {}
-
 #[tokio::test]
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let server = test_server().await;
@@ -138,6 +126,27 @@ async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 
 	let pong = test_client.receive_raw().await;
 	assert!(pong.is_pong());
+}
+
+#[tokio::test]
+#[cfg(feature = "bundle-frontend")]
+async fn test_server_should_serve_bundled_frontend() {
+	use gotham::hyper::StatusCode;
+
+	let server = test_server().await;
+	let client = server.client();
+
+	let response = client
+		.get(format!("http://{}/", TEST_SERVER_URL))
+		.perform()
+		.await
+		.unwrap();
+
+	let status_code = response.status();
+	let content = response.read_utf8_body().await.unwrap();
+
+	assert_eq!(StatusCode::OK, status_code);
+	assert!(content.starts_with("<!DOCTYPE html>"));
 }
 
 async fn registered_websocket_test_client(

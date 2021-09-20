@@ -1,17 +1,20 @@
+use gotham::hyper::http::{HeaderMap, Response};
+use gotham::hyper::upgrade::OnUpgrade;
+use gotham::hyper::Body;
+use gotham::hyper::StatusCode;
+use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes, RouterBuilder};
+use gotham::router::Router;
+use gotham::state::{FromState, State};
+use log::error;
+
 use crate::connection::split_websocket;
 use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
-use gotham::hyper::http::{HeaderMap, Response};
-use gotham::hyper::upgrade::OnUpgrade;
-use gotham::hyper::Body;
-use gotham::hyper::StatusCode;
-use gotham::router::builder::{build_simple_router, DefineSingleRoute, DrawRoutes};
-use gotham::router::Router;
-use gotham::state::{FromState, State};
-use log::error;
 
+mod etag;
+mod file_bundle;
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
 
@@ -28,13 +31,28 @@ pub async fn run_server(application_context: &ApplicationContext) {
 
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
 	build_simple_router(move |route| {
-		route
-			.get("/ws")
-			.to_new_handler(UnwindSafeGothamHandler::from(move |state| {
-				websocket_handler(application_context, room, state)
-			}));
+		route.get("/ws").to_new_handler(UnwindSafeGothamHandler::from({
+			let application_context = application_context.clone();
+			move |state| websocket_handler(application_context, room, state)
+		}));
+		add_frontend_handler(route);
 	})
 }
+
+#[cfg(feature = "bundle-frontend")]
+fn add_frontend_handler(route: &mut RouterBuilder<(), ()>) {
+	use file_bundle::BundledFileHandler;
+	use include_dir::{include_dir, Dir};
+
+	const FRONTEND_BUILD: Dir = include_dir!("../communityvi-frontend/build");
+
+	let new_handler = || Ok(BundledFileHandler::from(FRONTEND_BUILD));
+	route.get("/*").to_new_handler(new_handler);
+	route.get("/").to_new_handler(new_handler);
+}
+
+#[cfg(not(feature = "bundle-frontend"))]
+fn add_frontend_handler(_route: &mut RouterBuilder<(), ()>) {}
 
 fn websocket_handler(application_context: ApplicationContext, room: Room, mut state: State) -> (State, Response<Body>) {
 	let headers = HeaderMap::take_from(&mut state);
