@@ -38,7 +38,7 @@ unicode_skeleton = "0.1"
 rand = "0.8"
 
 [build-dependencies]
-npm_rs = "0.1"
+npm_rs = "0.2"
 
 [features]
 default = []
