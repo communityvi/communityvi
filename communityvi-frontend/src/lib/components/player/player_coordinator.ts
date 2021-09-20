@@ -75,7 +75,7 @@ export default class PlayerCoordinator {
 
 		if (playbackState instanceof PlayingPlaybackState) {
 			const proposedCurrentTime = performance.now() - playbackState.localStartTimeInMilliseconds;
-			if (Math.abs(this.player.currentTime - (proposedCurrentTime / 1000)) > 1) {
+			if (Math.abs(this.player.currentTime - proposedCurrentTime / 1000) > 1) {
 				this.setPlayerPosition(proposedCurrentTime);
 			}
 			if (this.player.paused) {
