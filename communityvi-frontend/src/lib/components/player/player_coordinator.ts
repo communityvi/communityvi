@@ -74,7 +74,10 @@ export default class PlayerCoordinator {
 		this.rateLimiter.reset();
 
 		if (playbackState instanceof PlayingPlaybackState) {
-			this.setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
+			const proposedCurrentTime = performance.now() - playbackState.localStartTimeInMilliseconds;
+			if (Math.abs(this.player.currentTime - (proposedCurrentTime / 1000)) > 1) {
+				this.setPlayerPosition(proposedCurrentTime);
+			}
 			if (this.player.paused) {
 				await this.player.play();
 			}
