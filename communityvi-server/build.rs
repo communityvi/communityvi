@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		Ok(_) => {
 			let exit_status = NpmEnv::default()
 				.set_path("../communityvi-frontend")
-				.init()
+				.init_env()
 				.install(None)
 				.run("build")
 				.exec()?;
