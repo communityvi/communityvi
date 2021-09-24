@@ -90,7 +90,7 @@ dependencies = [
 [[package]]
 name = "borrow-bag"
 version = "1.1.0"
-source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
+source = "git+https://github.com/gotham-rs/gotham#b0a97bc345db6aa9fea01680d66eea49e9444e67"
 
 [[package]]
 name = "bumpalo"
@@ -234,12 +234,6 @@ name = "discard"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
-
-[[package]]
-name = "either"
-version = "1.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "env_logger"
@@ -394,7 +388,7 @@ dependencies = [
 [[package]]
 name = "gotham"
 version = "0.6.0"
-source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
+source = "git+https://github.com/gotham-rs/gotham#b0a97bc345db6aa9fea01680d66eea49e9444e67"
 dependencies = [
  "anyhow",
  "base64",
@@ -405,10 +399,8 @@ dependencies = [
  "cookie",
  "futures-util",
  "gotham_derive",
- "http",
  "httpdate",
  "hyper",
- "itertools",
  "linked-hash-map",
  "log",
  "mime",
@@ -427,7 +419,7 @@ dependencies = [
 [[package]]
 name = "gotham_derive"
 version = "0.6.0"
-source = "git+https://github.com/gotham-rs/gotham#dc7d201d97457c322e21950c8a8ce74619189a61"
+source = "git+https://github.com/gotham-rs/gotham#b0a97bc345db6aa9fea01680d66eea49e9444e67"
 dependencies = [
  "quote",
  "syn",
@@ -446,25 +438,6 @@ dependencies = [
  "parking_lot",
  "rand",
  "smallvec",
-]
-
-[[package]]
-name = "h2"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "825343c4eef0b63f541f8903f395dc5beb362a979b5799a84062527ef1e37726"
-dependencies = [
- "bytes",
- "fnv",
- "futures-core",
- "futures-sink",
- "futures-util",
- "http",
- "indexmap",
- "slab",
- "tokio",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -553,15 +526,14 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.11"
+version = "0.14.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b61cf2d1aebcf6e6352c97b81dc2244ca29194be1b276f5d8ad5c6330fffb11"
+checksum = "15d1cfb9e4f68655fa04c01f59edb405b6074a0f7118ea881e5026e4a1cd8593"
 dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
  "futures-util",
- "h2",
  "http",
  "http-body",
  "httparse",
@@ -626,15 +598,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bee0328b1209d157ef001c94dd85b4f8f64139adb0eac2659f4b08382b2f474d"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "itertools"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69ddb889f9d0d08a67338271fa9b62996bc788c7796a5c18cf057420aaed5eaf"
-dependencies = [
- "either",
 ]
 
 [[package]]
