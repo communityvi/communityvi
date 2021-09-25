@@ -13,7 +13,7 @@ base64 = "0.13"
 chrono = {version = "0.4", features = ["serde"]}
 env_logger = "0.9"
 futures = "0.3"
-gotham = {git = "https://github.com/gotham-rs/gotham", default-features = false, features = ["derive", "testing"]}
+gotham = {git = "https://github.com/gotham-rs/gotham"}
 governor = {version = "0.3", default-features = false, features = ["std", "jitter"]}
 humantime-serde = "1.0"
 include_dir = {version = "0.6", default-features = false}
