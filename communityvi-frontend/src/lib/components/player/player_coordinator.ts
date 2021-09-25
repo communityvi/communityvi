@@ -87,12 +87,14 @@ export default class PlayerCoordinator {
 
 		if (playbackState instanceof PlayingPlaybackState) {
 			const position = performance.now() - playbackState.localStartTimeInMilliseconds;
-			if (this.positionAdjustmentExceedsThreshold(position)) {
+			if (this.player.paused) {
 				this.setPlayerPosition(position);
+				await this.player.play();
+				return;
 			}
 
-			if (this.player.paused) {
-				await this.player.play();
+			if (this.positionAdjustmentExceedsThreshold(position)) {
+				this.setPlayerPosition(position);
 			}
 
 			return;
@@ -106,7 +108,7 @@ export default class PlayerCoordinator {
 
 	private positionAdjustmentExceedsThreshold(milliseconds: number): boolean {
 		return (
-			Math.abs(this.player.currentTime * 1000 - milliseconds) > this.playbackPositionAdjustmentThresholdMilliseconds
+			Math.abs(this.player.currentTime * 1000 - milliseconds) >= this.playbackPositionAdjustmentThresholdMilliseconds
 		);
 	}
 
