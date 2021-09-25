@@ -14,17 +14,26 @@ export default class PlayerCoordinator {
 	private readonly playCallback: PlayCallback;
 	private readonly pauseCallback: PauseCallback;
 
+	private readonly playbackPositionAdjustmentThresholdMilliseconds: number;
+
 	static async forPlayerWithInitialState(
 		player: HTMLMediaElement | null | undefined,
 		initialPlaybackState: PlayingPlaybackState | PausedPlaybackState | undefined,
 		playCallback: PlayCallback,
 		pauseCallback: PauseCallback,
+		playbackPositionAdjustmentThresholdMilliseconds = 1000,
 	): Promise<PlayerCoordinator | undefined> {
 		if (!player || initialPlaybackState === undefined) {
 			return undefined;
 		}
 
-		const playerStateManager = new PlayerCoordinator(player, initialPlaybackState, playCallback, pauseCallback);
+		const playerStateManager = new PlayerCoordinator(
+			player,
+			initialPlaybackState,
+			playCallback,
+			pauseCallback,
+			playbackPositionAdjustmentThresholdMilliseconds,
+		);
 
 		// Ensure the playback position is synchronized after reconnect
 		await playerStateManager.syncPlaybackPosition(initialPlaybackState);
@@ -37,6 +46,7 @@ export default class PlayerCoordinator {
 		initialPlaybackState: PlayingPlaybackState | PausedPlaybackState,
 		playCallback: PlayCallback,
 		pauseCallback: PauseCallback,
+		playbackPositionAdjustmentThresholdMilliseconds: number,
 	) {
 		this.player = player;
 
@@ -49,6 +59,8 @@ export default class PlayerCoordinator {
 
 		this.playCallback = playCallback;
 		this.pauseCallback = pauseCallback;
+
+		this.playbackPositionAdjustmentThresholdMilliseconds = playbackPositionAdjustmentThresholdMilliseconds;
 	}
 
 	async setPlaybackState(playbackState?: PlayingPlaybackState | PausedPlaybackState): Promise<void> {
@@ -74,9 +86,15 @@ export default class PlayerCoordinator {
 		this.rateLimiter.reset();
 
 		if (playbackState instanceof PlayingPlaybackState) {
-			this.setPlayerPosition(performance.now() - playbackState.localStartTimeInMilliseconds);
+			const position = performance.now() - playbackState.localStartTimeInMilliseconds;
 			if (this.player.paused) {
+				this.setPlayerPosition(position);
 				await this.player.play();
+				return;
+			}
+
+			if (this.positionAdjustmentExceedsThreshold(position)) {
+				this.setPlayerPosition(position);
 			}
 
 			return;
@@ -86,6 +104,12 @@ export default class PlayerCoordinator {
 		if (!this.player.paused) {
 			this.player.pause();
 		}
+	}
+
+	private positionAdjustmentExceedsThreshold(milliseconds: number): boolean {
+		return (
+			Math.abs(this.player.currentTime * 1000 - milliseconds) >= this.playbackPositionAdjustmentThresholdMilliseconds
+		);
 	}
 
 	private setPlayerPosition(milliseconds: number) {
