@@ -4,9 +4,13 @@ updates:
     directory: "/communityvi-frontend/"
     schedule:
       interval: "daily"
+    allow:
+      - dependency-type: "all"
 
   - package-ecosystem: "cargo"
     directory: "/communityvi-server/"
     schedule:
       interval: "daily"
+    allow:
+      - dependency-type: "all"
 
