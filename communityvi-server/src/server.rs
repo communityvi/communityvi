@@ -14,6 +14,8 @@ use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
 use futures::{SinkExt, StreamExt, TryStreamExt};
+use rweb::warp::filters::BoxedFilter;
+use rweb::Filter;
 
 mod etag;
 mod file_bundle;
@@ -29,29 +31,35 @@ pub async fn run_gotham_server(application_context: &ApplicationContext) {
 	.await;
 }
 
-#[cfg(not(feature = "bundle-frontend"))]
-#[allow(clippy::pedantic)]
-pub async fn run_rweb_server(_application_context: &ApplicationContext) {}
+pub async fn run_rweb_server(application_context: &ApplicationContext) {
+	let bundled_frontend = bundled_frontend_filter();
+	rweb::serve(bundled_frontend)
+		.run(application_context.configuration.address)
+		.await
+}
 
 #[cfg(feature = "bundle-frontend")]
-pub async fn run_rweb_server(application_context: &ApplicationContext) {
+fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 	use crate::server::file_bundle::BundledFileHandler;
 	use include_dir::{include_dir, Dir};
+	use rweb::filters;
 	use rweb::path::Tail;
-	use rweb::{filters, Filter};
 	use std::sync::Arc;
 
 	const FRONTEND_BUILD: Dir = include_dir!("../communityvi-frontend/build");
 
 	let bundled_file_handler = Arc::new(BundledFileHandler::from(FRONTEND_BUILD));
 
-	let client_files = filters::path::tail()
+	filters::path::tail()
 		.and(filters::header::headers_cloned())
-		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.handle_request(path.as_str(), &headers));
+		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.handle_request(path.as_str(), &headers))
+		.boxed()
+}
 
-	rweb::serve(client_files)
-		.run(application_context.configuration.address)
-		.await
+#[cfg(not(feature = "bundle-frontend"))]
+fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
+	use std::future::ready;
+	rweb::any().and_then(|| ready(Err(rweb::reject::not_found()))).boxed()
 }
 
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
