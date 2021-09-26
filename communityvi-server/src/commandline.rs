@@ -1,7 +1,7 @@
 use crate::configuration::Configuration;
 use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
-use crate::server::run_server;
+use crate::server::run_gotham_server;
 use crate::utils::time_source::TimeSource;
 use clap::Clap;
 use log::info;
@@ -45,7 +45,7 @@ impl Commandline {
 					"Starting server. Start websocket connections at 'ws://{}/ws'.",
 					application_context.configuration.address
 				);
-				run_server(&application_context).await;
+				run_gotham_server(&application_context).await;
 			}
 			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
 		}

@@ -20,7 +20,7 @@ mod websocket_upgrade;
 
 pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
-pub async fn run_server(application_context: &ApplicationContext) {
+pub async fn run_gotham_server(application_context: &ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
 	let _ = gotham::init_server(
 		application_context.configuration.address,
