@@ -50,7 +50,7 @@ impl Commandline {
 				run_gotham_server(&application_context).await;
 			}
 			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
-			BaseCommand::Rweb => run_rweb_server(&application_context).await,
+			BaseCommand::Rweb => run_rweb_server(application_context).await,
 		}
 		Ok(())
 	}

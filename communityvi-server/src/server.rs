@@ -13,9 +13,13 @@ use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
+use crate::utils::websocket_message_conversion::{
+	rweb_websocket_message_to_tungstenite_message, tungstenite_message_to_rweb_websocket_message,
+};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use rweb::warp::filters::BoxedFilter;
-use rweb::Filter;
+use rweb::{Filter, Reply};
+use std::future::ready;
 
 mod etag;
 mod file_bundle;
@@ -31,11 +35,46 @@ pub async fn run_gotham_server(application_context: &ApplicationContext) {
 	.await;
 }
 
-pub async fn run_rweb_server(application_context: &ApplicationContext) {
-	let bundled_frontend = bundled_frontend_filter();
-	rweb::serve(bundled_frontend)
-		.run(application_context.configuration.address)
+pub async fn run_rweb_server(application_context: ApplicationContext) {
+	let address = application_context.configuration.address;
+	rweb::serve(websocket_filter(application_context).or(bundled_frontend_filter()))
+		.run(address)
 		.await;
+}
+
+fn websocket_filter(application_context: ApplicationContext) -> BoxedFilter<(impl Reply,)> {
+	let room = Room::new(application_context.configuration.room_size_limit);
+
+	rweb::path("ws")
+		.and(rweb::ws())
+		.map(
+			move |ws: rweb::ws::Ws /*, room: Room, application_context: ApplicationContext*/| {
+				let room = room.clone();
+				let application_context = application_context.clone();
+
+				ws.on_upgrade(move |websocket| {
+					let (sink, stream) = websocket.split();
+
+					let message_sender = MessageSender::from(
+						sink.with(|message| {
+							ready(Ok::<_, anyhow::Error>(tungstenite_message_to_rweb_websocket_message(
+								message,
+							)))
+						})
+						.sink_map_err(Into::into),
+					);
+					let message_receiver = MessageReceiver::new(
+						stream
+							.map_ok(rweb_websocket_message_to_tungstenite_message)
+							.map_err(Into::into),
+						message_sender.clone(),
+					);
+
+					run_client(application_context, room, message_sender, message_receiver)
+				})
+			},
+		)
+		.boxed()
 }
 
 #[cfg(feature = "bundle-frontend")]
@@ -58,7 +97,6 @@ fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 
 #[cfg(not(feature = "bundle-frontend"))]
 fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
-	use std::future::ready;
 	rweb::any().and_then(|| ready(Err(rweb::reject::not_found()))).boxed()
 }
 
@@ -101,7 +139,6 @@ fn websocket_handler(application_context: ApplicationContext, room: Room, mut st
 								let message_sender = MessageSender::from(websocket_sink.sink_map_err(Into::into));
 								let message_receiver =
 									MessageReceiver::new(websocket_stream.map_err(Into::into), message_sender.clone());
-								let (message_sender, message_receiver) = (message_sender, message_receiver);
 								run_client(application_context, room, message_sender, message_receiver).await;
 							}
 							Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
