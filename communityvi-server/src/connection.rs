@@ -1,19 +1,6 @@
-use crate::connection::receiver::MessageReceiver;
-use crate::connection::sender::MessageSender;
-use crate::server::WebSocket;
-use futures::stream::StreamExt;
-use futures::{SinkExt, TryStreamExt};
-
 pub mod broadcast_buffer;
 pub mod receiver;
 pub mod sender;
-
-pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver) {
-	let (websocket_sink, websocket_stream) = websocket.split();
-	let message_sender = MessageSender::from(websocket_sink.sink_map_err(Into::into));
-	let message_receiver = MessageReceiver::new(websocket_stream.map_err(Into::into), message_sender.clone());
-	(message_sender, message_receiver)
-}
 
 #[cfg(test)]
 pub mod test {

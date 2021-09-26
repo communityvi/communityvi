@@ -7,18 +7,18 @@ use gotham::router::Router;
 use gotham::state::{FromState, State};
 use log::error;
 
-use crate::connection::split_websocket;
+use crate::connection::receiver::MessageReceiver;
+use crate::connection::sender::MessageSender;
 use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::unwind_safe_gotham_handler::UnwindSafeGothamHandler;
+use futures::{SinkExt, StreamExt, TryStreamExt};
 
 mod etag;
 mod file_bundle;
 mod unwind_safe_gotham_handler;
 mod websocket_upgrade;
-
-pub type WebSocket = tokio_tungstenite::WebSocketStream<gotham::hyper::upgrade::Upgraded>;
 
 pub async fn run_gotham_server(application_context: &ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
@@ -88,7 +88,14 @@ fn websocket_handler(application_context: ApplicationContext, room: Room, mut st
 				Ok((response, websocket_future)) => {
 					tokio::spawn(async move {
 						match websocket_future.await {
-							Ok(websocket) => run_client_connection(application_context, room, websocket).await,
+							Ok(websocket) => {
+								let (websocket_sink, websocket_stream) = websocket.split();
+								let message_sender = MessageSender::from(websocket_sink.sink_map_err(Into::into));
+								let message_receiver =
+									MessageReceiver::new(websocket_stream.map_err(Into::into), message_sender.clone());
+								let (message_sender, message_receiver) = (message_sender, message_receiver);
+								run_client(application_context, room, message_sender, message_receiver).await
+							}
 							Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
 						}
 					});
@@ -107,9 +114,4 @@ fn bad_request() -> Response<Body> {
 		.status(StatusCode::BAD_REQUEST)
 		.body(Body::from("Bad Request"))
 		.expect("Failed to build BAD_REQUEST response.")
-}
-
-async fn run_client_connection(application_context: ApplicationContext, room: Room, websocket: WebSocket) {
-	let (message_sender, message_receiver) = split_websocket(websocket);
-	run_client(application_context, room, message_sender, message_receiver).await;
 }
