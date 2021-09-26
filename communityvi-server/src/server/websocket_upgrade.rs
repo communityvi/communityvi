@@ -24,14 +24,14 @@
  * > SOFTWARE.
  */
 
-use gotham::hyper::header::{HeaderValue, CONNECTION, UPGRADE};
-use gotham::hyper::{upgrade::Upgraded, Body, HeaderMap, Response, StatusCode};
 use log::error;
+use rweb::hyper::header::{HeaderValue, CONNECTION, UPGRADE};
+use rweb::hyper::{upgrade::Upgraded, Body, HeaderMap, Response, StatusCode};
 use sha1::Sha1;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 
-use gotham::hyper::upgrade::OnUpgrade;
+use rweb::hyper::upgrade::OnUpgrade;
 use std::future::Future;
 pub use tungstenite::protocol::{Message, Role};
 pub use tungstenite::Error;
@@ -55,7 +55,7 @@ pub fn accept(
 ) -> Result<
 	(
 		Response<Body>,
-		impl Future<Output = Result<WebSocketStream<Upgraded>, gotham::hyper::Error>>,
+		impl Future<Output = Result<WebSocketStream<Upgraded>, rweb::hyper::Error>>,
 	),
 	(),
 > {

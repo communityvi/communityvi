@@ -11,9 +11,9 @@ use crate::room::Room;
 use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
-use gotham::hyper::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
-use gotham::hyper::Response;
 use gotham::plain::test::AsyncTestServer;
+use rweb::http::header::{HeaderValue, SEC_WEBSOCKET_KEY, UPGRADE};
+use rweb::hyper::Response;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use tungstenite::protocol::Role;
 
@@ -131,7 +131,7 @@ async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 #[tokio::test]
 #[cfg(feature = "bundle-frontend")]
 async fn test_server_should_serve_bundled_frontend() {
-	use gotham::hyper::StatusCode;
+	use rweb::hyper::StatusCode;
 
 	let server = test_server().await;
 	let client = server.client();
@@ -191,7 +191,7 @@ async fn websocket_test_client(server: &AsyncTestServer) -> WebsocketTestClient 
 		.expect("Failed to initiate websocket connection.");
 
 	let response: Response<_> = response.into();
-	let upgraded = gotham::hyper::upgrade::on(response)
+	let upgraded = rweb::hyper::upgrade::on(response)
 		.await
 		.expect("Failed to upgrade connection");
 	WebSocketStream::from_raw_socket(upgraded, Role::Client, None)

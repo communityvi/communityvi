@@ -1,10 +1,10 @@
 use crate::server::etag::{ETag, ETags};
 use gotham::handler::{Handler, HandlerFuture};
-use gotham::hyper::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH};
-use gotham::hyper::{Body, HeaderMap, Response, StatusCode, Uri};
 use gotham::state::State;
 use include_dir::{Dir, File};
 use mime_guess::MimeGuess;
+use rweb::hyper::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH};
+use rweb::hyper::{Body, HeaderMap, Response, StatusCode, Uri};
 use std::pin::Pin;
 
 pub struct BundledFileHandler {
@@ -110,9 +110,9 @@ fn ok(file: File<'static>, etag: ETag) -> Response<Body> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use gotham::hyper::body::Bytes;
-	use gotham::hyper::http::HeaderValue;
 	use include_dir::include_dir;
+	use rweb::http::HeaderValue;
+	use rweb::hyper::body::Bytes;
 
 	const BUNDLED_TEST_FILES: Dir = include_dir!("test/bundled_files");
 
@@ -275,6 +275,6 @@ mod test {
 	}
 
 	async fn content(response: Response<Body>) -> Bytes {
-		gotham::hyper::body::to_bytes(response.into_body()).await.unwrap()
+		rweb::hyper::body::to_bytes(response.into_body()).await.unwrap()
 	}
 }
