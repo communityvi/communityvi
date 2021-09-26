@@ -8,18 +8,18 @@ use std::convert::TryFrom;
 use std::pin::Pin;
 
 pub struct MessageReceiver {
-	stream: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
-	message_sender: MessageSender,
+	stream: Pin<Box<dyn Stream<Item = anyhow::Result<WebSocketMessage>> + Unpin + Send>>,
+	sender: MessageSender,
 }
 
 impl MessageReceiver {
-	pub fn new<RequestStream>(request_stream: RequestStream, message_sender: MessageSender) -> Self
+	pub fn new<WebSocketStream>(websocket_stream: WebSocketStream, sender: MessageSender) -> Self
 	where
-		RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send + 'static,
+		WebSocketStream: Stream<Item = anyhow::Result<WebSocketMessage>> + Unpin + Send + 'static,
 	{
 		Self {
-			stream: Box::pin(request_stream),
-			message_sender,
+			stream: Box::pin(websocket_stream),
+			sender,
 		}
 	}
 
@@ -30,7 +30,11 @@ impl MessageReceiver {
 
 		for _ in 0..MAXIMUM_RETRIES {
 			let websocket_message = match self.stream.next().await {
-				Some(websocket_message) => websocket_message,
+				Some(Ok(websocket_message)) => websocket_message,
+				Some(Err(error)) => {
+					log::error!("Failed to receive websocket message: {}", error);
+					return Finished;
+				}
 				None => return Finished,
 			};
 
@@ -38,7 +42,7 @@ impl MessageReceiver {
 			let websocket_message = match websocket_message {
 				Pong(payload) => return ReceivedMessage::Pong { payload },
 				Close(_) => {
-					self.message_sender.close().await;
+					self.sender.close().await;
 					return Finished;
 				}
 				websocket_message => websocket_message,
@@ -61,7 +65,7 @@ impl MessageReceiver {
 					};
 					error!("{}", message);
 					let _ = self
-						.message_sender
+						.sender
 						.send_error_message(
 							ErrorMessage::builder()
 								.error(ErrorMessageType::InvalidFormat)
@@ -78,7 +82,7 @@ impl MessageReceiver {
 		}
 
 		let _ = self
-			.message_sender
+			.sender
 			.send_error_message(
 				ErrorMessage::builder()
 					.error(ErrorMessageType::InvalidOperation)
@@ -87,7 +91,7 @@ impl MessageReceiver {
 				None,
 			)
 			.await;
-		self.message_sender.close().await;
+		self.sender.close().await;
 		Finished
 	}
 }

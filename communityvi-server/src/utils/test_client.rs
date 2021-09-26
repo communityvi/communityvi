@@ -33,7 +33,7 @@ impl WebsocketTestClient {
 		let client_sender = client_sender.sink_map_err(|_error| ());
 
 		let message_sender = MessageSender::from(server_sender.sink_map_err(Into::into));
-		let message_receiver = MessageReceiver::new(server_receiver, message_sender.clone());
+		let message_receiver = MessageReceiver::new(server_receiver.map(Result::Ok), message_sender.clone());
 
 		let test_client = Self {
 			sender: Box::pin(client_sender),
