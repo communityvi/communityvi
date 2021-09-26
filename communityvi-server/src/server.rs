@@ -36,15 +36,18 @@ pub async fn run_gotham_server(application_context: &ApplicationContext) {
 }
 
 pub async fn run_rweb_server(application_context: ApplicationContext) {
+	let room = Room::new(application_context.configuration.room_size_limit);
 	let address = application_context.configuration.address;
-	rweb::serve(websocket_filter(application_context).or(bundled_frontend_filter()))
-		.run(address)
-		.await;
+	rweb::serve(create_filter(application_context, room)).run(address).await;
 }
 
-fn websocket_filter(application_context: ApplicationContext) -> BoxedFilter<(impl Reply,)> {
-	let room = Room::new(application_context.configuration.room_size_limit);
+pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
+	websocket_filter(application_context, room)
+		.or(bundled_frontend_filter())
+		.boxed()
+}
 
+fn websocket_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
 	rweb::path("ws")
 		.and(rweb::ws())
 		.map(
