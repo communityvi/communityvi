@@ -1,5 +1,5 @@
 use crate::connection::receiver::{MessageReceiver, StreamMessageReceiver};
-use crate::connection::sender::{MessageSender, SinkMessageSender};
+use crate::connection::sender::MessageSender;
 use crate::lifecycle::send_broadcasts;
 use crate::message::client_request::{ClientRequest, ClientRequestWithId};
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
@@ -32,8 +32,7 @@ impl WebsocketTestClient {
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
 		let client_sender = client_sender.sink_map_err(|_error| ());
 
-		let sink_message_sender = SinkMessageSender::new(server_sender);
-		let message_sender = MessageSender::from(sink_message_sender);
+		let message_sender = MessageSender::from(server_sender.sink_map_err(Into::into));
 		let stream_message_receiver = StreamMessageReceiver::new(server_receiver, message_sender.clone());
 
 		let message_receiver = MessageReceiver::from(stream_message_receiver);

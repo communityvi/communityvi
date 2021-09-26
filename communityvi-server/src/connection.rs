@@ -1,8 +1,9 @@
 use crate::connection::receiver::{MessageReceiver, WebSocketMessageReceiver};
-use crate::connection::sender::{MessageSender, WebSocketMessageSender};
+use crate::connection::sender::MessageSender;
 use crate::server::WebSocket;
 use crate::utils::infallible_stream::InfallibleStream;
 use futures::stream::StreamExt;
+use futures::SinkExt;
 
 pub mod broadcast_buffer;
 pub mod receiver;
@@ -10,8 +11,7 @@ pub mod sender;
 
 pub fn split_websocket(websocket: WebSocket) -> (MessageSender, MessageReceiver) {
 	let (websocket_sink, websocket_stream) = websocket.split();
-	let websocket_message_sender = WebSocketMessageSender::new(websocket_sink);
-	let message_sender = MessageSender::from(websocket_message_sender);
+	let message_sender = MessageSender::from(websocket_sink.sink_map_err(Into::into));
 	let stream_message_receiver =
 		WebSocketMessageReceiver::new(InfallibleStream::from(websocket_stream), message_sender.clone());
 	(message_sender, stream_message_receiver.into())
