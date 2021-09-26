@@ -32,7 +32,7 @@ impl Handler for BundledFileHandler {
 }
 
 impl BundledFileHandler {
-	fn handle_request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {
+	pub fn handle_request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {
 		let (file, etag) = match self.get_file_and_etag_falling_back_to_index_html(path) {
 			Some(file_and_etag) => file_and_etag,
 			None => return not_found(),

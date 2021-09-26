@@ -29,6 +29,31 @@ pub async fn run_gotham_server(application_context: &ApplicationContext) {
 	.await;
 }
 
+#[cfg(not(feature = "bundle-frontend"))]
+#[allow(clippy::pedantic)]
+pub async fn run_rweb_server(_application_context: &ApplicationContext) {}
+
+#[cfg(feature = "bundle-frontend")]
+pub async fn run_rweb_server(application_context: &ApplicationContext) {
+	use crate::server::file_bundle::BundledFileHandler;
+	use include_dir::{include_dir, Dir};
+	use rweb::path::Tail;
+	use rweb::{filters, Filter};
+	use std::sync::Arc;
+
+	const FRONTEND_BUILD: Dir = include_dir!("../communityvi-frontend/build");
+
+	let bundled_file_handler = Arc::new(BundledFileHandler::from(FRONTEND_BUILD));
+
+	let client_files = filters::path::tail()
+		.and(filters::header::headers_cloned())
+		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.handle_request(path.as_str(), &headers));
+
+	rweb::serve(client_files)
+		.run(application_context.configuration.address)
+		.await
+}
+
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
 	build_simple_router(move |route| {
 		route.get("/ws").to_new_handler(UnwindSafeGothamHandler::from({

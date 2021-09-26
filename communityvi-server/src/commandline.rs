@@ -1,7 +1,7 @@
 use crate::configuration::Configuration;
 use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
-use crate::server::run_gotham_server;
+use crate::server::{run_gotham_server, run_rweb_server};
 use crate::utils::time_source::TimeSource;
 use clap::Clap;
 use log::info;
@@ -20,6 +20,8 @@ pub enum BaseCommand {
 	Run,
 	/// Print the configuration
 	Configuration,
+	/// Runs experimental Rweb server
+	Rweb,
 }
 
 impl Default for BaseCommand {
@@ -48,6 +50,7 @@ impl Commandline {
 				run_gotham_server(&application_context).await;
 			}
 			BaseCommand::Configuration => println!("{:?}", application_context.configuration),
+			BaseCommand::Rweb => run_rweb_server(&application_context).await,
 		}
 		Ok(())
 	}
