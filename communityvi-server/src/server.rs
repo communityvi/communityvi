@@ -35,7 +35,7 @@ pub async fn run_rweb_server(application_context: &ApplicationContext) {
 	let bundled_frontend = bundled_frontend_filter();
 	rweb::serve(bundled_frontend)
 		.run(application_context.configuration.address)
-		.await
+		.await;
 }
 
 #[cfg(feature = "bundle-frontend")]
@@ -102,7 +102,7 @@ fn websocket_handler(application_context: ApplicationContext, room: Room, mut st
 								let message_receiver =
 									MessageReceiver::new(websocket_stream.map_err(Into::into), message_sender.clone());
 								let (message_sender, message_receiver) = (message_sender, message_receiver);
-								run_client(application_context, room, message_sender, message_receiver).await
+								run_client(application_context, room, message_sender, message_receiver).await;
 							}
 							Err(error) => error!("Failed to upgrade websocket with error {:?}.", error),
 						}
