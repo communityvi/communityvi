@@ -2,54 +2,39 @@ use crate::connection::sender::MessageSender;
 use crate::message::client_request::{ClientRequestWithId, RequestIdOnly};
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
-use crate::server::WebSocket;
-use crate::utils::infallible_stream::InfallibleStream;
-use async_trait::async_trait;
-use futures::stream::SplitStream;
 use futures::{Stream, StreamExt};
 use log::error;
 use std::convert::TryFrom;
 use std::pin::Pin;
 
-pub type MessageReceiver = Pin<Box<dyn MessageReceiverTrait + Unpin + Send>>;
-pub type WebSocketMessageReceiver = StreamMessageReceiver<InfallibleStream<SplitStream<WebSocket>>>;
-
-#[async_trait]
-pub trait MessageReceiverTrait {
-	/// Receive a message from the client or None if the connection has been closed.
-	async fn receive(&mut self) -> ReceivedMessage;
+pub struct MessageReceiver {
+	stream: Pin<Box<dyn Stream<Item = anyhow::Result<WebSocketMessage>> + Unpin + Send>>,
+	sender: MessageSender,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum ReceivedMessage {
-	Request(ClientRequestWithId),
-	Pong { payload: Vec<u8> },
-	Finished,
-}
-
-impl From<ClientRequestWithId> for ReceivedMessage {
-	fn from(request: ClientRequestWithId) -> Self {
-		ReceivedMessage::Request(request)
+impl MessageReceiver {
+	pub fn new<WebSocketStream>(websocket_stream: WebSocketStream, sender: MessageSender) -> Self
+	where
+		WebSocketStream: Stream<Item = anyhow::Result<WebSocketMessage>> + Unpin + Send + 'static,
+	{
+		Self {
+			stream: Box::pin(websocket_stream),
+			sender,
+		}
 	}
-}
 
-pub struct StreamMessageReceiver<RequestStream = InfallibleStream<SplitStream<WebSocket>>> {
-	request_stream: RequestStream,
-	message_sender: MessageSender,
-}
-
-#[async_trait]
-impl<RequestStream> MessageReceiverTrait for StreamMessageReceiver<RequestStream>
-where
-	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send,
-{
-	async fn receive(&mut self) -> ReceivedMessage {
+	/// Receive a message from the client or Finished if the connection has been closed.
+	pub async fn receive(&mut self) -> ReceivedMessage {
 		const MAXIMUM_RETRIES: usize = 10;
 		use ReceivedMessage::Finished;
 
 		for _ in 0..MAXIMUM_RETRIES {
-			let websocket_message = match self.request_stream.next().await {
-				Some(websocket_message) => websocket_message,
+			let websocket_message = match self.stream.next().await {
+				Some(Ok(websocket_message)) => websocket_message,
+				Some(Err(error)) => {
+					log::error!("Failed to receive websocket message: {}", error);
+					return Finished;
+				}
 				None => return Finished,
 			};
 
@@ -57,7 +42,7 @@ where
 			let websocket_message = match websocket_message {
 				Pong(payload) => return ReceivedMessage::Pong { payload },
 				Close(_) => {
-					self.message_sender.close().await;
+					self.sender.close().await;
 					return Finished;
 				}
 				websocket_message => websocket_message,
@@ -80,7 +65,7 @@ where
 					};
 					error!("{}", message);
 					let _ = self
-						.message_sender
+						.sender
 						.send_error_message(
 							ErrorMessage::builder()
 								.error(ErrorMessageType::InvalidFormat)
@@ -97,7 +82,7 @@ where
 		}
 
 		let _ = self
-			.message_sender
+			.sender
 			.send_error_message(
 				ErrorMessage::builder()
 					.error(ErrorMessageType::InvalidOperation)
@@ -106,29 +91,21 @@ where
 				None,
 			)
 			.await;
-		self.message_sender.close().await;
+		self.sender.close().await;
 		Finished
 	}
 }
 
-impl<RequestStream> StreamMessageReceiver<RequestStream>
-where
-	RequestStream: Stream<Item = WebSocketMessage>,
-{
-	pub fn new(request_stream: RequestStream, message_sender: MessageSender) -> Self {
-		Self {
-			request_stream,
-			message_sender,
-		}
-	}
+#[derive(Debug, PartialEq)]
+pub enum ReceivedMessage {
+	Request(ClientRequestWithId),
+	Pong { payload: Vec<u8> },
+	Finished,
 }
 
-impl<RequestStream> From<StreamMessageReceiver<RequestStream>> for MessageReceiver
-where
-	RequestStream: Stream<Item = WebSocketMessage> + Unpin + Send + 'static,
-{
-	fn from(stream_message_receiver: StreamMessageReceiver<RequestStream>) -> Self {
-		Box::pin(stream_message_receiver)
+impl From<ClientRequestWithId> for ReceivedMessage {
+	fn from(request: ClientRequestWithId) -> Self {
+		ReceivedMessage::Request(request)
 	}
 }
 

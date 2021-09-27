@@ -1,36 +1,27 @@
-use crate::connection::sender::{MessageSender, MessageSenderTrait};
-use crate::message::outgoing::broadcast_message::BroadcastMessage;
-use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
-use async_trait::async_trait;
-use std::sync::Arc;
+use crate::message::WebSocketMessage;
+use futures::Sink;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[derive(Clone, Debug, Default)]
 pub struct FakeMessageSender {}
 
-impl From<FakeMessageSender> for MessageSender {
-	fn from(fake_message_sender: FakeMessageSender) -> Self {
-		Arc::pin(fake_message_sender)
-	}
-}
+impl Sink<WebSocketMessage> for FakeMessageSender {
+	type Error = anyhow::Error;
 
-#[async_trait]
-impl MessageSenderTrait for FakeMessageSender {
-	async fn send_success_message(&self, _message: SuccessMessage, _request_id: u64) -> Result<(), ()> {
+	fn poll_ready(self: Pin<&mut Self>, _context: &mut Context) -> Poll<anyhow::Result<()>> {
+		Poll::Ready(Ok(()))
+	}
+
+	fn start_send(self: Pin<&mut Self>, _item: WebSocketMessage) -> anyhow::Result<()> {
 		Ok(())
 	}
 
-	async fn send_error_message(&self, _message: ErrorMessage, _request_id: Option<u64>) -> Result<(), ()> {
-		Ok(())
+	fn poll_flush(self: Pin<&mut Self>, _context: &mut Context) -> Poll<anyhow::Result<()>> {
+		Poll::Ready(Ok(()))
 	}
 
-	async fn send_broadcast_message(&self, _message: BroadcastMessage) -> Result<(), ()> {
-		Ok(())
+	fn poll_close(self: Pin<&mut Self>, _context: &mut Context) -> Poll<anyhow::Result<()>> {
+		Poll::Ready(Ok(()))
 	}
-
-	async fn send_ping(&self, _payload: Vec<u8>) -> Result<(), ()> {
-		Ok(())
-	}
-
-	async fn close(&self) {}
 }
