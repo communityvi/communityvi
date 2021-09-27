@@ -9,18 +9,22 @@ use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use crate::room::client::Client;
 use crate::room::Room;
-use futures::{Sink, SinkExt, Stream, StreamExt};
+use crate::utils::websocket_message_conversion::{
+	rweb_websocket_message_to_tungstenite_message, tungstenite_message_to_rweb_websocket_message,
+};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use futures::{SinkExt, StreamExt};
+use rweb::test::WsClient;
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::TryFrom;
-use std::pin::Pin;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
 
 pub struct WebsocketTestClient {
-	sender: Pin<Box<dyn Sink<WebSocketMessage, Error = ()> + Unpin + Send>>,
-	receiver: Pin<Box<dyn Stream<Item = WebSocketMessage> + Unpin + Send>>,
+	websocket_client: Box<dyn WebSocketClient>,
 	success_messages: BTreeMap<u64, SuccessMessage>,
 	error_messages: BTreeMap<Option<u64>, ErrorMessage>,
 	broadcast_messages: VecDeque<BroadcastMessage>,
@@ -30,18 +34,11 @@ impl WebsocketTestClient {
 	pub fn new() -> (MessageSender, MessageReceiver, Self) {
 		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
 		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
-		let client_sender = client_sender.sink_map_err(|_error| ());
+
+		let test_client = Self::from((client_sender, client_receiver));
 
 		let message_sender = MessageSender::from(server_sender.sink_map_err(Into::into));
 		let message_receiver = MessageReceiver::new(server_receiver.map(Result::Ok), message_sender.clone());
-
-		let test_client = Self {
-			sender: Box::pin(client_sender),
-			receiver: Box::pin(client_receiver),
-			success_messages: Default::default(),
-			error_messages: Default::default(),
-			broadcast_messages: Default::default(),
-		};
 
 		(message_sender, message_receiver, test_client)
 	}
@@ -57,14 +54,14 @@ impl WebsocketTestClient {
 	}
 
 	pub async fn send_raw(&mut self, message: WebSocketMessage) {
-		self.sender
+		self.websocket_client
 			.send(message)
 			.await
 			.expect("Failed to send message via TestClient.");
 	}
 
 	pub async fn receive_raw(&mut self) -> WebSocketMessage {
-		timeout(Duration::from_secs(1), self.receiver.next())
+		timeout(Duration::from_secs(1), self.websocket_client.receive())
 			.await
 			.expect("Timed out waiting for raw message.")
 			.expect("Failed to receive message via TestClient")
@@ -140,20 +137,75 @@ impl WebsocketTestClient {
 	}
 }
 
-impl<Socket> From<WebSocketStream<Socket>> for WebsocketTestClient
+impl<Client> From<Client> for WebsocketTestClient
 where
-	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+	Client: WebSocketClient + 'static,
 {
-	fn from(websocket: WebSocketStream<Socket>) -> Self {
-		let (sender, receiver) = websocket.split();
-		let sender = sender.sink_map_err(|_error| ());
-		let receiver = receiver.map(|result| result.expect("Failed to receive websocket message"));
+	fn from(client: Client) -> Self {
 		Self {
-			sender: Box::pin(sender),
-			receiver: Box::pin(receiver),
+			websocket_client: Box::new(client),
 			success_messages: Default::default(),
 			error_messages: Default::default(),
 			broadcast_messages: Default::default(),
+		}
+	}
+}
+
+#[async_trait]
+pub trait WebSocketClient {
+	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()>;
+	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage>;
+}
+
+#[async_trait]
+impl WebSocketClient for WsClient {
+	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {
+		let rweb_message = tungstenite_message_to_rweb_websocket_message(message);
+		self.send(rweb_message).await;
+		Ok(())
+	}
+
+	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage> {
+		let rweb_message = self.recv().await?;
+		Ok(rweb_websocket_message_to_tungstenite_message(rweb_message))
+	}
+}
+
+#[async_trait]
+impl WebSocketClient
+	for (
+		futures::channel::mpsc::UnboundedSender<WebSocketMessage>,
+		futures::channel::mpsc::UnboundedReceiver<WebSocketMessage>,
+	)
+{
+	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {
+		let (sender, _) = self;
+		Ok(sender.send(message).await?)
+	}
+
+	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage> {
+		let (_, receiver) = self;
+		receiver
+			.next()
+			.await
+			.ok_or_else(|| anyhow!("Failed to receive message"))
+	}
+}
+
+#[async_trait]
+impl<Socket> WebSocketClient for WebSocketStream<Socket>
+where
+	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {
+		Ok(SinkExt::send(self, message).await?)
+	}
+
+	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage> {
+		match StreamExt::next(self).await {
+			Some(Ok(message)) => Ok(message),
+			Some(Err(error)) => Err(error.into()),
+			None => Err(anyhow!("Failed to receive message")),
 		}
 	}
 }

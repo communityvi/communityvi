@@ -36,6 +36,7 @@ unicode_skeleton = "0.1"
 
 [dev-dependencies]
 rand = "0.8"
+async-trait = "0.1.51"
 
 [build-dependencies]
 npm_rs = "0.2"
