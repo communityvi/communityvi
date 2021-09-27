@@ -18,12 +18,12 @@ mod configuration;
 mod connection;
 mod context;
 mod error;
+#[cfg(test)]
+mod gotham_server_tests;
 mod lifecycle;
 mod message;
 mod room;
 mod server;
-#[cfg(test)]
-mod server_tests;
 mod utils;
 
 #[tokio::main]
