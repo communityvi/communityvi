@@ -23,6 +23,8 @@ mod gotham_server_tests;
 mod lifecycle;
 mod message;
 mod room;
+#[cfg(test)]
+mod rweb_server_tests;
 mod server;
 mod utils;
 
