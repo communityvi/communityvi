@@ -17,7 +17,7 @@ use std::future::ready;
 mod etag;
 mod file_bundle;
 
-pub async fn run_rweb_server(application_context: ApplicationContext) {
+pub async fn run_server(application_context: ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
 	let address = application_context.configuration.address;
 	rweb::serve(create_filter(application_context, room)).run(address).await;

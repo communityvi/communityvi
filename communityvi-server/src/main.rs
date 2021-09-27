@@ -21,9 +21,9 @@ mod error;
 mod lifecycle;
 mod message;
 mod room;
-#[cfg(test)]
-mod rweb_server_tests;
 mod server;
+#[cfg(test)]
+mod server_tests;
 mod utils;
 
 #[tokio::main]
