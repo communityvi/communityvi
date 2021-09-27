@@ -1,7 +1,6 @@
 use crate::configuration::Configuration;
 use crate::context::ApplicationContext;
-use crate::gotham_server_tests::register_client;
-use crate::message::client_request::ChatRequest;
+use crate::message::client_request::{ChatRequest, RegisterRequest};
 use crate::message::outgoing::broadcast_message::{
 	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, LeftReason,
 };
@@ -147,6 +146,28 @@ async fn registered_websocket_test_client(
 	let mut test_client = websocket_test_client(filter).await;
 	let client_id = register_client(name, &mut test_client).await;
 	(client_id, test_client)
+}
+
+async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
+	let register_request = RegisterRequest { name: name.to_string() };
+
+	let request_id = test_client.send_request(register_request).await;
+
+	let response = test_client.receive_success_message(request_id).await;
+
+	let id = if let SuccessMessage::Hello { id, .. } = response {
+		id
+	} else {
+		panic!("Expected Hello-Response, got '{:?}'", response);
+	};
+
+	let joined_response = test_client.receive_broadcast_message().await;
+	assert!(matches!(
+		joined_response,
+		BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
+	));
+
+	id
 }
 
 async fn websocket_test_client(filter: &BoxedFilter<(impl Reply + 'static,)>) -> WebsocketTestClient {
