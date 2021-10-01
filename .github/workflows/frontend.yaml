@@ -23,6 +23,20 @@ jobs:
         run: npm install
       - name: ESLint & Prettier & Svelte check
         run: npm run lint
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install NodeJS
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - name: Install packages
+        run: npm install
+      - name: Build static files
+        run: npm run build
   test:
     name: Test
     runs-on: ubuntu-latest
