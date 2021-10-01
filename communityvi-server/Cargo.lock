@@ -935,9 +935,9 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 
 [[package]]
 name = "rweb"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4cf691b1973c9a9ac6d888738c3f44804ad14bc5f4c6ed7f7f546fc1b3f2610"
+checksum = "3b96c5237e770e3dc2e2121d64123789fe068648a14a5f901ec255c24b942bef"
 dependencies = [
  "futures",
  "http",
