@@ -51,7 +51,7 @@ describe('Medium', () => {
 		});
 
 		it('compares name and length', () => {
-			const bidman = new Medium('Bidman', 116 * 60 * 1000);
+			const bidman = new Medium('Bidman', birdman.lengthInMilliseconds);
 			const birdmanTrailer = new Medium('Birdman', 2 * 60 * 1000);
 
 			const differentLengthComparison = Medium.hasChangedMetadata(birdman, birdmanTrailer);
