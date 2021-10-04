@@ -4,7 +4,7 @@
 	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
-	import MetadataLoader from '$lib/components/medium_selector/metadata_loader';
+	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
 
 	$: isRegistered = $registeredClient !== undefined;
 
@@ -48,17 +48,16 @@
 			return;
 		}
 
-		let selectedMedium: Medium;
+		let selectedMedium: SelectedMedium;
 		try {
-			selectedMedium = await metadataLoader.mediumFromFile(selectedFile);
+			selectedMedium = await metadataLoader.selectedMediumFromFile(selectedFile);
 		} catch (error) {
 			console.error('Error while loading medium:', error);
 			notifications.reportError(error as Error);
 			return;
 		}
 
-		// FIXME: Needs fuzzy check.
-		if (mediumIsOutdated && medium !== undefined && Medium.hasChangedMetadata(medium, selectedMedium)) {
+		if (mediumIsOutdated && medium !== undefined && selectedMedium.isMeaningfullyDifferentTo(medium)) {
 			notifications.error('Wrong medium selected');
 			return;
 		}
