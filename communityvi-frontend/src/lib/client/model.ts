@@ -220,16 +220,16 @@ export class Medium {
 		this.playbackState = playbackState;
 	}
 
-	static haveEqualMetadata(one?: Medium, another?: Medium): boolean {
+	static hasChangedMetadata(one?: Medium, another?: Medium): boolean {
 		if (one === undefined) {
-			return another === undefined;
+			return another !== undefined;
 		}
 
 		if (another === undefined) {
-			return false;
+			return true;
 		}
 
-		return one.name === another.name && one.lengthInMilliseconds === another.lengthInMilliseconds;
+		return one.name !== another.name || one.lengthInMilliseconds !== another.lengthInMilliseconds;
 	}
 }
 

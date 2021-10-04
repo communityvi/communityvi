@@ -10,12 +10,10 @@
 
 	let medium: Medium | undefined;
 	$: {
-		if ($registeredClient !== undefined) {
-			if (!Medium.haveEqualMetadata(medium, $registeredClient.currentMedium)) {
-				// Update the medium in case of relogin
-				medium = $registeredClient.currentMedium;
-				$videoUrl = undefined;
-			}
+		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
+			// Update the medium in case of relogin
+			medium = $registeredClient.currentMedium;
+			$videoUrl = undefined;
 		}
 	}
 	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
@@ -36,9 +34,10 @@
 			return;
 		}
 
-		if (!Medium.haveEqualMetadata(medium, change.medium)) {
+		if (Medium.hasChangedMetadata(medium, change.medium)) {
 			$videoUrl = undefined;
 		}
+
 		medium = change.medium;
 	}
 
@@ -58,7 +57,8 @@
 			return;
 		}
 
-		if (mediumIsOutdated && medium !== undefined && !Medium.haveEqualMetadata(medium, selectedMedium)) {
+		// FIXME: Needs fuzzy check.
+		if (mediumIsOutdated && medium !== undefined && Medium.hasChangedMetadata(medium, selectedMedium)) {
 			notifications.error('Wrong medium selected');
 			return;
 		}
