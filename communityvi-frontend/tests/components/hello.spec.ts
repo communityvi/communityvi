@@ -12,5 +12,3 @@ describe('The Hello component', () => {
 		expect(output).toHaveTextContent('Hello Max!');
 	});
 });
-
-export {};

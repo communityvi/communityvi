@@ -32,5 +32,3 @@ describe('Client registrations', () => {
 		expect(registeredClient2.id).toBeGreaterThan(registeredClient1.id);
 	});
 });
-
-export {};

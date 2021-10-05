@@ -203,5 +203,3 @@ describe('The PlayerCoordinator', () => {
 	// TODO: forwarding of playback changes caused by the user
 	// TODO: differentiates between skips caused by the user and caused by the playercoordinator itself (needs an integration test)
 });
-
-export {};

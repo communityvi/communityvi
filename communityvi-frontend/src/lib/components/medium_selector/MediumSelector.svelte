@@ -4,18 +4,16 @@
 	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
-	import MetadataLoader from '$lib/components/medium_selector/metadata_loader';
+	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
 
 	$: isRegistered = $registeredClient !== undefined;
 
 	let medium: Medium | undefined;
 	$: {
-		if ($registeredClient !== undefined) {
-			if (!Medium.haveEqualMetadata(medium, $registeredClient.currentMedium)) {
-				// Update the medium in case of relogin
-				medium = $registeredClient.currentMedium;
-				$videoUrl = undefined;
-			}
+		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
+			// Update the medium in case of relogin
+			medium = $registeredClient.currentMedium;
+			$videoUrl = undefined;
 		}
 	}
 	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
@@ -36,9 +34,10 @@
 			return;
 		}
 
-		if (!Medium.haveEqualMetadata(medium, change.medium)) {
+		if (Medium.hasChangedMetadata(medium, change.medium)) {
 			$videoUrl = undefined;
 		}
+
 		medium = change.medium;
 	}
 
@@ -49,16 +48,16 @@
 			return;
 		}
 
-		let selectedMedium: Medium;
+		let selectedMedium: SelectedMedium;
 		try {
-			selectedMedium = await metadataLoader.mediumFromFile(selectedFile);
+			selectedMedium = await metadataLoader.selectedMediumFromFile(selectedFile);
 		} catch (error) {
 			console.error('Error while loading medium:', error);
 			notifications.reportError(error as Error);
 			return;
 		}
 
-		if (mediumIsOutdated && medium !== undefined && !Medium.haveEqualMetadata(medium, selectedMedium)) {
+		if (mediumIsOutdated && medium !== undefined && selectedMedium.isMeaningfullyDifferentTo(medium)) {
 			notifications.error('Wrong medium selected');
 			return;
 		}

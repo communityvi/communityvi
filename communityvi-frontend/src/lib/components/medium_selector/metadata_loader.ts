@@ -1,5 +1,5 @@
-import {Medium} from '$lib/client/model';
 import {promiseWithTimout} from '$lib/client/promises';
+import {Medium} from '$lib/client/model';
 
 export default class MetadataLoader {
 	private readonly player: HTMLMediaElement;
@@ -14,12 +14,12 @@ export default class MetadataLoader {
 		this.player.onerror = () => this.onError();
 	}
 
-	async mediumFromFile(file: File): Promise<Medium> {
+	async selectedMediumFromFile(file: File): Promise<SelectedMedium> {
 		if (this.pendingMetadataLoad !== undefined) {
 			throw Error('Already loading');
 		}
 
-		const loadingPromise = new Promise<Medium>((resolve, reject) => {
+		const loadingPromise = new Promise<SelectedMedium>((resolve, reject) => {
 			this.pendingMetadataLoad = new PendingMetadataLoad(file.name, resolve, reject);
 
 			this.player.src = URL.createObjectURL(file);
@@ -38,8 +38,9 @@ export default class MetadataLoader {
 		const duration = this.player.duration;
 		this.reset();
 
-		const medium = new Medium(pendingMetadataLoad.name, Math.round(duration * 1000));
-		pendingMetadataLoad.resolve(medium);
+		const durationInMilliseconds = Math.round(duration * 1000);
+		const selectedMedium = new SelectedMedium(pendingMetadataLoad.name, durationInMilliseconds);
+		pendingMetadataLoad.resolve(selectedMedium);
 	}
 
 	private onError() {
@@ -65,14 +66,31 @@ export default class MetadataLoader {
 class PendingMetadataLoad {
 	name: string;
 
-	resolve: (medium: Medium) => void;
+	resolve: (selectedMedium: SelectedMedium) => void;
 	reject: (error: Error) => void;
 
-	constructor(name: string, resolve: (medium: Medium) => void, reject: (error: Error) => void) {
+	constructor(name: string, resolve: (selectedMedium: SelectedMedium) => void, reject: (error: Error) => void) {
 		this.name = name;
 
 		this.resolve = resolve;
 		this.reject = reject;
+	}
+}
+
+export class SelectedMedium {
+	readonly name: string;
+	readonly lengthInMilliseconds: number;
+
+	constructor(name: string, lengthInMilliseconds: number) {
+		this.name = name;
+		this.lengthInMilliseconds = lengthInMilliseconds;
+	}
+
+	isMeaningfullyDifferentTo(medium: Medium): boolean {
+		const ownLengthInSecondsTruncated = Math.trunc(this.lengthInMilliseconds / 1000);
+		const mediumLengthInSecondsTruncated = Math.trunc(medium.lengthInMilliseconds / 1000);
+
+		return this.name.trim() !== medium.name.trim() || ownLengthInSecondsTruncated !== mediumLengthInSecondsTruncated;
 	}
 }
 
