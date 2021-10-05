@@ -21,6 +21,8 @@
 	let durationHelper: HTMLVideoElement | undefined;
 	$: metadataLoader = durationHelper ? new MetadataLoader(durationHelper) : undefined;
 
+	let fileSelector: HTMLInputElement;
+
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 
 	onDestroy(() => {
@@ -41,9 +43,8 @@
 		medium = change.medium;
 	}
 
-	async function onMediumSelection(event: Event) {
-		const fileSelector = event.target as HTMLInputElement;
-		const selectedFile = fileSelector?.files?.item(0) ?? undefined;
+	async function onMediumSelection() {
+		const selectedFile = fileSelector.files?.item(0) ?? undefined;
 		if (selectedFile === undefined || metadataLoader === undefined) {
 			return;
 		}
@@ -78,6 +79,7 @@
 	}
 
 	async function ejectMedium() {
+		fileSelector.value = ''; // reset the file selection
 		if ($registeredClient === undefined) {
 			return;
 		}
@@ -103,7 +105,13 @@
 
 		<div class="file">
 			<label class="file-label">
-				<input class="file-input" type="file" accept="video/*,audio/*" on:change={onMediumSelection} />
+				<input
+					class="file-input"
+					type="file"
+					accept="video/*,audio/*"
+					bind:this={fileSelector}
+					on:change={onMediumSelection}
+				/>
 				<span class="file-cta">
 					<span class="file-icon">
 						<i class="fas fa-upload" />
