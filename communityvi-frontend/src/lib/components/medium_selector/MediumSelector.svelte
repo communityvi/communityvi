@@ -79,7 +79,11 @@
 	}
 
 	async function ejectMedium() {
-		fileSelector.value = ''; // reset the file selection
+		// The input element needs to be reset, otherwise Chrome won't trigger a change event
+		// if the same file is selected again after ejecting.
+		// See https://github.com/communityvi/communityvi/issues/267
+		resetFileSelector();
+
 		if ($registeredClient === undefined) {
 			return;
 		}
@@ -92,6 +96,10 @@
 			console.error('Error while ejecting medium:', error);
 			notifications.reportError(new Error('Ejecting the medium failed!'));
 		}
+	}
+
+	function resetFileSelector() {
+		fileSelector.value = '';
 	}
 </script>
 
