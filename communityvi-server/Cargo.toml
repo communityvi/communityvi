@@ -9,6 +9,7 @@ repository = "https://github.com/communityvi/communityvi"
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = "3.0.0-beta.5"
+cookie = {version = "0.15", default-features = false, features = ["percent-encode"]}
 env_logger = "0.9"
 futures = "0.3"
 governor = { version = "0.3", default-features = false, features = ["std", "jitter"] }
@@ -31,6 +32,7 @@ tokio-tungstenite = "0.16"
 toml = "0.5"
 typed-builder = "0.9"
 unicode_skeleton = "0.1"
+uuid = {version = "0.8", default-features = false, features = ["std", "v4"]}
 
 [dev-dependencies]
 rand = "0.8"
