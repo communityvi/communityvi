@@ -15,6 +15,7 @@ use rweb::{Filter, Reply};
 use std::future::ready;
 
 mod file_bundle;
+mod session;
 
 pub async fn run_server(application_context: ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
