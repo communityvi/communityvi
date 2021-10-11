@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	match env::var("CARGO_FEATURE_BUNDLE_FRONTEND") {
 		Ok(_) => {
 			if is_debug_profile() {
-				rerun_if_frontend_changes(&frontend_path);
+				rerun_if_frontend_changes(frontend_path);
 			}
 
 			let exit_status = NpmEnv::default()
