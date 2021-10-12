@@ -67,6 +67,7 @@ impl BundledFile {
 			.header(CACHE_CONTROL, "must-revalidate")
 			.header(ETAG, self.etag());
 
+		#[allow(clippy::option_if_let_else)] // False positive, see: https://github.com/rust-lang/rust-clippy/pull/7573
 		let builder = if let Some(last_modified) = self.last_modified() {
 			builder.header(LAST_MODIFIED, last_modified)
 		} else {
