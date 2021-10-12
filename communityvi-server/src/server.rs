@@ -37,26 +37,29 @@ fn websocket_filter(application_context: ApplicationContext, room: Room) -> Boxe
 				let room = room.clone();
 				let application_context = application_context.clone();
 
-				ws.on_upgrade(move |websocket| {
-					let (sink, stream) = websocket.split();
+				ws.max_send_queue(1)
+					.max_message_size(10 * 1024)
+					.max_frame_size(10 * 1024)
+					.on_upgrade(move |websocket| {
+						let (sink, stream) = websocket.split();
 
-					let message_sender = MessageSender::from(
-						sink.with(|message| {
-							ready(Ok::<_, anyhow::Error>(tungstenite_message_to_rweb_websocket_message(
-								message,
-							)))
-						})
-						.sink_map_err(Into::into),
-					);
-					let message_receiver = MessageReceiver::new(
-						stream
-							.map_ok(rweb_websocket_message_to_tungstenite_message)
-							.map_err(Into::into),
-						message_sender.clone(),
-					);
+						let message_sender = MessageSender::from(
+							sink.with(|message| {
+								ready(Ok::<_, anyhow::Error>(tungstenite_message_to_rweb_websocket_message(
+									message,
+								)))
+							})
+							.sink_map_err(Into::into),
+						);
+						let message_receiver = MessageReceiver::new(
+							stream
+								.map_ok(rweb_websocket_message_to_tungstenite_message)
+								.map_err(Into::into),
+							message_sender.clone(),
+						);
 
-					run_client(application_context, room, message_sender, message_receiver)
-				})
+						run_client(application_context, room, message_sender, message_receiver)
+					})
 			},
 		)
 		.boxed()
