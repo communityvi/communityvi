@@ -54,9 +54,6 @@ pub struct BundledFile {
 }
 
 impl BundledFile {
-	fn etag(&self) -> String {
-		hex::encode(&self.file.metadata.sha256_hash())
-	}
 
 	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
 		match request_headers.get(IF_NONE_MATCH) {
@@ -77,6 +74,10 @@ impl BundledFile {
 			.header(ETAG, self.etag())
 			.body(Body::from(self.file.data.clone()))
 			.unwrap()
+	}
+
+	fn etag(&self) -> String {
+		format!(r#""{}""#, hex::encode(&self.file.metadata.sha256_hash()))
 	}
 
 	#[cfg(test)]
@@ -267,6 +268,16 @@ mod test {
 		let response = not_found();
 
 		assert_eq!("Not Found", content(response).await);
+	}
+
+	#[test]
+	fn bundled_file_should_format_etag_properly() {
+		let file = bundled_file("index.html");
+		let etag = file.etag();
+
+		assert!(etag.starts_with('"'));
+		assert!(etag.ends_with('"'));
+		assert!(!etag.trim_matches('"').contains('"'))
 	}
 
 	fn test_handler() -> BundledFileHandler {
