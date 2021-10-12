@@ -3,20 +3,24 @@ use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
-use std::marker::PhantomData;
 
 #[allow(unused)]
-pub struct BundledFileHandler<Bundle> {
-	_bundle: PhantomData<Bundle>,
+#[derive(Clone)]
+pub struct BundledFileHandler {
+	file_getter: fn(path: &str) -> Option<EmbeddedFile>,
 }
 
 #[allow(unused)]
-impl<Bundle> BundledFileHandler<Bundle>
-where
-	Bundle: RustEmbed,
-{
-	pub fn handle_request(path: &str, request_headers: &HeaderMap) -> Response<Body> {
-		let file = match Self::get_file_falling_back_to_index_html(path) {
+impl BundledFileHandler {
+	/// Creates a new [`BundledFileHandler`] from a [`RustEmbed`] asset type, erasing the type in the process.
+	pub fn new<Bundle: RustEmbed>() -> Self {
+		Self {
+			file_getter: Bundle::get,
+		}
+	}
+
+	pub fn request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {
+		let file = match self.look_up_file_falling_back_to_index_html(path) {
 			Some(file) => file,
 			None => return not_found(),
 		};
@@ -28,16 +32,16 @@ where
 		file.to_response()
 	}
 
-	fn get_file_falling_back_to_index_html(path: &str) -> Option<BundledFile> {
-		match Self::get_file(path) {
+	fn look_up_file_falling_back_to_index_html(&self, path: &str) -> Option<BundledFile> {
+		match self.look_up_file(path) {
 			Some(file) => Some(file),
-			None => Self::get_file(&format!("{}/index.html", path)),
+			None => self.look_up_file(&format!("{}/index.html", path)),
 		}
 	}
 
-	fn get_file(path: &str) -> Option<BundledFile> {
+	fn look_up_file(&self, path: &str) -> Option<BundledFile> {
 		let path = normalize_path(path);
-		Bundle::get(path).map(|file| BundledFile {
+		(self.file_getter)(path).map(|file| BundledFile {
 			file,
 			path: path.to_string(),
 		})
@@ -112,13 +116,11 @@ mod test {
 	#[folder = "$CARGO_MANIFEST_DIR/test/bundled_files"]
 	struct TestBundle;
 
-	type TestHandler = BundledFileHandler<TestBundle>;
-
 	#[tokio::test]
 	async fn request_handler_should_return_files() {
 		let index = bundled_file("index.html");
 
-		let response = TestHandler::handle_request("index.html", &HeaderMap::default());
+		let response = test_handler().request("index.html", &HeaderMap::default());
 		let status_code = response.status();
 		let content = content(response).await;
 
@@ -128,7 +130,7 @@ mod test {
 
 	#[test]
 	fn request_handler_should_reply_with_not_found_if_file_is_not_found() {
-		let response = TestHandler::handle_request("nonexistent", &HeaderMap::default());
+		let response = test_handler().request("nonexistent", &HeaderMap::default());
 
 		assert_eq!(StatusCode::NOT_FOUND, response.status());
 	}
@@ -136,13 +138,13 @@ mod test {
 	#[test]
 	fn request_handler_should_reply_with_not_modified_if_etag_matches() {
 		const PATH: &str = "about/index.html";
-		let uncached_response = TestHandler::handle_request(PATH, &HeaderMap::default());
+		let uncached_response = test_handler().request(PATH, &HeaderMap::default());
 		let etag = uncached_response.headers()[ETAG].as_bytes();
 
 		let mut request_headers = HeaderMap::new();
 		request_headers.insert(IF_NONE_MATCH, HeaderValue::from_bytes(etag).unwrap());
 
-		let cached_response = TestHandler::handle_request(PATH, &request_headers);
+		let cached_response = test_handler().request(PATH, &request_headers);
 
 		assert_eq!(StatusCode::NOT_MODIFIED, cached_response.status());
 	}
@@ -154,7 +156,7 @@ mod test {
 		let mut request_headers = HeaderMap::new();
 		request_headers.insert(IF_NONE_MATCH, "wrong_etag".parse().unwrap());
 
-		let response = TestHandler::handle_request(PATH, &request_headers);
+		let response = test_handler().request(PATH, &request_headers);
 
 		assert_eq!(StatusCode::OK, response.status());
 	}
@@ -171,10 +173,9 @@ mod test {
 	async fn request_handler_should_normalize_path() {
 		let index = bundled_file("index.html");
 
-		assert_eq!(
-			index.content(),
-			content(TestHandler::handle_request("/index.html/", &HeaderMap::default())).await
-		);
+		let response = test_handler().request("/index.html/", &HeaderMap::default());
+
+		assert_eq!(index.content(), content(response).await);
 	}
 
 	#[test]
@@ -266,6 +267,10 @@ mod test {
 		let response = not_found();
 
 		assert_eq!("Not Found", content(response).await);
+	}
+
+	fn test_handler() -> BundledFileHandler {
+		BundledFileHandler::new::<TestBundle>()
 	}
 
 	fn bundled_file(path: &str) -> BundledFile {

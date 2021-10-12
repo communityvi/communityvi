@@ -73,11 +73,11 @@ fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 	#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
 	struct FrontendBundle;
 
+	let bundled_file_handler = BundledFileHandler::new::<FrontendBundle>();
+
 	filters::path::tail()
 		.and(filters::header::headers_cloned())
-		.map(move |path: Tail, headers: HeaderMap| {
-			BundledFileHandler::<FrontendBundle>::handle_request(path.as_str(), &headers)
-		})
+		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.request(path.as_str(), &headers))
 		.boxed()
 }
 
