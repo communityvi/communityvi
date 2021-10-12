@@ -54,14 +54,6 @@ pub struct BundledFile {
 }
 
 impl BundledFile {
-
-	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
-		match request_headers.get(IF_NONE_MATCH) {
-			Some(if_none_match) => &self.etag() == if_none_match,
-			None => false,
-		}
-	}
-
 	fn to_response(&self) -> Response<Body> {
 		let mime = MimeGuess::from_path(&self.path).first_or_octet_stream();
 		Response::builder()
@@ -78,6 +70,13 @@ impl BundledFile {
 
 	fn etag(&self) -> String {
 		format!(r#""{}""#, hex::encode(&self.file.metadata.sha256_hash()))
+	}
+
+	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
+		match request_headers.get(IF_NONE_MATCH) {
+			Some(if_none_match) => &self.etag() == if_none_match,
+			None => false,
+		}
 	}
 
 	#[cfg(test)]
