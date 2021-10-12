@@ -1,8 +1,10 @@
+use chrono::{DateTime, TimeZone, Utc};
 use mime_guess::MimeGuess;
 use rust_embed::{EmbeddedFile, RustEmbed};
-use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH};
+use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
+use std::convert::TryFrom;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -56,20 +58,32 @@ pub struct BundledFile {
 impl BundledFile {
 	fn to_response(&self) -> Response<Body> {
 		let mime = MimeGuess::from_path(&self.path).first_or_octet_stream();
-		Response::builder()
+		let builder = Response::builder()
 			.status(StatusCode::OK)
 			.header(CONTENT_TYPE, mime.as_ref())
 			.header(CONTENT_LENGTH, self.file.data.len())
 			// Tell browsers to always make the request with If-None-Match instead
 			// of relying on a maximum age.
 			.header(CACHE_CONTROL, "must-revalidate")
-			.header(ETAG, self.etag())
-			.body(Body::from(self.file.data.clone()))
-			.unwrap()
+			.header(ETAG, self.etag());
+
+		let builder = if let Some(last_modified) = self.last_modified() {
+			builder.header(LAST_MODIFIED, last_modified)
+		} else {
+			builder
+		};
+
+		builder.body(Body::from(self.file.data.clone())).unwrap()
 	}
 
 	fn etag(&self) -> String {
 		format!(r#""{}""#, hex::encode(&self.file.metadata.sha256_hash()))
+	}
+
+	fn last_modified(&self) -> Option<String> {
+		let unix_timestamp = i64::try_from(self.file.metadata.last_modified()?).ok()?;
+		let date_time = Utc.timestamp(unix_timestamp, 0);
+		Some(last_modified(date_time))
 	}
 
 	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
@@ -83,6 +97,11 @@ impl BundledFile {
 	fn content(&self) -> &[u8] {
 		self.file.data.as_ref()
 	}
+}
+
+fn last_modified(date_time: DateTime<Utc>) -> String {
+	// https://httpwg.org/specs/rfc7231.html#http.date
+	date_time.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
 
 fn normalize_path(path: &str) -> &str {
@@ -207,6 +226,25 @@ mod test {
 		let headers = response.headers();
 
 		assert_eq!(file.etag().as_bytes(), headers[ETAG].as_bytes())
+	}
+
+	#[test]
+	fn ok_responses_should_have_a_last_modified_header() {
+		let file = bundled_file("index.html");
+
+		let response = file.to_response();
+		let headers = response.headers();
+
+		assert!(headers.contains_key(LAST_MODIFIED));
+	}
+
+	#[test]
+	fn last_modified_should_have_the_expected_format() {
+		let date_time = Utc.ymd(2021, 10, 12).and_hms(13, 37, 42);
+
+		let last_modified = last_modified(date_time);
+
+		assert_eq!("Tue, 12 Oct 2021 13:37:42 GMT", last_modified)
 	}
 
 	#[tokio::test]
