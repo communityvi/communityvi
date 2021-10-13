@@ -1,21 +1,21 @@
+use rand::{thread_rng, Rng};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use uuid::Uuid;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct SessionId {
-	uuid: Uuid,
+	id: [u8; 16],
 }
 
 impl SessionId {
 	pub fn new() -> Self {
-		Self { uuid: Uuid::new_v4() }
+		Self { id: thread_rng().gen() }
 	}
 }
 
 impl Display for SessionId {
 	fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
-		self.uuid.fmt(formatter)
+		formatter.write_str(&hex::encode(&self.id))
 	}
 }
 
@@ -23,7 +23,11 @@ impl TryFrom<&str> for SessionId {
 	type Error = anyhow::Error;
 
 	fn try_from(text: &str) -> anyhow::Result<Self> {
-		Ok(Self { uuid: text.parse()? })
+		let mut session_id = Self { id: Default::default() };
+
+		hex::decode_to_slice(text, &mut session_id.id)?;
+
+		Ok(session_id)
 	}
 }
 
