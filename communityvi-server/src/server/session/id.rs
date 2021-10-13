@@ -34,6 +34,7 @@ impl TryFrom<&str> for SessionId {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use std::collections::HashSet;
 
 	#[test]
 	fn session_id_can_be_serialized_and_deserialized() {
@@ -47,9 +48,14 @@ mod test {
 
 	#[test]
 	fn session_id_is_randomly_generated() {
-		let session_id1 = SessionId::new();
-		let session_id2 = SessionId::new();
+		const ITERATIONS: usize = 1_000;
+		let mut session_ids = HashSet::with_capacity(ITERATIONS);
 
-		assert_ne!(session_id1, session_id2);
+		for _ in 0..ITERATIONS {
+			let session_id = SessionId::new();
+			assert!(!session_ids.contains(&session_id));
+
+			session_ids.insert(session_id);
+		}
 	}
 }
