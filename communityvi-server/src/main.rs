@@ -11,7 +11,7 @@
 #![allow(clippy::used_underscore_binding)]
 use crate::commandline::Commandline;
 use crate::error::CommunityviError;
-use clap::Clap;
+use clap::Parser;
 
 mod commandline;
 mod configuration;
