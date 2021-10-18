@@ -3,10 +3,9 @@ use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
 use crate::server::run_server;
 use crate::utils::time_source::TimeSource;
-use clap::Clap;
 use log::info;
 
-#[derive(Clap)]
+#[derive(clap::Parser)]
 pub struct Commandline {
 	#[clap(short = 'c', long = "config-file", default_value = "configuration.toml")]
 	pub configuration_file_path: String,
@@ -14,7 +13,7 @@ pub struct Commandline {
 	pub command: Option<BaseCommand>,
 }
 
-#[derive(Clap)]
+#[derive(clap::Parser)]
 pub enum BaseCommand {
 	/// Run the communityvi server (websocket mode only)
 	Run,
