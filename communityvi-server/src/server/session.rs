@@ -48,7 +48,7 @@ impl<Data: Clone> SessionStore<Data> {
 		Ok(id)
 	}
 
-	pub fn store_session(&self, mut session: Session<Data>) -> anyhow::Result<()> {
+	pub fn update_session(&self, mut session: Session<Data>) -> anyhow::Result<()> {
 		if session.has_expired() {
 			bail!("Session {} has expired.", session.id);
 		}
