@@ -102,8 +102,7 @@ async fn should_broadcast_when_client_leaves_the_room() {
 	let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &filter).await;
 	let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", &filter).await;
 
-	// skip join message for bob
-	let _dropped_message = alice_test_client.receive_broadcast_message().await;
+	let _bobs_join_message = alice_test_client.receive_broadcast_message().await;
 	std::mem::drop(bob_test_client);
 
 	let expected_leave_message = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
