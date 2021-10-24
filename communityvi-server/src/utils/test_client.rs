@@ -17,7 +17,6 @@ use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use rweb::test::WsClient;
 use std::collections::{BTreeMap, VecDeque};
-use std::convert::TryFrom;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;

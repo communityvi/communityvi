@@ -3,7 +3,6 @@ use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
 use crate::room::medium::{Medium, VersionedMedium};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]

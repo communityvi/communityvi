@@ -4,7 +4,6 @@ use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
 use futures::{Stream, StreamExt};
 use log::error;
-use std::convert::TryFrom;
 use std::pin::Pin;
 
 pub struct MessageReceiver {

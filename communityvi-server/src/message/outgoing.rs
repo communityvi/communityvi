@@ -3,7 +3,6 @@ use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::{MessageError, WebSocketMessage};
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 
 pub mod broadcast_message;
 pub mod error_message;

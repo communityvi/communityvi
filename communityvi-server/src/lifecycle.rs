@@ -20,7 +20,6 @@ use futures::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
 use log::{debug, error, info};
 use nonzero_ext::nonzero;
-use std::convert::TryFrom;
 
 /// Once this count of heartbeats are missed, the client is kicked.
 const MISSED_HEARTBEAT_LIMIT: usize = 3;

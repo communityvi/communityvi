@@ -6,7 +6,6 @@ use crate::room::medium::fixed_length::FixedLengthMedium;
 use crate::room::medium::Medium;
 use chrono::Duration;
 use log::error;
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ClientRequestWithId {

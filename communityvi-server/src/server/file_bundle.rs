@@ -4,7 +4,6 @@ use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
-use std::convert::TryFrom;
 
 #[allow(unused)]
 #[derive(Clone)]

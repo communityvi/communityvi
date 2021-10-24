@@ -4,7 +4,6 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::medium::playback_state::PlaybackState;
 use crate::room::medium::{Medium, VersionedMedium};
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
