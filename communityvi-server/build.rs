@@ -1,11 +1,18 @@
+use ignore::DirEntry;
 use npm_rs::NpmEnv;
 use std::env;
+use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+	let frontend_path = Path::new("../communityvi-frontend");
 	match env::var("CARGO_FEATURE_BUNDLE_FRONTEND") {
 		Ok(_) => {
+			if is_debug_profile() {
+				limit_rerun_to_frontend_changes(frontend_path);
+			}
+
 			let exit_status = NpmEnv::default()
-				.set_path("../communityvi-frontend")
+				.set_path(frontend_path)
 				.init_env()
 				.install(None)
 				.run("build")
@@ -15,8 +22,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			}
 		}
 		Err(_) => {
+			// don't always rerun build.rs
 			println!("cargo:rerun-if-changed=build.rs")
 		}
 	}
 	Ok(())
+}
+
+fn is_debug_profile() -> bool {
+	env::var("PROFILE") == Ok("debug".to_string())
+}
+
+// Prints the necessary cargo directives for rebuilding only
+// if changes to the frontend directory have been detected.
+fn limit_rerun_to_frontend_changes(frontend_path: &Path) {
+	let package_lock_json_path = frontend_path.join("package-lock.json");
+
+	for entry in files_and_directories_not_in_gitignore(frontend_path) {
+		let path = entry.path();
+
+		// These paths are changed by npm when building the frontend
+		if (path == package_lock_json_path) || (path == frontend_path) {
+			continue;
+		}
+
+		println!("cargo:rerun-if-changed={}", path.display());
+	}
+}
+
+fn files_and_directories_not_in_gitignore(path: &Path) -> impl Iterator<Item = DirEntry> {
+	ignore::WalkBuilder::new(path)
+		.hidden(false)
+		.ignore(false)
+		.require_git(false)
+		.build()
+		.map(Result::unwrap)
 }
