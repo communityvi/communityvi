@@ -2,7 +2,6 @@ use crate::server::session::id::SessionId;
 use anyhow::bail;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant};
 
@@ -30,13 +29,8 @@ impl<Data: Clone> SessionStore<Data> {
 		}
 	}
 
-	pub fn start_session(&self, data: Data) -> anyhow::Result<SessionId> {
-		let id = SessionId::new();
-		let session = Session {
-			expires_at: Instant::now() + self.inner.expire_after,
-			id: SessionId::new(),
-			data,
-		};
+	pub fn start_session(&self, data: Data) -> anyhow::Result<Session<Data>> {
+		let session = Session::new(self.inner.expire_after, data);
 
 		let mut sessions = self.inner.sessions.write();
 		if sessions.len() >= self.inner.maximum_session_count {
@@ -49,9 +43,9 @@ impl<Data: Clone> SessionStore<Data> {
 			}
 		}
 
-		sessions.insert(id, session);
+		sessions.insert(session.id, session.clone());
 
-		Ok(id)
+		Ok(session)
 	}
 
 	fn cleanup(sessions: &mut HashMap<SessionId, Session<Data>>) {
@@ -76,6 +70,7 @@ impl<Data: Clone> SessionStore<Data> {
 	}
 
 	pub fn retrieve_session(&self, id: SessionId) -> Option<Session<Data>> {
+		// FIXME: Refresh session once it is retrieved.
 		let sessions = self.inner.sessions.read();
 		sessions.get(&id).and_then(|session| {
 			if session.has_expired() {
@@ -95,26 +90,24 @@ impl<Data: Clone> SessionStore<Data> {
 pub struct Session<Data> {
 	expires_at: Instant,
 	id: SessionId,
-	data: Data,
+	pub data: Data,
 }
 
 impl<Data> Session<Data> {
+	fn new(expire_after: StdDuration, data: Data) -> Self {
+		Self {
+			id: SessionId::random(),
+			expires_at: Instant::now() + expire_after,
+			data,
+		}
+	}
+
+	pub fn id(&self) -> SessionId {
+		self.id
+	}
+
 	pub fn has_expired(&self) -> bool {
 		Instant::now() >= self.expires_at
-	}
-}
-
-impl<Data> Deref for Session<Data> {
-	type Target = Data;
-
-	fn deref(&self) -> &Self::Target {
-		&self.data
-	}
-}
-
-impl<Data> DerefMut for Session<Data> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.data
 	}
 }
 
@@ -152,24 +145,32 @@ mod test {
 	fn session_store_should_retrieve_sessions() {
 		let session_store = session_store();
 
-		let session1_id = session_store.start_session("session 1").unwrap();
-		let session2_id = session_store.start_session("session 2").unwrap();
+		let session1 = session_store.start_session("session 1").unwrap();
+		let session2 = session_store.start_session("session 2").unwrap();
 
-		let session1 = session_store.retrieve_session(session1_id).unwrap();
-		let session2 = session_store.retrieve_session(session2_id).unwrap();
+		let retrieved_session1 = session_store.retrieve_session(session1.id()).unwrap();
+		let retrieved_session2 = session_store.retrieve_session(session2.id()).unwrap();
 
-		assert_eq!(session1.data, "session 1");
-		assert_eq!(session2.data, "session 2");
+		assert_eq!(retrieved_session1.data, "session 1");
+		assert_eq!(retrieved_session2.data, "session 2");
+	}
+
+	#[test]
+	fn session_store_should_not_retrieve_expired_sessions() {
+		let (session_store, expired_session) = session_store_with_expired_session();
+
+		let retrieval = session_store.retrieve_session(expired_session.id);
+
+		assert!(
+			retrieval.is_none(),
+			"Expired session was retrieved even though it shouldn't have been."
+		);
 	}
 
 	#[test]
 	fn session_store_should_clean_expired_sessions_if_no_more_sessions_are_available() {
 		let session_store = SessionStore::new(EXPIRE_AFTER, 1);
-		let expired_session = Session {
-			expires_at: Instant::now() - StdDuration::from_secs(1),
-			id: SessionId::new(),
-			data: "Expired",
-		};
+		let expired_session = expired_session();
 		session_store
 			.inner
 			.sessions
@@ -179,6 +180,78 @@ mod test {
 		session_store
 			.start_session("New session")
 			.expect("Cleaning did not purge expired session.");
+	}
+
+	#[test]
+	fn session_store_should_update_session_data_of_existing_sessions() {
+		let session_store = session_store();
+		let mut session = session_store
+			.start_session("Initial state")
+			.expect("Could not start session");
+
+		session.data = "Updated state";
+		session_store
+			.update_session(session.clone())
+			.expect("Could not update session");
+
+		let retrieved_session = session_store
+			.retrieve_session(session.id())
+			.expect("Could not retrieve stored session");
+		assert_eq!(retrieved_session.data, "Updated state");
+	}
+
+	#[test]
+	fn session_store_should_reject_updates_to_sessions_that_do_not_exist() {
+		let session_store = session_store();
+		let nonexistent_session = Session::new(StdDuration::from_secs(1), "Irrelevant");
+
+		session_store
+			.update_session(nonexistent_session)
+			.expect_err("Updating nonexisting sessions should not have worked, but it did.");
+	}
+
+	#[test]
+	fn session_store_should_reject_updates_to_expired_sessions() {
+		let (session_store, expired_session) = session_store_with_expired_session();
+
+		session_store
+			.update_session(expired_session)
+			.expect_err("Updating an expired session has worked even though it shouldn't have.");
+	}
+
+	#[test]
+	fn session_store_should_allow_session_termination() {
+		let session_store = session_store();
+		let session = session_store
+			.start_session("Some data")
+			.expect("Could not start session");
+
+		session_store.terminate_session(session.id);
+
+		assert!(
+			session_store.retrieve_session(session.id).is_none(),
+			"Session wasn't terminated."
+		);
+	}
+
+	fn session_store_with_expired_session() -> (SessionStore<&'static str>, Session<&'static str>) {
+		let session_store = session_store();
+		let expired_session = expired_session();
+		session_store
+			.inner
+			.sessions
+			.write()
+			.insert(expired_session.id, expired_session.clone());
+
+		(session_store, expired_session)
+	}
+
+	fn expired_session() -> Session<&'static str> {
+		Session {
+			expires_at: Instant::now() - StdDuration::from_secs(1),
+			id: SessionId::random(),
+			data: "Expired",
+		}
 	}
 
 	fn session_store() -> SessionStore<&'static str> {

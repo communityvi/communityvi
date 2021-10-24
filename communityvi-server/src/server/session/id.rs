@@ -8,7 +8,7 @@ pub struct SessionId {
 }
 
 impl SessionId {
-	pub fn new() -> Self {
+	pub fn random() -> Self {
 		Self { id: thread_rng().gen() }
 	}
 }
@@ -38,7 +38,7 @@ mod test {
 
 	#[test]
 	fn session_id_can_be_serialized_and_deserialized() {
-		let session_id = SessionId::new();
+		let session_id = SessionId::random();
 
 		let serialized = session_id.to_string();
 		let deserialized = SessionId::try_from(serialized.as_str()).expect("Failed to deserialize");
@@ -52,7 +52,7 @@ mod test {
 		let mut session_ids = HashSet::with_capacity(ITERATIONS);
 
 		for _ in 0..ITERATIONS {
-			let session_id = SessionId::new();
+			let session_id = SessionId::random();
 			assert!(!session_ids.contains(&session_id));
 
 			session_ids.insert(session_id);
