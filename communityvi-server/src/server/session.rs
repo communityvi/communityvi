@@ -40,12 +40,22 @@ impl<Data: Clone> SessionStore<Data> {
 
 		let mut sessions = self.inner.sessions.write();
 		if sessions.len() >= self.inner.maximum_session_count {
-			bail!("Maximum session count of {} exceeded", self.inner.maximum_session_count);
+			// Try to make some space before bailing out.
+			Self::cleanup(&mut sessions);
+
+			// Re-check.
+			if sessions.len() >= self.inner.maximum_session_count {
+				bail!("Maximum session count of {} exceeded", self.inner.maximum_session_count);
+			}
 		}
 
 		sessions.insert(id, session);
 
 		Ok(id)
+	}
+
+	fn cleanup(sessions: &mut HashMap<SessionId, Session<Data>>) {
+		sessions.retain(|_id, session| !session.has_expired());
 	}
 
 	pub fn update_session(&self, mut session: Session<Data>) -> anyhow::Result<()> {
@@ -78,10 +88,6 @@ impl<Data: Clone> SessionStore<Data> {
 
 	pub fn terminate_session(&self, id: SessionId) {
 		self.inner.sessions.write().remove(&id);
-	}
-
-	fn cleanup(sessions: &mut HashMap<SessionId, Session<Data>>) {
-		sessions.retain(|_id, session| !session.has_expired());
 	}
 }
 
@@ -154,6 +160,25 @@ mod test {
 
 		assert_eq!(session1.data, "session 1");
 		assert_eq!(session2.data, "session 2");
+	}
+
+	#[test]
+	fn session_store_should_clean_expired_sessions_if_no_more_sessions_are_available() {
+		let session_store = SessionStore::new(EXPIRE_AFTER, 1);
+		let expired_session = Session {
+			expires_at: Instant::now() - StdDuration::from_secs(1),
+			id: SessionId::new(),
+			data: "Expired",
+		};
+		session_store
+			.inner
+			.sessions
+			.write()
+			.insert(expired_session.id, expired_session);
+
+		session_store
+			.start_session("New session")
+			.expect("Cleaning did not purge expired session.");
 	}
 
 	fn session_store() -> SessionStore<&'static str> {
