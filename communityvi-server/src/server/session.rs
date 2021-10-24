@@ -130,6 +130,7 @@ mod test {
 	fn session_store_should_limit_number_of_sessions() {
 		let session_store = session_store();
 
+		#[allow(clippy::expect_fun_call)]
 		for index in 0..MAX_SESSION_COUNT {
 			session_store
 				.start_session("data")
