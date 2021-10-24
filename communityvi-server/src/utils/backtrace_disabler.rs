@@ -24,7 +24,7 @@ impl<'mutex_guard> Default for BacktraceDisabler<'mutex_guard> {
 impl<'mutex_guard> Drop for BacktraceDisabler<'mutex_guard> {
 	fn drop(&mut self) {
 		if let Some(text) = self.previous_environment_variable.as_ref() {
-			std::env::set_var(RUST_BACKTRACE, text)
+			std::env::set_var(RUST_BACKTRACE, text);
 		}
 	}
 }

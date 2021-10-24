@@ -22,7 +22,7 @@ use log::{debug, error, info};
 use nonzero_ext::nonzero;
 
 /// Once this count of heartbeats are missed, the client is kicked.
-const MISSED_HEARTBEAT_LIMIT: usize = 3;
+const MISSED_HEARTBEAT_LIMIT: u32 = 3;
 
 pub async fn run_client(
 	application_context: ApplicationContext,
@@ -33,7 +33,7 @@ pub async fn run_client(
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
 		let client_id = client.id();
 		let client_name = client.name().to_string();
-		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT);
+		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
 
 		let left_reason = tokio::select! {
 			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
@@ -453,7 +453,7 @@ mod test {
 				message: non_empty_chat_request.message,
 				counter: 0
 			})
-		)
+		);
 	}
 
 	#[tokio::test]
@@ -518,7 +518,7 @@ mod test {
 				.error(ErrorMessageType::InvalidFormat)
 				.message("Length of a medium must not be larger than one year.".to_string())
 				.build()
-		)
+		);
 	}
 
 	#[tokio::test]
@@ -764,7 +764,7 @@ mod test {
 			async move {
 				let room = &room;
 				let (pong_sender, _pong_receiver) = mpsc::channel(0);
-				handle_messages(room, client_handle, message_receiver, pong_sender).await
+				handle_messages(room, client_handle, message_receiver, pong_sender).await;
 			}
 		});
 
@@ -1000,7 +1000,7 @@ mod test {
 		});
 
 		time_source.wait_for_time_request().await;
-		const ITERATIONS: u32 = (MISSED_HEARTBEAT_LIMIT as u32) + 1;
+		const ITERATIONS: u32 = MISSED_HEARTBEAT_LIMIT + 1;
 		for _ in 0..ITERATIONS {
 			time_source.advance_time(heartbeat_interval);
 			let payload = test_client.receive_ping().await;
@@ -1043,7 +1043,7 @@ mod test {
 			let time_source = time_source_for_test;
 
 			time_source.wait_for_time_request().await;
-			time_source.advance_time((MISSED_HEARTBEAT_LIMIT as u32) * heartbeat_interval);
+			time_source.advance_time(MISSED_HEARTBEAT_LIMIT * heartbeat_interval);
 
 			for _ in 0..MISSED_HEARTBEAT_LIMIT {
 				time_source.wait_for_time_request().await;

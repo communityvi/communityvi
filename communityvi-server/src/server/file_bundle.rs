@@ -204,7 +204,7 @@ mod test {
 		let response = file.to_response();
 		let headers = response.headers();
 
-		assert_eq!("must-revalidate", headers[CACHE_CONTROL])
+		assert_eq!("must-revalidate", headers[CACHE_CONTROL]);
 	}
 
 	#[test]
@@ -215,7 +215,7 @@ mod test {
 		let headers = response.headers();
 
 		assert_eq!("text/html", headers[CONTENT_TYPE]);
-		assert_eq!(file.content().len().to_string(), headers[CONTENT_LENGTH])
+		assert_eq!(file.content().len().to_string(), headers[CONTENT_LENGTH]);
 	}
 
 	#[test]
@@ -225,7 +225,7 @@ mod test {
 		let response = file.to_response();
 		let headers = response.headers();
 
-		assert_eq!(file.etag().as_bytes(), headers[ETAG].as_bytes())
+		assert_eq!(file.etag().as_bytes(), headers[ETAG].as_bytes());
 	}
 
 	#[test]
@@ -244,7 +244,7 @@ mod test {
 
 		let last_modified = last_modified(date_time);
 
-		assert_eq!("Tue, 12 Oct 2021 13:37:42 GMT", last_modified)
+		assert_eq!("Tue, 12 Oct 2021 13:37:42 GMT", last_modified);
 	}
 
 	#[tokio::test]
@@ -263,7 +263,7 @@ mod test {
 		let response = file.to_response();
 		let status_code = response.status();
 
-		assert_eq!(StatusCode::OK, status_code)
+		assert_eq!(StatusCode::OK, status_code);
 	}
 
 	#[test]
@@ -314,7 +314,7 @@ mod test {
 
 		assert!(etag.starts_with('"'));
 		assert!(etag.ends_with('"'));
-		assert!(!etag.trim_matches('"').contains('"'))
+		assert!(!etag.trim_matches('"').contains('"'));
 	}
 
 	fn test_handler() -> BundledFileHandler {

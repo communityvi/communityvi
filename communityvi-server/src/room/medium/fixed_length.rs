@@ -90,7 +90,7 @@ mod test {
 			PlaybackState::Paused {
 				at_position: medium.length
 			}
-		)
+		);
 	}
 
 	#[test]
@@ -106,7 +106,7 @@ mod test {
 			PlaybackState::Playing {
 				start_time: Duration::seconds(now - 10)
 			}
-		)
+		);
 	}
 
 	#[test]
@@ -120,7 +120,7 @@ mod test {
 			PlaybackState::Paused {
 				at_position: Duration::seconds(13)
 			}
-		)
+		);
 	}
 
 	#[test]
@@ -136,7 +136,7 @@ mod test {
 			PlaybackState::Paused {
 				at_position: Duration::seconds(1)
 			}
-		)
+		);
 	}
 
 	#[test]
@@ -150,7 +150,7 @@ mod test {
 			PlaybackState::Paused {
 				at_position: Duration::seconds(0)
 			}
-		)
+		);
 	}
 
 	#[test]
@@ -164,6 +164,6 @@ mod test {
 			PlaybackState::Paused {
 				at_position: medium.length
 			}
-		)
+		);
 	}
 }

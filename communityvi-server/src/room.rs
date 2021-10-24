@@ -124,8 +124,8 @@ mod test {
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client_and_return_existing("elephant".to_string(), message_sender.clone());
-		assert!(matches!(result, Err(RoomError::RoomFull)))
+		let result = room.add_client_and_return_existing("elephant".to_string(), message_sender);
+		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
 	#[test]
@@ -135,7 +135,7 @@ mod test {
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		let (makise_kurisu, _) = room
-			.add_client_and_return_existing(name.to_string(), message_sender.clone())
+			.add_client_and_return_existing(name.to_string(), message_sender)
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
 		room.insert_medium(medium, 0).expect("Failed to insert medium");

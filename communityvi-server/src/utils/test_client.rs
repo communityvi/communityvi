@@ -78,7 +78,7 @@ impl WebsocketTestClient {
 			request: request.into(),
 		};
 		let websocket_message = WebSocketMessage::from(&client_request);
-		self.send_raw(websocket_message).await
+		self.send_raw(websocket_message).await;
 	}
 
 	pub async fn receive_success_message(&mut self, expected_request_id: u64) -> SuccessMessage {

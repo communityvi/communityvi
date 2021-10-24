@@ -170,7 +170,7 @@ mod test {
 		let mut clients = Clients::with_limit(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = clients.add_and_return_existing("".to_string(), message_sender.clone());
+		let result = clients.add_and_return_existing("".to_string(), message_sender);
 
 		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
@@ -180,7 +180,7 @@ mod test {
 		let mut clients = Clients::with_limit(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = clients.add_and_return_existing("  	 ".to_string(), message_sender.clone());
+		let result = clients.add_and_return_existing("  	 ".to_string(), message_sender);
 
 		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
@@ -193,7 +193,7 @@ mod test {
 		clients
 			.add_and_return_existing("Anorak  ".to_string(), message_sender.clone())
 			.expect("First add did not succeed!");
-		let result = clients.add_and_return_existing("   Anorak".to_string(), message_sender.clone());
+		let result = clients.add_and_return_existing("   Anorak".to_string(), message_sender);
 
 		assert!(matches!(result, Err(RoomError::ClientNameAlreadyInUse)));
 	}
@@ -206,14 +206,14 @@ mod test {
 		{
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 			let (client, _) = clients
-				.add_and_return_existing(name.to_string(), message_sender.clone())
+				.add_and_return_existing(name.to_string(), message_sender)
 				.expect("Failed to add client");
 			clients.remove(client.id());
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		clients
-			.add_and_return_existing(name.to_string(), message_sender.clone())
+			.add_and_return_existing(name.to_string(), message_sender)
 			.expect("Failed to add client with same name after first is gone");
 	}
 
@@ -224,7 +224,7 @@ mod test {
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
 		clients
-			.add_and_return_existing(long_name, message_sender.clone())
+			.add_and_return_existing(long_name, message_sender)
 			.expect("Failed to add client with name that is not too long");
 	}
 
@@ -234,7 +234,7 @@ mod test {
 		let mut clients = Clients::with_limit(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = clients.add_and_return_existing(long_name, message_sender.clone());
+		let result = clients.add_and_return_existing(long_name, message_sender);
 
 		assert!(matches!(result, Err(RoomError::ClientNameTooLong)));
 	}
@@ -314,7 +314,7 @@ mod test {
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = clients.add_and_return_existing("elephant".to_string(), message_sender.clone());
-		assert!(matches!(result, Err(RoomError::RoomFull)))
+		let result = clients.add_and_return_existing("elephant".to_string(), message_sender);
+		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 }
