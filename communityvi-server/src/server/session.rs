@@ -113,7 +113,7 @@ pub struct Session<Data> {
 impl<Data> Session<Data> {
 	fn new(expire_after: StdDuration, data: Data) -> Self {
 		Self {
-			id: SessionId::random(),
+			id: SessionId::new(),
 			expires_at: Instant::now() + expire_after,
 			data,
 		}
@@ -282,7 +282,7 @@ mod test {
 	fn expired_session() -> Session<&'static str> {
 		Session {
 			expires_at: Instant::now() - StdDuration::from_secs(1),
-			id: SessionId::random(),
+			id: SessionId::new(),
 			data: "Expired",
 		}
 	}
