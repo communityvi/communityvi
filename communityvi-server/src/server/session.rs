@@ -157,7 +157,7 @@ mod test {
 
 	#[test]
 	fn session_store_should_not_retrieve_expired_sessions() {
-		let (session_store, expired_session) = session_store_with_expired_session();
+		let (session_store, expired_session) = session_store_with_session(expired_session());
 
 		let retrieval = session_store.retrieve_session(expired_session.id);
 
@@ -212,7 +212,7 @@ mod test {
 
 	#[test]
 	fn session_store_should_reject_updates_to_expired_sessions() {
-		let (session_store, expired_session) = session_store_with_expired_session();
+		let (session_store, expired_session) = session_store_with_session(expired_session());
 
 		session_store
 			.update_session(expired_session)
@@ -235,15 +235,14 @@ mod test {
 	}
 
 	fn session_store_with_expired_session() -> (SessionStore<&'static str>, Session<&'static str>) {
-		let session_store = session_store();
-		let expired_session = expired_session();
-		session_store
-			.inner
-			.sessions
-			.write()
-			.insert(expired_session.id, expired_session.clone());
 
-		(session_store, expired_session)
+	fn session_store_with_session(
+		session: Session<&'static str>,
+	) -> (SessionStore<&'static str>, Session<&'static str>) {
+		let session_store = session_store();
+		session_store.inner.sessions.write().insert(session.id, session.clone());
+
+		(session_store, session)
 	}
 
 	fn expired_session() -> Session<&'static str> {
