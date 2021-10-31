@@ -2,7 +2,7 @@ use rand::{thread_rng, Rng};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SessionId {
 	id: [u8; 16],
 }
