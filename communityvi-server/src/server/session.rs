@@ -1,6 +1,6 @@
 use crate::server::session::id::SessionId;
 use anyhow::bail;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant};
@@ -70,15 +70,32 @@ impl<Data: Clone> SessionStore<Data> {
 	}
 
 	pub fn retrieve_session(&self, id: SessionId) -> Option<Session<Data>> {
-		// FIXME: Refresh session once it is retrieved.
-		let sessions = self.inner.sessions.read();
-		sessions.get(&id).and_then(|session| {
+		let sessions = self.inner.sessions.upgradable_read();
+		let mut session = sessions.get(&id).and_then(|session| {
 			if session.has_expired() {
 				None
 			} else {
 				Some(session.clone())
 			}
-		})
+		})?;
+
+		self.refresh_session(sessions, &mut session);
+
+		Some(session)
+	}
+
+	fn refresh_session(
+		&self,
+		sessions: RwLockUpgradableReadGuard<HashMap<SessionId, Session<Data>>>,
+		session: &mut Session<Data>,
+	) {
+		let session_time_at_least_half_expired = (session.expires_at - Instant::now()) < (self.inner.expire_after / 2);
+		if session_time_at_least_half_expired {
+			let sessions = &mut RwLockUpgradableReadGuard::upgrade(sessions);
+			session.refresh_expires_at(self.inner.expire_after);
+
+			sessions.insert(session.id, session.clone());
+		}
 	}
 
 	pub fn terminate_session(&self, id: SessionId) {
@@ -108,6 +125,10 @@ impl<Data> Session<Data> {
 
 	pub fn has_expired(&self) -> bool {
 		Instant::now() >= self.expires_at
+	}
+
+	fn refresh_expires_at(&mut self, expire_after: StdDuration) {
+		self.expires_at = Instant::now() + expire_after;
 	}
 }
 
@@ -234,7 +255,20 @@ mod test {
 		);
 	}
 
-	fn session_store_with_expired_session() -> (SessionStore<&'static str>, Session<&'static str>) {
+	#[test]
+	fn session_store_should_refresh_sessions_on_retrieval() {
+		let half_expired_session = Session::new(EXPIRE_AFTER / 2 - StdDuration::from_secs(1), "Half-expired session");
+		let (session_store, half_expired_session) = session_store_with_session(half_expired_session);
+
+		let session = session_store
+			.retrieve_session(half_expired_session.id)
+			.expect("Could not retrieve session");
+
+		assert!(
+			session.expires_at > half_expired_session.expires_at,
+			"Session wasn't refreshed."
+		);
+	}
 
 	fn session_store_with_session(
 		session: Session<&'static str>,
