@@ -1,14 +1,14 @@
-use crate::utils::portable_integer::PortableInteger;
+use crate::utils::portable_unsigned_integer::PortableUnsignedInteger;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(transparent)]
-pub struct ClientId(PortableInteger);
+pub struct ClientId(PortableUnsignedInteger);
 
-impl From<PortableInteger> for ClientId {
-	fn from(id: PortableInteger) -> Self {
+impl From<PortableUnsignedInteger> for ClientId {
+	fn from(id: PortableUnsignedInteger) -> Self {
 		ClientId(id)
 	}
 }
@@ -19,7 +19,7 @@ impl From<u32> for ClientId {
 	}
 }
 
-impl From<ClientId> for PortableInteger {
+impl From<ClientId> for PortableUnsignedInteger {
 	fn from(ClientId(id): ClientId) -> Self {
 		id
 	}
@@ -35,7 +35,7 @@ impl TryFrom<u64> for ClientId {
 	type Error = anyhow::Error;
 
 	fn try_from(id: u64) -> anyhow::Result<Self> {
-		Ok(ClientId(PortableInteger::try_from(id)?))
+		Ok(ClientId(PortableUnsignedInteger::try_from(id)?))
 	}
 }
 

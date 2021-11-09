@@ -1,5 +1,5 @@
 use crate::room::client_id::ClientId;
-use crate::utils::portable_integer::PortableInteger;
+use crate::utils::portable_unsigned_integer::PortableUnsignedInteger;
 use std::ops::Range;
 use std::unreachable;
 
@@ -10,7 +10,7 @@ pub struct ClientIdSequence {
 impl Default for ClientIdSequence {
 	fn default() -> Self {
 		Self {
-			id_pool: PortableInteger::MIN..PortableInteger::MAX,
+			id_pool: PortableUnsignedInteger::MIN..PortableUnsignedInteger::MAX,
 		}
 	}
 }
