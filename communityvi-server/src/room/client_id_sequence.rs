@@ -1,5 +1,7 @@
 use crate::room::client_id::ClientId;
+use crate::utils::portable_integer::PortableInteger;
 use std::ops::Range;
+use std::unreachable;
 
 pub struct ClientIdSequence {
 	id_pool: Range<u64>,
@@ -7,17 +9,20 @@ pub struct ClientIdSequence {
 
 impl Default for ClientIdSequence {
 	fn default() -> Self {
-		Self { id_pool: 0..u64::MAX }
+		Self {
+			id_pool: PortableInteger::MIN..PortableInteger::MAX,
+		}
 	}
 }
 
 impl ClientIdSequence {
 	pub fn next(&mut self) -> ClientId {
-		ClientId::from(
+		ClientId::try_from(
 			self.id_pool
 				.next()
-				.expect("This only happens if 18446744073709551615 ClientIDs are created."),
+				.expect("This only happens if 9007199254740991 ClientIDs are created."),
 		)
+		.unwrap_or_else(|_| unreachable!())
 	}
 }
 

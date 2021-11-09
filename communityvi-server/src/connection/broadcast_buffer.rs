@@ -175,6 +175,9 @@ mod test {
 	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
 
+	#[allow(clippy::cast_possible_truncation)]
+	const CHAT_MESSAGE_BUFFER_LIMIT: u32 = super::CHAT_MESSAGE_BUFFER_LIMIT as _;
+
 	struct BroadcastBufferWithTestHelpers {
 		pub broadcast_buffer: BroadcastBuffer,
 		pub broadcast_number: usize,
@@ -206,7 +209,7 @@ mod test {
 
 		fn enqueue_client_joined(&mut self, id: u64) {
 			let message = ClientJoinedBroadcast {
-				id: id.into(),
+				id: id.try_into().unwrap(),
 				name: format!("{}", id),
 			};
 			self.enqueue_next(message.into());
@@ -214,7 +217,7 @@ mod test {
 
 		fn enqueue_client_left(&mut self, id: u64) {
 			let message = ClientLeftBroadcast {
-				id: id.into(),
+				id: id.try_into().unwrap(),
 				name: format!("{}", id),
 				reason: LeftReason::Closed,
 			};
@@ -310,16 +313,16 @@ mod test {
 	#[test]
 	fn should_not_store_more_than_limit_chat_messages() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
-		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT as u64 + 3) {
-			broadcast_buffer.enqueue_chat_message(ClientId::from(number), number);
+		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT as u32 + 3) {
+			broadcast_buffer.enqueue_chat_message(ClientId::from(number), number.into());
 		}
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
-		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT as u64 + 3) {
+		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT as u32 + 3) {
 			let (id, count) = broadcast_buffer.dequeue_chat_message();
 			assert_eq!(id, ClientId::from(number));
-			assert_eq!(count, number);
+			assert_eq!(count, u64::from(number));
 		}
 	}
 
@@ -397,17 +400,18 @@ mod test {
 		broadcast_buffer.enqueue(message, 41);
 	}
 
+	#[allow(clippy::cast_possible_truncation)]
 	#[test]
 	fn should_trigger_garbage_collection_after_one_and_a_half_time_worst_count_is_exceeded() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
-		let worst_count_to_keep_alive = broadcast_buffer.worst_count_of_messages_to_keep_alive() as u64;
+		let worst_count_to_keep_alive = broadcast_buffer.worst_count_of_messages_to_keep_alive() as u32;
 		for number in 0..(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2)) {
-			broadcast_buffer.enqueue_medium_state(ClientId::from(number), number);
+			broadcast_buffer.enqueue_medium_state(ClientId::from(number), number.into());
 		}
 
 		assert_eq!(
-			broadcast_buffer.inner.lock().length() as u64,
+			broadcast_buffer.inner.lock().length() as u32,
 			(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2))
 		);
 

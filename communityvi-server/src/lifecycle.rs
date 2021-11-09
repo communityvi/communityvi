@@ -13,6 +13,7 @@ use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
+use crate::utils::portable_integer::PortableInteger;
 use crate::utils::time_source::TimeSource;
 use chrono::Duration;
 use futures::channel::mpsc;
@@ -225,7 +226,7 @@ async fn handle_messages(
 			"Received {} message from '{}' (#{})",
 			message.request.kind(),
 			client.name(),
-			Into::<u64>::into(client.id()),
+			Into::<PortableInteger>::into(client.id()),
 		);
 
 		match handle_request(room, &client, message.request) {
