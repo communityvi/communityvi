@@ -13,12 +13,12 @@ use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
-use crate::utils::portable_unsigned_integer::PortableUnsignedInteger;
 use crate::utils::time_source::TimeSource;
 use chrono::Duration;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
+use js_int::UInt;
 use log::{debug, error, info};
 use nonzero_ext::nonzero;
 
@@ -226,7 +226,7 @@ async fn handle_messages(
 			"Received {} message from '{}' (#{})",
 			message.request.kind(),
 			client.name(),
-			Into::<PortableUnsignedInteger>::into(client.id()),
+			Into::<UInt>::into(client.id()),
 		);
 
 		match handle_request(room, &client, message.request) {
