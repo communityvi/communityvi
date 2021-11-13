@@ -11,6 +11,7 @@ use crate::room::Room;
 use crate::server::create_filter;
 use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
+use js_int::uint;
 use rweb::filters::BoxedFilter;
 use rweb::Reply;
 use tokio_tungstenite::tungstenite;
@@ -77,7 +78,7 @@ async fn should_broadcast_messages() {
 		sender_id: alice_client_id,
 		sender_name: "Alice".to_string(),
 		message: message.to_string(),
-		counter: 0,
+		counter: uint!(0),
 	});
 
 	let request_id = alice_test_client.send_request(request).await;

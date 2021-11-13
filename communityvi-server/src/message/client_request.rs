@@ -5,11 +5,12 @@ use crate::message::{MessageError, WebSocketMessage};
 use crate::room::medium::fixed_length::FixedLengthMedium;
 use crate::room::medium::Medium;
 use chrono::Duration;
+use js_int::{Int, UInt};
 use log::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ClientRequestWithId {
-	pub request_id: u64,
+	pub request_id: UInt,
 	#[serde(flatten)]
 	pub request: ClientRequest,
 }
@@ -41,7 +42,7 @@ impl ClientRequest {
 }
 
 pub trait RequestConvertible: Into<ClientRequest> {
-	fn with_id(self, request_id: u64) -> ClientRequestWithId {
+	fn with_id(self, request_id: UInt) -> ClientRequestWithId {
 		ClientRequestWithId {
 			request_id,
 			request: self.into(),
@@ -85,7 +86,7 @@ client_request_from_struct!(Chat, ChatRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct InsertMediumRequest {
-	pub previous_version: u64,
+	pub previous_version: UInt,
 	pub medium: MediumRequest,
 }
 
@@ -93,7 +94,7 @@ pub struct InsertMediumRequest {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum MediumRequest {
-	FixedLength { name: String, length_in_milliseconds: u64 },
+	FixedLength { name: String, length_in_milliseconds: UInt },
 	Empty,
 }
 
@@ -108,7 +109,7 @@ impl TryFrom<MediumRequest> for Medium {
 				name,
 				length_in_milliseconds,
 			} => {
-				if length_in_milliseconds > (u64::try_from(Duration::days(365).num_milliseconds()).unwrap()) {
+				if length_in_milliseconds > (UInt::try_from(Duration::days(365).num_milliseconds()).unwrap()) {
 					Err(ErrorMessage::builder()
 						.error(ErrorMessageType::InvalidFormat)
 						.message("Length of a medium must not be larger than one year.".to_string())
@@ -132,7 +133,7 @@ impl From<Medium> for MediumRequest {
 			Medium::Empty => MediumRequest::Empty,
 			Medium::FixedLength(fixed_length) => MediumRequest::FixedLength {
 				name: fixed_length.name,
-				length_in_milliseconds: u64::try_from(fixed_length.length.num_milliseconds()).unwrap(),
+				length_in_milliseconds: UInt::try_from(fixed_length.length.num_milliseconds()).unwrap(),
 			},
 		}
 	}
@@ -140,18 +141,18 @@ impl From<Medium> for MediumRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PlayRequest {
-	pub previous_version: u64,
+	pub previous_version: UInt,
 	pub skipped: bool,
-	pub start_time_in_milliseconds: i64,
+	pub start_time_in_milliseconds: Int,
 }
 
 client_request_from_struct!(Play, PlayRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PauseRequest {
-	pub previous_version: u64,
+	pub previous_version: UInt,
 	pub skipped: bool,
-	pub position_in_milliseconds: u64,
+	pub position_in_milliseconds: UInt,
 }
 
 client_request_from_struct!(Pause, PauseRequest);
@@ -181,7 +182,7 @@ impl TryFrom<&WebSocketMessage> for ClientRequestWithId {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct RequestIdOnly {
-	pub request_id: u64,
+	pub request_id: UInt,
 }
 
 impl TryFrom<&WebSocketMessage> for RequestIdOnly {
@@ -199,13 +200,14 @@ impl TryFrom<&WebSocketMessage> for RequestIdOnly {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use js_int::{int, uint};
 
 	#[test]
 	fn chat_request_should_serialize_and_deserialize() {
 		let chat_request = ClientRequest::Chat(ChatRequest {
 			message: "hello".into(),
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json = serde_json::to_string(&chat_request).expect("Failed to serialize Chat request to JSON");
 		assert_eq!(r#"{"request_id":42,"type":"chat","message":"hello"}"#, json);
 
@@ -219,7 +221,7 @@ mod test {
 		let register_request = ClientRequest::Register(RegisterRequest {
 			name: "Ferris".to_string(),
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json = serde_json::to_string(&register_request).expect("Failed to serialize Register request to JSON");
 		assert_eq!(r#"{"request_id":42,"type":"register","name":"Ferris"}"#, json);
 
@@ -230,7 +232,7 @@ mod test {
 
 	#[test]
 	fn get_reference_time_request_should_serialize_and_deserialize() {
-		let get_reference_time_request = ClientRequest::GetReferenceTime.with_id(42);
+		let get_reference_time_request = ClientRequest::GetReferenceTime.with_id(uint!(42));
 		let json = serde_json::to_string(&get_reference_time_request)
 			.expect("Failed to serialize GetReferenceTime request to JSON");
 		assert_eq!(r#"{"request_id":42,"type":"get_reference_time"}"#, json);
@@ -245,11 +247,11 @@ mod test {
 		let insert_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
 			medium: MediumRequest::FixedLength {
 				name: "Blues Brothers".to_string(),
-				length_in_milliseconds: 8_520_000,
+				length_in_milliseconds: uint!(8_520_000),
 			},
-			previous_version: 0,
+			previous_version: uint!(0),
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json =
 			serde_json::to_string(&insert_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
@@ -265,10 +267,10 @@ mod test {
 	#[test]
 	fn insert_medium_request_with_empty_medium_should_serialize_and_deserialize() {
 		let eject_medium_request = ClientRequest::InsertMedium(InsertMediumRequest {
-			previous_version: 0,
+			previous_version: uint!(0),
 			medium: MediumRequest::Empty,
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json =
 			serde_json::to_string(&eject_medium_request).expect("Failed to serialize InsertMedium request to JSON");
 		assert_eq!(
@@ -284,11 +286,11 @@ mod test {
 	#[test]
 	fn play_request_should_serialize_and_deserialize() {
 		let play_request = ClientRequest::Play(PlayRequest {
-			previous_version: 0,
+			previous_version: uint!(0),
 			skipped: false,
-			start_time_in_milliseconds: -1337,
+			start_time_in_milliseconds: int!(-1337),
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json = serde_json::to_string(&play_request).expect("Failed to serialize Play request to JSON");
 		assert_eq!(
 			r#"{"request_id":42,"type":"play","previous_version":0,"skipped":false,"start_time_in_milliseconds":-1337}"#,
@@ -303,11 +305,11 @@ mod test {
 	#[test]
 	fn pause_request_should_serialize_and_deserialize() {
 		let pause_request = ClientRequest::Pause(PauseRequest {
-			previous_version: 0,
+			previous_version: uint!(0),
 			skipped: false,
-			position_in_milliseconds: 42,
+			position_in_milliseconds: uint!(42),
 		})
-		.with_id(42);
+		.with_id(uint!(42));
 		let json = serde_json::to_string(&pause_request).expect("Failed to serialize Pause request to JSON");
 		assert_eq!(
 			r#"{"request_id":42,"type":"pause","previous_version":0,"skipped":false,"position_in_milliseconds":42}"#,
@@ -321,7 +323,7 @@ mod test {
 
 	#[test]
 	fn request_id_only_should_serialize_and_deserialize() {
-		let request_id_only = RequestIdOnly { request_id: 42 };
+		let request_id_only = RequestIdOnly { request_id: uint!(42) };
 		let json = serde_json::to_string(&request_id_only).expect("Failed to serialize RequestIdOnly to JSON");
 		assert_eq!(r#"{"request_id":42}"#, json);
 
@@ -336,6 +338,6 @@ mod test {
 		let request_id_only: RequestIdOnly =
 			serde_json::from_str(json).expect("Failed to deserialize RequestIdOnly from JSON");
 
-		assert_eq!(request_id_only.request_id, 42);
+		assert_eq!(request_id_only.request_id, uint!(42));
 	}
 }

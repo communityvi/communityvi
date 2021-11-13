@@ -6,6 +6,7 @@ use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use chrono::Duration;
+use js_int::UInt;
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 use std::time::Instant;
@@ -69,7 +70,7 @@ impl Room {
 	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
 	/// and `None` is returned. This is similar to compare and swap.
 	#[must_use]
-	pub fn insert_medium(&self, medium: impl Into<Medium>, previous_version: u64) -> Option<VersionedMedium> {
+	pub fn insert_medium(&self, medium: impl Into<Medium>, previous_version: UInt) -> Option<VersionedMedium> {
 		let mut versioned_medium = self.inner.medium.lock();
 		if previous_version != versioned_medium.version {
 			return None;
@@ -81,7 +82,7 @@ impl Room {
 	}
 
 	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
-	pub fn play_medium(&self, start_time: Duration, previous_version: u64) -> Option<VersionedMedium> {
+	pub fn play_medium(&self, start_time: Duration, previous_version: UInt) -> Option<VersionedMedium> {
 		let reference_now = Duration::from_std(self.current_reference_time())
 			.expect("This won't happen unless you run the server for more than 9_223_372_036_854_775_807 seconds :)");
 		self.inner
@@ -91,7 +92,7 @@ impl Room {
 	}
 
 	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
-	pub fn pause_medium(&self, at_position: Duration, previous_version: u64) -> Option<VersionedMedium> {
+	pub fn pause_medium(&self, at_position: Duration, previous_version: UInt) -> Option<VersionedMedium> {
 		self.inner.medium.lock().pause(at_position, previous_version)
 	}
 
@@ -111,6 +112,7 @@ mod test {
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use chrono::Duration;
+	use js_int::uint;
 
 	#[test]
 	fn should_not_allow_adding_more_clients_than_room_size() {
@@ -138,14 +140,14 @@ mod test {
 			.add_client_and_return_existing(name.to_string(), message_sender)
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
-		room.insert_medium(medium, 0).expect("Failed to insert medium");
+		room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
 
 		room.remove_client(makise_kurisu.id());
 		assert_eq!(
 			room.medium(),
 			VersionedMedium {
 				medium: Medium::Empty,
-				version: 2
+				version: uint!(2),
 			},
 			"A medium was still left in the room!"
 		);
@@ -154,24 +156,25 @@ mod test {
 	#[test]
 	fn should_not_insert_medium_with_smaller_previous_version() {
 		let room = Room::new(1);
-		room.insert_medium(Medium::Empty, 0).expect("Failed to insert medium"); // increase the version
-		assert_eq!(room.medium().version, 1);
+		room.insert_medium(Medium::Empty, uint!(0))
+			.expect("Failed to insert medium"); // increase the version
+		assert_eq!(room.medium().version, uint!(1));
 
 		assert!(
-			room.insert_medium(Medium::Empty, 0).is_none(),
+			room.insert_medium(Medium::Empty, uint!(0)).is_none(),
 			"Must not be able to insert"
 		);
-		assert_eq!(room.medium().version, 1);
+		assert_eq!(room.medium().version, uint!(1));
 	}
 
 	#[test]
 	fn should_not_insert_medium_with_larger_previous_version() {
 		let room = Room::new(1);
 		assert!(
-			room.insert_medium(Medium::Empty, 1).is_none(),
+			room.insert_medium(Medium::Empty, uint!(1)).is_none(),
 			"Must not be able to insert"
 		);
-		assert_eq!(room.medium().version, 0);
+		assert_eq!(room.medium().version, uint!(0));
 	}
 
 	#[test]

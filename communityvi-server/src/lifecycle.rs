@@ -223,10 +223,10 @@ async fn handle_messages(
 		rate_limiter.until_ready().await;
 
 		debug!(
-			"Received {} message from '{}' (#{})",
+			"Received {} message from '{}', {}",
 			message.request.kind(),
 			client.name(),
-			Into::<UInt>::into(client.id()),
+			client.id(),
 		);
 
 		match handle_request(room, &client, message.request) {
@@ -277,7 +277,7 @@ fn handle_register_request(client: &Client) -> Result<SuccessMessage, ErrorMessa
 fn handle_get_reference_time_request(room: &Room) -> SuccessMessage {
 	let reference_time = room.current_reference_time();
 	SuccessMessage::ReferenceTime {
-		milliseconds: u64::try_from(reference_time.as_millis()).unwrap(),
+		milliseconds: UInt::try_from(reference_time.as_millis()).unwrap(),
 	}
 }
 
@@ -322,8 +322,10 @@ fn handle_play_request(
 		start_time_in_milliseconds,
 	}: PlayRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
-	let versioned_medium = match room.play_medium(Duration::milliseconds(start_time_in_milliseconds), previous_version)
-	{
+	let versioned_medium = match room.play_medium(
+		Duration::milliseconds(start_time_in_milliseconds.into()),
+		previous_version,
+	) {
 		None => {
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
@@ -354,9 +356,7 @@ fn handle_pause_request(
 	}: PauseRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
 	let versioned_medium = match room.pause_medium(
-		Duration::milliseconds(
-			i64::try_from(position_in_milliseconds.max(0).min(u64::try_from(i64::MAX).unwrap())).unwrap(),
-		),
+		Duration::milliseconds(position_in_milliseconds.max(UInt::MIN).min(UInt::MAX).into()),
 		previous_version,
 	) {
 		None => {
@@ -392,6 +392,7 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
+	use js_int::{int, uint};
 	use tokio::time::sleep;
 
 	#[tokio::test]
@@ -411,7 +412,7 @@ mod test {
 		match response {
 			SuccessMessage::ReferenceTime { milliseconds } => {
 				assert!(
-					(milliseconds >= u64::try_from(TEST_DELAY.as_millis()).unwrap()) && (milliseconds < 1000),
+					(milliseconds >= UInt::try_from(TEST_DELAY.as_millis()).unwrap()) && (milliseconds < uint!(1000)),
 					"milliseconds = {}",
 					milliseconds
 				);
@@ -452,7 +453,7 @@ mod test {
 				sender_id: client.id(),
 				sender_name: client.name().to_string(),
 				message: non_empty_chat_request.message,
-				counter: 0
+				counter: uint!(0),
 			})
 		);
 	}
@@ -469,7 +470,7 @@ mod test {
 			&alice,
 			InsertMediumRequest {
 				medium: Medium::from(medium.clone()).into(),
-				previous_version: 0,
+				previous_version: uint!(0),
 			}
 			.into(),
 		)
@@ -485,7 +486,7 @@ mod test {
 			medium: VersionedMediumBroadcast::new(
 				VersionedMedium {
 					medium: medium.into(),
-					version: 1,
+					version: uint!(1),
 				},
 				false,
 			),
@@ -507,9 +508,9 @@ mod test {
 		let request = InsertMediumRequest {
 			medium: MediumRequest::FixedLength {
 				name: "Metropolis".to_string(),
-				length_in_milliseconds: u64::try_from(Duration::days(400).num_milliseconds()).unwrap(),
+				length_in_milliseconds: UInt::try_from(Duration::days(400).num_milliseconds()).unwrap(),
 			},
-			previous_version: 0,
+			previous_version: uint!(0),
 		};
 		let response = handle_request(&room, &alice, request.into()).expect_err("Failed to ger error response");
 
@@ -529,7 +530,9 @@ mod test {
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room
+			.insert_medium(medium.clone(), uint!(0))
+			.expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
@@ -537,7 +540,7 @@ mod test {
 			PlayRequest {
 				previous_version: inserted_medium.version,
 				skipped: true,
-				start_time_in_milliseconds: -1024,
+				start_time_in_milliseconds: int!(-1024),
 			}
 			.into(),
 		)
@@ -553,13 +556,13 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
+					length_in_milliseconds: UInt::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: true,
 					playback_state: PlaybackStateResponse::Playing {
-						start_time_in_milliseconds: -1024,
+						start_time_in_milliseconds: int!(-1024),
 					},
 				},
-				version: 2,
+				version: uint!(2),
 			},
 		};
 
@@ -574,7 +577,9 @@ mod test {
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room
+			.insert_medium(medium.clone(), uint!(0))
+			.expect("Failed to insert medium");
 		let played_medium = room
 			.play_medium(Duration::milliseconds(-1024), inserted_medium.version)
 			.expect("Failed to play medium.");
@@ -585,7 +590,7 @@ mod test {
 			PauseRequest {
 				previous_version: played_medium.version,
 				skipped: false,
-				position_in_milliseconds: 1027,
+				position_in_milliseconds: uint!(1027),
 			}
 			.into(),
 		)
@@ -601,13 +606,13 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
+					length_in_milliseconds: UInt::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: false,
 					playback_state: PlaybackStateResponse::Paused {
-						position_in_milliseconds: 1027,
+						position_in_milliseconds: uint!(1027),
 					},
 				},
-				version: 3,
+				version: uint!(3),
 			},
 		};
 
@@ -622,7 +627,9 @@ mod test {
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium.clone(), 0).expect("Failed to insert medium");
+		let inserted_medium = room
+			.insert_medium(medium.clone(), uint!(0))
+			.expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
@@ -630,7 +637,7 @@ mod test {
 			PauseRequest {
 				previous_version: inserted_medium.version,
 				skipped: true,
-				position_in_milliseconds: 1000,
+				position_in_milliseconds: uint!(1000),
 			}
 			.into(),
 		)
@@ -646,13 +653,13 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: medium.name,
-					length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
+					length_in_milliseconds: UInt::try_from(medium.length.num_milliseconds()).unwrap(),
 					playback_skipped: true,
 					playback_state: PlaybackStateResponse::Paused {
-						position_in_milliseconds: 1000,
+						position_in_milliseconds: uint!(1000),
 					},
 				},
-				version: 2,
+				version: uint!(2),
 			},
 		};
 
@@ -670,15 +677,15 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium, 0).expect("Failed to insert medium");
+		let inserted_medium = room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
 			&alice,
 			PlayRequest {
-				previous_version: inserted_medium.version + 1,
+				previous_version: inserted_medium.version + uint!(1),
 				skipped: true,
-				start_time_in_milliseconds: 0,
+				start_time_in_milliseconds: int!(0),
 			}
 			.into(),
 		)
@@ -702,15 +709,15 @@ mod test {
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
-		let inserted_medium = room.insert_medium(medium, 0).expect("Failed to insert medium");
+		let inserted_medium = room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
 
 		let response = handle_request(
 			&room,
 			&alice,
 			PauseRequest {
-				previous_version: inserted_medium.version + 1,
+				previous_version: inserted_medium.version + uint!(1),
 				skipped: true,
-				position_in_milliseconds: 0,
+				position_in_milliseconds: uint!(0),
 			}
 			.into(),
 		)
@@ -737,7 +744,7 @@ mod test {
 			&room,
 			&alice,
 			InsertMediumRequest {
-				previous_version: 1,
+				previous_version: uint!(1),
 				medium: MediumRequest::Empty,
 			}
 			.into(),
@@ -865,7 +872,9 @@ mod test {
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
-		let inserted_medium = room.insert_medium(short_circuit, 0).expect("Failed to insert medium");
+		let inserted_medium = room
+			.insert_medium(short_circuit, uint!(0))
+			.expect("Failed to insert medium");
 		room.play_medium(Duration::milliseconds(0), inserted_medium.version)
 			.expect("Must successfully start playing");
 
@@ -887,10 +896,10 @@ mod test {
 						name: video_name,
 						length_in_milliseconds: u64::try_from(video_length.num_milliseconds()).unwrap(),
 						playback_state: PlaybackStateResponse::Playing {
-							start_time_in_milliseconds: 0,
+							start_time_in_milliseconds: int!(0),
 						}
 					},
-					version: 2
+					version: uint!(2),
 				}
 			},
 			response
@@ -955,7 +964,7 @@ mod test {
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
-		room.insert_medium(short_circuit, 0).unwrap();
+		room.insert_medium(short_circuit, uint!(0)).unwrap();
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
@@ -975,10 +984,10 @@ mod test {
 						name: video_name,
 						length_in_milliseconds: u64::try_from(video_length.num_milliseconds()).unwrap(),
 						playback_state: PlaybackStateResponse::Paused {
-							position_in_milliseconds: 0
+							position_in_milliseconds: uint!(0),
 						}
 					},
-					version: 1
+					version: uint!(1),
 				}
 			},
 			response

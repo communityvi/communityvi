@@ -2,6 +2,7 @@ use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
 use crate::room::client_id::ClientId;
 use crate::room::medium::{Medium, VersionedMedium};
+use js_int::UInt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -53,7 +54,7 @@ pub struct ChatBroadcast {
 	pub sender_id: ClientId,
 	pub sender_name: String,
 	pub message: String,
-	pub counter: u64,
+	pub counter: UInt,
 }
 
 broadcast_from_struct!(Chat, ChatBroadcast);
@@ -67,7 +68,7 @@ pub struct MediumStateChangedBroadcast {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct VersionedMediumBroadcast {
-	pub version: u64,
+	pub version: UInt,
 	#[serde(flatten)]
 	pub medium: MediumBroadcast,
 }
@@ -87,7 +88,7 @@ impl VersionedMediumBroadcast {
 pub enum MediumBroadcast {
 	FixedLength {
 		name: String,
-		length_in_milliseconds: u64,
+		length_in_milliseconds: UInt,
 		playback_skipped: bool,
 		playback_state: PlaybackStateResponse,
 	},
@@ -99,7 +100,7 @@ impl MediumBroadcast {
 		match medium.into() {
 			Medium::FixedLength(medium) => MediumBroadcast::FixedLength {
 				name: medium.name,
-				length_in_milliseconds: u64::try_from(medium.length.num_milliseconds()).unwrap(),
+				length_in_milliseconds: UInt::try_from(medium.length.num_milliseconds()).unwrap(),
 				playback_skipped: skipped,
 				playback_state: medium.playback.into(),
 			},
@@ -136,6 +137,7 @@ impl From<&BroadcastMessage> for WebSocketMessage {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use js_int::{int, uint};
 
 	#[test]
 	fn chat_broadcast_should_serialize_and_deserialize() {
@@ -143,7 +145,7 @@ mod test {
 			sender_id: ClientId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
-			counter: 1337,
+			counter: uint!(1337),
 		});
 		let json = serde_json::to_string(&chat_broadcast).expect("Failed to serialize Chat broadcast to JSON");
 		assert_eq!(
@@ -198,13 +200,13 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "The Acorn".to_string(),
-					length_in_milliseconds: 20 * 60 * 1000,
+					length_in_milliseconds: UInt::from(20u32 * 60 * 1000),
 					playback_skipped: false,
 					playback_state: PlaybackStateResponse::Paused {
-						position_in_milliseconds: 0,
+						position_in_milliseconds: uint!(0),
 					},
 				},
-				version: 0,
+				version: uint!(0),
 			},
 		});
 		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)
@@ -245,13 +247,13 @@ mod test {
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "Metropolis".to_string(),
-					length_in_milliseconds: 153 * 60 * 1000,
+					length_in_milliseconds: UInt::from(153u32 * 60 * 1000),
 					playback_skipped: false,
 					playback_state: PlaybackStateResponse::Playing {
-						start_time_in_milliseconds: -1337,
+						start_time_in_milliseconds: int!(-1337),
 					},
 				},
-				version: 0,
+				version: uint!(0),
 			},
 		});
 		let json = serde_json::to_string_pretty(&medium_state_changed_broadcast)

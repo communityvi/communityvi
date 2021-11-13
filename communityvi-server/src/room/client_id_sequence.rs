@@ -1,7 +1,6 @@
 use crate::room::client_id::ClientId;
 use js_int::UInt;
 use std::ops::Range;
-use std::unreachable;
 
 pub struct ClientIdSequence {
 	id_pool: Range<u64>,
@@ -17,12 +16,14 @@ impl Default for ClientIdSequence {
 
 impl ClientIdSequence {
 	pub fn next(&mut self) -> ClientId {
-		ClientId::try_from(
-			self.id_pool
-				.next()
-				.expect("This only happens if 9007199254740991 ClientIDs are created."),
+		ClientId::from(
+			UInt::try_from(
+				self.id_pool
+					.next()
+					.expect("This only happens if 9007199254740991 ClientIDs are created."),
+			)
+			.unwrap_or_else(|_| unreachable!()),
 		)
-		.unwrap_or_else(|_| unreachable!())
 	}
 }
 

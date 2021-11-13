@@ -5,6 +5,7 @@ use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
+use js_int::{uint, UInt};
 use std::collections::{BTreeMap, BTreeSet};
 use unicode_skeleton::UnicodeSkeleton;
 
@@ -18,14 +19,14 @@ pub struct Clients {
 
 #[derive(Default)]
 struct Counters {
-	chat_message_counter: u64,
+	chat_message_counter: UInt,
 	broadcast_counter: usize,
 }
 
 impl Counters {
-	pub fn fetch_and_increment_chat_counter(&mut self) -> u64 {
+	pub fn fetch_and_increment_chat_counter(&mut self) -> UInt {
 		let count = self.chat_message_counter;
-		self.chat_message_counter += 1;
+		self.chat_message_counter += uint!(1);
 		count
 	}
 

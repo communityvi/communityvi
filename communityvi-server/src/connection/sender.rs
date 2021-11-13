@@ -5,6 +5,7 @@ use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use futures::Sink;
 use futures::SinkExt;
+use js_int::UInt;
 use log::error;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -26,12 +27,12 @@ where
 }
 
 impl MessageSender {
-	pub async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> Result<(), ()> {
+	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> Result<(), ()> {
 		let outgoing_message = OutgoingMessage::Success { request_id, message };
 		self.send_message(outgoing_message).await
 	}
 
-	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> Result<(), ()> {
+	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<UInt>) -> Result<(), ()> {
 		let outgoing_message = OutgoingMessage::Error { request_id, message };
 		self.send_message(outgoing_message).await
 	}

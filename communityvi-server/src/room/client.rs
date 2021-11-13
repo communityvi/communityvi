@@ -4,6 +4,7 @@ use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::client_id::ClientId;
+use js_int::UInt;
 use log::info;
 use std::sync::Arc;
 
@@ -39,7 +40,7 @@ impl Client {
 		self.inner.name.as_str()
 	}
 
-	pub async fn send_success_message(&self, message: SuccessMessage, request_id: u64) -> bool {
+	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> bool {
 		if self
 			.inner
 			.connection
@@ -57,7 +58,7 @@ impl Client {
 		}
 	}
 
-	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<u64>) -> bool {
+	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<UInt>) -> bool {
 		if self
 			.inner
 			.connection

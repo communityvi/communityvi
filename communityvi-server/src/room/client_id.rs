@@ -13,29 +13,10 @@ impl From<UInt> for ClientId {
 	}
 }
 
+#[cfg(test)]
 impl From<u32> for ClientId {
 	fn from(id: u32) -> Self {
 		ClientId(id.into())
-	}
-}
-
-impl From<ClientId> for UInt {
-	fn from(ClientId(id): ClientId) -> Self {
-		id
-	}
-}
-
-impl From<ClientId> for u64 {
-	fn from(ClientId(id): ClientId) -> Self {
-		id.into()
-	}
-}
-
-impl TryFrom<u64> for ClientId {
-	type Error = anyhow::Error;
-
-	fn try_from(id: u64) -> anyhow::Result<Self> {
-		Ok(ClientId(UInt::try_from(id)?))
 	}
 }
 
