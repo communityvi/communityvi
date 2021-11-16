@@ -52,7 +52,9 @@ describe('RegisteredClient medium handling', () => {
 				},
 			});
 
-			expect(subscriber).toHaveBeenCalledWith(new MediumChangedByPeer(new Peer(23, 'some_other_client'), undefined));
+			expect(subscriber).toHaveBeenCalledWith(
+				new MediumChangedByPeer(new Peer(23, 'some_other_client'), undefined),
+			);
 		});
 
 		it('ignores broadcasts when we have changed the medium', () => {
@@ -79,7 +81,9 @@ describe('RegisteredClient medium handling', () => {
 			// Given we pulled out the reference time callback
 			let referenceTimeUpdatedCallback: TimeUpdatedCallback | undefined;
 			const referenceTimeSynchronizerMock = mock<ReferenceTimeSynchronizer>();
-			referenceTimeSynchronizerMock.start.mockImplementationOnce(callback => (referenceTimeUpdatedCallback = callback));
+			referenceTimeSynchronizerMock.start.mockImplementationOnce(
+				callback => (referenceTimeUpdatedCallback = callback),
+			);
 
 			// ...and we had a subscriber
 			const subscriber = jest.fn();
@@ -111,13 +115,17 @@ describe('RegisteredClient medium handling', () => {
 			// Given we pulled out the reference time callback
 			let referenceTimeUpdatedCallback: TimeUpdatedCallback | undefined;
 			const referenceTimeSynchronizerMock = mock<ReferenceTimeSynchronizer>();
-			referenceTimeSynchronizerMock.start.mockImplementationOnce(callback => (referenceTimeUpdatedCallback = callback));
+			referenceTimeSynchronizerMock.start.mockImplementationOnce(
+				callback => (referenceTimeUpdatedCallback = callback),
+			);
 
 			// ...and we had a subscriber
 			const subscriber = jest.fn();
 
 			// ...that is subscribed to a registered client without a medium
-			const client = RegisteredClientBuilder.default().referenceTimeSynchronizer(referenceTimeSynchronizerMock).build();
+			const client = RegisteredClientBuilder.default()
+				.referenceTimeSynchronizer(referenceTimeSynchronizerMock)
+				.build();
 			client.subscribeToMediumStateChanges(subscriber);
 
 			// when

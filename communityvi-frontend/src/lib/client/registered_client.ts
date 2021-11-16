@@ -98,7 +98,9 @@ export default class RegisteredClient {
 		);
 		this.versionedMedium = new VersionedMedium(this.versionedMedium.version, newMedium);
 
-		this.mediumStateChangedMessageBroker.notify(new MediumTimeAdjusted(newMedium, referenceTimeDeltaInMilliseconds));
+		this.mediumStateChangedMessageBroker.notify(
+			new MediumTimeAdjusted(newMedium, referenceTimeDeltaInMilliseconds),
+		);
 	}
 
 	asPeer(): Peer {
@@ -134,7 +136,8 @@ export default class RegisteredClient {
 	}
 
 	async play(localStartTimeInMilliseconds: number, skipped = false): Promise<void> {
-		const startTimeInMs = this.referenceTimeSynchronizer.calculateServerTimeFromLocalTime(localStartTimeInMilliseconds);
+		const startTimeInMs =
+			this.referenceTimeSynchronizer.calculateServerTimeFromLocalTime(localStartTimeInMilliseconds);
 		const playRequest = new PlayRequest(this.versionedMedium.version, skipped, startTimeInMs);
 		await this.connection.performRequest(playRequest);
 	}

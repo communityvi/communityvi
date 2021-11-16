@@ -90,7 +90,9 @@ export class SelectedMedium {
 		const ownLengthInSecondsTruncated = Math.trunc(this.lengthInMilliseconds / 1000);
 		const mediumLengthInSecondsTruncated = Math.trunc(medium.lengthInMilliseconds / 1000);
 
-		return this.name.trim() !== medium.name.trim() || ownLengthInSecondsTruncated !== mediumLengthInSecondsTruncated;
+		return (
+			this.name.trim() !== medium.name.trim() || ownLengthInSecondsTruncated !== mediumLengthInSecondsTruncated
+		);
 	}
 }
 

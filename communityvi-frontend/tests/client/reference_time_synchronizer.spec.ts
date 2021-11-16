@@ -12,7 +12,9 @@ describe('The reference time synchronizer', () => {
 		const connectionMock = mock<Connection>();
 		scheduleReferenceTimeResponse(connectionMock, 1337, 0, 0);
 
-		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connectionMock);
+		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
+			connectionMock,
+		);
 
 		referenceTimeSynchronizer.start(jest.fn());
 
@@ -23,7 +25,9 @@ describe('The reference time synchronizer', () => {
 		const connectionMock = mock<Connection>();
 		scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
 
-		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connectionMock);
+		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
+			connectionMock,
+		);
 
 		expect(referenceTimeSynchronizer.offset).toBe(1337);
 	});
@@ -32,7 +36,9 @@ describe('The reference time synchronizer', () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
 			const connectionMock = mock<Connection>();
 			scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
-			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connectionMock);
+			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
+				connectionMock,
+			);
 
 			const subscriber = jest.fn();
 			referenceTimeSynchronizer.start(subscriber);
@@ -51,7 +57,9 @@ describe('The reference time synchronizer', () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
 			const connectionMock = mock<Connection>();
 			scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
-			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connectionMock);
+			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
+				connectionMock,
+			);
 
 			const subscriber = jest.fn();
 			referenceTimeSynchronizer.start(subscriber);

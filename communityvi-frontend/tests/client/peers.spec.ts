@@ -90,7 +90,9 @@ describe('The registered client peer tracking', () => {
 			reason: LeftReason.Closed,
 		});
 
-		expect(peerLifecycleCallback).toHaveBeenCalledWith(new PeerLeftMessage(new Peer(0, 'left'), LeaveReason.Closed));
+		expect(peerLifecycleCallback).toHaveBeenCalledWith(
+			new PeerLeftMessage(new Peer(0, 'left'), LeaveReason.Closed),
+		);
 	});
 
 	it('does not notify subscribers if an unknown peer left', () => {

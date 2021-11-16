@@ -62,7 +62,12 @@
 			{#if isRegistered}
 				<input class="button is-danger" type="submit" value="Logout" />
 			{:else}
-				<input class="button is-primary" type="submit" value="Login" disabled={registeredName === '' || undefined} />
+				<input
+					class="button is-primary"
+					type="submit"
+					value="Login"
+					disabled={registeredName === '' || undefined}
+				/>
 			{/if}
 		</p>
 	</div>
