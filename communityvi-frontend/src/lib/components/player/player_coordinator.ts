@@ -108,7 +108,8 @@ export default class PlayerCoordinator {
 
 	private positionAdjustmentExceedsThreshold(milliseconds: number): boolean {
 		return (
-			Math.abs(this.player.currentTime * 1000 - milliseconds) >= this.playbackPositionAdjustmentThresholdMilliseconds
+			Math.abs(this.player.currentTime * 1000 - milliseconds) >=
+			this.playbackPositionAdjustmentThresholdMilliseconds
 		);
 	}
 

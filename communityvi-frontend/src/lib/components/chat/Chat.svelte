@@ -65,7 +65,11 @@
 				{#if message instanceof ChatMessage}
 					<SingleChatMessage message={message.message} sender={message.sender} />
 				{:else if message instanceof OwnMessage}
-					<SingleChatMessage message={message.message} sender={message.sender} acknowledged={message.acknowledged} />
+					<SingleChatMessage
+						message={message.message}
+						sender={message.sender}
+						acknowledged={message.acknowledged}
+					/>
 				{/if}
 			{/each}
 		</tbody>
