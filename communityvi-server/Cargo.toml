@@ -14,7 +14,7 @@ futures = "0.3"
 governor = { version = "0.3", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
-js_int = {version = "0.2", features = ["serde"]}
+js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
 log = "0.4"
 mime = "0.3"
 mime_guess = "2"
