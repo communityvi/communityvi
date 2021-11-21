@@ -1,16 +1,19 @@
 use js_int::UInt;
+use static_assertions::assert_obj_safe;
 use user_id::UserId;
 
 mod user_id;
 
-trait User {
+pub trait User {
 	fn id(&self) -> UserId;
 	fn display_name(&self) -> Option<&str>;
 }
 
-struct AnonymousUser {
-	id: UInt,
-	display_name: Option<String>,
+assert_obj_safe!(User);
+
+pub struct AnonymousUser {
+	pub id: UInt,
+	pub display_name: Option<String>,
 }
 
 impl User for AnonymousUser {

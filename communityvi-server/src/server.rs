@@ -11,9 +11,10 @@ use crate::utils::websocket_message_conversion::{
 };
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use rweb::warp::filters::BoxedFilter;
-use rweb::{Filter, Reply};
+use rweb::{path, Filter, Reply};
 use std::future::ready;
 
+mod api;
 mod file_bundle;
 mod session;
 
@@ -25,6 +26,7 @@ pub async fn run_server(application_context: ApplicationContext) {
 
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
 	websocket_filter(application_context, room)
+		.or(path("api").and(api::rest_api()))
 		.or(bundled_frontend_filter())
 		.boxed()
 }

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant};
 
-mod id;
+pub mod id;
 
 #[derive(Clone)]
 pub struct SessionStore<Data> {
