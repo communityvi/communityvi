@@ -24,6 +24,7 @@ mod room;
 mod server;
 #[cfg(test)]
 mod server_tests;
+mod user;
 mod utils;
 
 #[tokio::main]
