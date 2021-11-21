@@ -2,6 +2,7 @@ use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::{MessageError, WebSocketMessage};
+use js_int::UInt;
 use serde::{Deserialize, Serialize};
 
 pub mod broadcast_message;
@@ -13,11 +14,11 @@ pub mod success_message;
 #[serde(tag = "type")]
 pub enum OutgoingMessage {
 	Success {
-		request_id: u64,
+		request_id: UInt,
 		message: SuccessMessage,
 	},
 	Error {
-		request_id: Option<u64>,
+		request_id: Option<UInt>,
 		message: ErrorMessage,
 	},
 	Broadcast {
@@ -54,11 +55,12 @@ mod test {
 	use crate::message::outgoing::broadcast_message::ClientJoinedBroadcast;
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::room::client_id::ClientId;
+	use js_int::uint;
 
 	#[test]
 	fn success_message_should_serialize_and_deserialize() {
 		let success_message = OutgoingMessage::Success {
-			request_id: 42,
+			request_id: uint!(42),
 			message: SuccessMessage::Success,
 		};
 		let json = serde_json::to_string(&success_message).expect("Failed to serialize Success message to JSON");
@@ -75,7 +77,7 @@ mod test {
 	#[test]
 	fn error_message_with_request_id_should_serialize_and_deserialize() {
 		let error_message = OutgoingMessage::Error {
-			request_id: Some(42),
+			request_id: Some(uint!(42)),
 			message: ErrorMessage::builder()
 				.error(ErrorMessageType::InternalServerError)
 				.message("No medium".to_string())

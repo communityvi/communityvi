@@ -15,6 +15,7 @@ use crate::utils::websocket_message_conversion::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
+use js_int::UInt;
 use rweb::test::WsClient;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
@@ -24,8 +25,8 @@ use tokio_tungstenite::WebSocketStream;
 
 pub struct WebsocketTestClient {
 	websocket_client: Box<dyn WebSocketClient>,
-	success_messages: BTreeMap<u64, SuccessMessage>,
-	error_messages: BTreeMap<Option<u64>, ErrorMessage>,
+	success_messages: BTreeMap<UInt, SuccessMessage>,
+	error_messages: BTreeMap<Option<UInt>, ErrorMessage>,
 	broadcast_messages: VecDeque<BroadcastMessage>,
 }
 
@@ -66,13 +67,13 @@ impl WebsocketTestClient {
 			.expect("Failed to receive message via TestClient")
 	}
 
-	pub async fn send_request(&mut self, request: impl Into<ClientRequest>) -> u64 {
-		let request_id = rand::random();
+	pub async fn send_request(&mut self, request: impl Into<ClientRequest>) -> UInt {
+		let request_id = rand::random::<u32>().into();
 		self.send_request_with_id(request, request_id).await;
 		request_id
 	}
 
-	pub async fn send_request_with_id(&mut self, request: impl Into<ClientRequest>, request_id: u64) {
+	pub async fn send_request_with_id(&mut self, request: impl Into<ClientRequest>, request_id: UInt) {
 		let client_request = ClientRequestWithId {
 			request_id,
 			request: request.into(),
@@ -81,7 +82,7 @@ impl WebsocketTestClient {
 		self.send_raw(websocket_message).await;
 	}
 
-	pub async fn receive_success_message(&mut self, expected_request_id: u64) -> SuccessMessage {
+	pub async fn receive_success_message(&mut self, expected_request_id: UInt) -> SuccessMessage {
 		loop {
 			self.receive_outgoing_message().await;
 			if let Some(success) = self.success_messages.remove(&expected_request_id) {
@@ -90,7 +91,7 @@ impl WebsocketTestClient {
 		}
 	}
 
-	pub async fn receive_error_message(&mut self, expected_request_id: Option<u64>) -> ErrorMessage {
+	pub async fn receive_error_message(&mut self, expected_request_id: Option<UInt>) -> ErrorMessage {
 		loop {
 			self.receive_outgoing_message().await;
 			if let Some(error) = self.error_messages.remove(&expected_request_id) {

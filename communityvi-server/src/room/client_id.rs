@@ -1,41 +1,22 @@
-use crate::utils::portable_unsigned_integer::PortableUnsignedInteger;
+use js_int::UInt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(transparent)]
-pub struct ClientId(PortableUnsignedInteger);
+pub struct ClientId(UInt);
 
-impl From<PortableUnsignedInteger> for ClientId {
-	fn from(id: PortableUnsignedInteger) -> Self {
+impl From<UInt> for ClientId {
+	fn from(id: UInt) -> Self {
 		ClientId(id)
 	}
 }
 
+#[cfg(test)]
 impl From<u32> for ClientId {
 	fn from(id: u32) -> Self {
 		ClientId(id.into())
-	}
-}
-
-impl From<ClientId> for PortableUnsignedInteger {
-	fn from(ClientId(id): ClientId) -> Self {
-		id
-	}
-}
-
-impl From<ClientId> for u64 {
-	fn from(ClientId(id): ClientId) -> Self {
-		id.into()
-	}
-}
-
-impl TryFrom<u64> for ClientId {
-	type Error = anyhow::Error;
-
-	fn try_from(id: u64) -> anyhow::Result<Self> {
-		Ok(ClientId(PortableUnsignedInteger::try_from(id)?))
 	}
 }
 

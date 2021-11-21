@@ -1,3 +1,4 @@
+use js_int::{Int, UInt};
 use serde::{Deserialize, Serialize};
 
 use crate::room::client::Client;
@@ -15,7 +16,7 @@ pub enum SuccessMessage {
 		current_medium: VersionedMediumResponse,
 	},
 	ReferenceTime {
-		milliseconds: u64,
+		milliseconds: UInt,
 	},
 	Success,
 }
@@ -37,7 +38,7 @@ impl From<Client> for ClientResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct VersionedMediumResponse {
-	pub version: u64,
+	pub version: UInt,
 	#[serde(flatten)]
 	pub medium: MediumResponse,
 }
@@ -58,18 +59,18 @@ pub enum MediumResponse {
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum PlaybackStateResponse {
-	Playing { start_time_in_milliseconds: i64 },
-	Paused { position_in_milliseconds: u64 },
+	Playing { start_time_in_milliseconds: Int },
+	Paused { position_in_milliseconds: UInt },
 }
 
 impl From<PlaybackState> for PlaybackStateResponse {
 	fn from(playback_state: PlaybackState) -> Self {
 		match playback_state {
 			PlaybackState::Playing { start_time } => Self::Playing {
-				start_time_in_milliseconds: start_time.num_milliseconds(),
+				start_time_in_milliseconds: Int::try_from(start_time.num_milliseconds()).unwrap(),
 			},
 			PlaybackState::Paused { at_position } => Self::Paused {
-				position_in_milliseconds: u64::try_from(at_position.num_milliseconds()).unwrap(),
+				position_in_milliseconds: UInt::try_from(at_position.num_milliseconds()).unwrap(),
 			},
 		}
 	}
@@ -101,6 +102,7 @@ impl From<Medium> for MediumResponse {
 mod test {
 	use super::*;
 	use chrono::Duration;
+	use js_int::uint;
 
 	#[test]
 	fn hello_response_without_medium_should_serialize_and_deserialize() {
@@ -133,10 +135,10 @@ mod test {
 					name: "WarGames".to_string(),
 					length_in_milliseconds: u64::try_from(Duration::minutes(114).num_milliseconds()).unwrap(),
 					playback_state: PlaybackStateResponse::Paused {
-						position_in_milliseconds: 0,
+						position_in_milliseconds: uint!(0),
 					},
 				},
-				version: 0,
+				version: uint!(0),
 			},
 		};
 		let json = serde_json::to_string_pretty(&hello_response).expect("Failed to serialize Hello response to JSON");
@@ -171,7 +173,9 @@ mod test {
 
 	#[test]
 	fn reference_time_response_should_serialize_and_deserialize() {
-		let reference_time_response = SuccessMessage::ReferenceTime { milliseconds: 1337 };
+		let reference_time_response = SuccessMessage::ReferenceTime {
+			milliseconds: uint!(1337),
+		};
 		let json = serde_json::to_string(&reference_time_response)
 			.expect("Failed to serialize ReferenceTime response to JSON");
 		assert_eq!(r#"{"type":"reference_time","milliseconds":1337}"#, json);

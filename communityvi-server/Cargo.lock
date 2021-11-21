@@ -158,6 +158,7 @@ dependencies = [
  "hex",
  "humantime-serde",
  "ignore",
+ "js_int",
  "log",
  "mime",
  "mime_guess",
@@ -617,6 +618,14 @@ name = "itoa"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
+
+[[package]]
+name = "js_int"
+version = "0.2.1"
+source = "git+https://github.com/ruma/js_int?branch=main#8d5ddede301ec890ef35a2673f8a174a54c5d958"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "lazy_static"
