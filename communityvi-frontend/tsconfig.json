@@ -3,7 +3,7 @@
 		"strict": true,
 		"noImplicitReturns": true,
 		"moduleResolution": "node",
-		"module": "es2020",
+		"module": "es2022",
 		"lib": ["es2020", "dom"],
 		"target": "es2019",
 		"importsNotUsedAsValues": "remove",
