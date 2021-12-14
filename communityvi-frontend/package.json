@@ -35,7 +35,7 @@
 		"sass": "^1.45",
 		"svelte": "^3.44",
 		"svelte-check": "^2.2",
-		"svelte-jester": "^1.5",
+		"svelte-jester": "^2.1",
 		"svelte-preprocess": "^4.10",
 		"ts-jest": "^26.5",
 		"tslib": "^2.3",
