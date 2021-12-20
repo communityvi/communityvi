@@ -24,7 +24,7 @@
 		"@typescript-eslint/eslint-plugin": "^5.7",
 		"@typescript-eslint/parser": "^5.7",
 		"bulma": "^0.9",
-		"eslint": "^8.4",
+		"eslint": "^8.5",
 		"eslint-config-prettier": "^8.1",
 		"eslint-plugin-svelte3": "^3.2",
 		"faker": "^5.5.3",
