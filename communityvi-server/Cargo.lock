@@ -902,9 +902,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.34"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f84e92c0f7c9d58328b85a78557813e4bd845130db68d7184635344399423b1"
+checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
@@ -1470,9 +1470,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b63708a265f51345575b27fe43f9500ad611579e764c79edbc2037b1121959ec"
+checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "unicase"
