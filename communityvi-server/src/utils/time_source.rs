@@ -1,10 +1,10 @@
-use futures::task::{Context, Poll};
-use futures::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 use pin_project::pin_project;
 use std::any::type_name;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::sync::{broadcast, Notify};
 use tokio::time::{interval_at, timeout};
@@ -224,7 +224,7 @@ impl<ValueFuture: Future> Future for TestTimeout<ValueFuture> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use futures::poll;
+	use futures_util::{future, poll};
 	use std::fmt::Debug;
 	use tokio::time::timeout;
 
@@ -379,7 +379,7 @@ mod test {
 	async fn time_source_should_create_tokio_timeout_that_elapses() {
 		let time_source = TimeSource::default();
 
-		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::pending::<u8>());
+		let timeout = time_source.timeout(Duration::from_millis(1), future::pending::<u8>());
 		assert_eq!(timeout.await, Err(()));
 	}
 
@@ -387,7 +387,7 @@ mod test {
 	async fn time_source_should_create_tokio_timeout_that_succeeds() {
 		let time_source = TimeSource::default();
 
-		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::ready(42));
+		let timeout = time_source.timeout(Duration::from_millis(1), future::ready(42));
 		assert_eq!(timeout.await, Ok(42));
 	}
 
@@ -395,10 +395,10 @@ mod test {
 	async fn test_timeout_should_not_time_out_too_early() {
 		let time_source = TimeSource::test();
 
-		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		let timeout = time_source.timeout(Duration::from_millis(1337), future::ready(42));
 		assert_eq!(timeout.await, Ok(42));
 
-		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		let timeout = time_source.timeout(Duration::from_millis(1337), future::ready(42));
 		time_source.advance_time(Duration::from_millis(42));
 		assert_eq!(timeout.await, Ok(42));
 	}
@@ -407,11 +407,11 @@ mod test {
 	async fn test_timeout_should_time_out() {
 		let time_source = TimeSource::test();
 
-		let timeout = time_source.timeout(Duration::from_millis(1337), futures::future::ready(42));
+		let timeout = time_source.timeout(Duration::from_millis(1337), future::ready(42));
 		time_source.advance_time(Duration::from_millis(1337));
 		assert_eq!(timeout.await, Err(()));
 
-		let timeout = time_source.timeout(Duration::from_millis(1), futures::future::pending::<u8>());
+		let timeout = time_source.timeout(Duration::from_millis(1), future::pending::<u8>());
 		time_source.advance_time(Duration::from_millis(1));
 		assert_eq!(timeout.await, Err(()));
 	}
@@ -424,13 +424,13 @@ mod test {
 
 		let wait_before = time_source.wait_for_time_request();
 		time_source
-			.timeout(Duration::from_millis(1337), futures::future::ready(()))
+			.timeout(Duration::from_millis(1337), future::ready(()))
 			.await
 			.expect("Timeout failed");
 		assert_poll(Poll::Ready(()), wait_before).await;
 
 		time_source
-			.timeout(Duration::from_millis(1337), futures::future::ready(()))
+			.timeout(Duration::from_millis(1337), future::ready(()))
 			.await
 			.expect("Timeout failed");
 		assert_poll(Poll::Ready(()), time_source.wait_for_time_request()).await;
