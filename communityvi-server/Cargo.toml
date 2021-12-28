@@ -18,7 +18,7 @@ humantime-serde = "1.0"
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
 log = "0.4"
 mime = "0.3"
-mime_guess = "2"
+mime_guess = {version = "2", default-features = false}
 nonzero_ext = "0.3"
 parking_lot = "0.11"
 pin-project = "1"
