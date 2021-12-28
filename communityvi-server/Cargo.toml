@@ -10,14 +10,15 @@ anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = {version = "3.0.0-rc.9", features = ["derive"]}
 env_logger = "0.9"
-futures = "0.3"
+futures-util = "0.3.19"
+futures-channel = "0.3.19"
 governor = { version = "0.3", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
 log = "0.4"
 mime = "0.3"
-mime_guess = "2"
+mime_guess = {version = "2", default-features = false}
 nonzero_ext = "0.3"
 parking_lot = "0.11"
 pin-project = "1"
@@ -26,7 +27,7 @@ rweb = { version = "0.15", default-features = false, features = ["openapi", "web
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-tungstenite = "0.16"
 toml = "0.5"
 typed-builder = "0.9"

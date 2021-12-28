@@ -1,5 +1,5 @@
 use crate::message::WebSocketMessage;
-use futures::Sink;
+use futures_util::Sink;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 

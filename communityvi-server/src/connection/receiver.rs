@@ -2,7 +2,7 @@ use crate::connection::sender::MessageSender;
 use crate::message::client_request::{ClientRequestWithId, RequestIdOnly};
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
-use futures::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 use log::error;
 use std::pin::Pin;
 

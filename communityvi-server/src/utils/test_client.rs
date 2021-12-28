@@ -14,7 +14,8 @@ use crate::utils::websocket_message_conversion::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use futures::{SinkExt, StreamExt};
+use futures_channel::mpsc;
+use futures_util::{SinkExt, StreamExt};
 use js_int::UInt;
 use rweb::test::WsClient;
 use std::collections::{BTreeMap, VecDeque};
@@ -32,8 +33,8 @@ pub struct WebsocketTestClient {
 
 impl WebsocketTestClient {
 	pub fn new() -> (MessageSender, MessageReceiver, Self) {
-		let (client_sender, server_receiver) = futures::channel::mpsc::unbounded();
-		let (server_sender, client_receiver) = futures::channel::mpsc::unbounded();
+		let (client_sender, server_receiver) = mpsc::unbounded();
+		let (server_sender, client_receiver) = mpsc::unbounded();
 
 		let test_client = Self::from((client_sender, client_receiver));
 
@@ -174,8 +175,8 @@ impl WebSocketClient for WsClient {
 #[async_trait]
 impl WebSocketClient
 	for (
-		futures::channel::mpsc::UnboundedSender<WebSocketMessage>,
-		futures::channel::mpsc::UnboundedReceiver<WebSocketMessage>,
+		mpsc::UnboundedSender<WebSocketMessage>,
+		mpsc::UnboundedReceiver<WebSocketMessage>,
 	)
 {
 	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {

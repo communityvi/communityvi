@@ -9,7 +9,7 @@ use crate::room::Room;
 use crate::utils::websocket_message_conversion::{
 	rweb_websocket_message_to_tungstenite_message, tungstenite_message_to_rweb_websocket_message,
 };
-use futures::{SinkExt, StreamExt, TryStreamExt};
+use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use rweb::warp::filters::BoxedFilter;
 use rweb::{Filter, Reply};
 use std::future::ready;
