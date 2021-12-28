@@ -12,7 +12,7 @@ clap = {version = "3.0.0-rc.9", features = ["derive"]}
 env_logger = "0.9"
 futures-util = "0.3.19"
 futures-channel = "0.3.19"
-governor = { version = "0.3", default-features = false, features = ["std", "jitter"] }
+governor = { version = "0.4", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
