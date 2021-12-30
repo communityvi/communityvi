@@ -12,16 +12,29 @@
 	import Player from '$lib/components/player/Player.svelte';
 	import {page} from '$app/stores';
 	import {browser} from '$app/env';
+	import {RESTClient} from '$lib/client/RESTClient';
 
-	const transport = new WebSocketTransport(determineBackendURL());
-	const client = new Client(transport);
+	const transport = new WebSocketTransport(determineWebSocketURL());
+	const restClient = new RESTClient(determineAPIUrl());
+	const client = new Client(transport, restClient);
 
-	function determineBackendURL(): URL {
+	function determineWebSocketURL(): URL {
 		// Just a stopgap measure for now. The (generally wrong) assumption is that
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
 		// as when the frontend is bundled with the backend.
 		const url = new URL(`ws://${pageHost()}/ws`);
+		url.port = '8000';
+
+		return url;
+	}
+
+	function determineAPIUrl(): URL {
+		// Just a stopgap measure for now. The (generally wrong) assumption is that
+		// the backend listens on port 8000. But this is good enough for now because it
+		// works both with `npm run watch` and the default backend settings as well
+		// as when the frontend is bundled with the backend.
+		const url = new URL(`http://${pageHost()}/api`);
 		url.port = '8000';
 
 		return url;

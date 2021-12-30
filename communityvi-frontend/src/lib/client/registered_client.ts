@@ -32,6 +32,7 @@ import {
 } from '$lib/client/model';
 import MessageBroker, {Subscriber, Unsubscriber} from '$lib/client/message_broker';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
+import {RESTClient} from '$lib/client/RESTClient';
 
 export default class RegisteredClient {
 	readonly id: number;
@@ -39,6 +40,8 @@ export default class RegisteredClient {
 	private referenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private versionedMedium: VersionedMedium;
 	readonly peers: Array<Peer>;
+
+	private readonly restClient: RESTClient;
 
 	private readonly connection: Connection;
 	private readonly disconnectCallback: DisconnectCallback;
@@ -57,6 +60,7 @@ export default class RegisteredClient {
 		referenceTimeSynchronizer: ReferenceTimeSynchronizer,
 		versionedMedium: VersionedMedium,
 		peers: Array<Peer>,
+		restClient: RESTClient,
 		connection: Connection,
 		disconnectCallback: DisconnectCallback,
 	) {
@@ -65,6 +69,8 @@ export default class RegisteredClient {
 		this.referenceTimeSynchronizer = referenceTimeSynchronizer;
 		this.versionedMedium = versionedMedium;
 		this.peers = peers;
+
+		this.restClient = restClient;
 
 		this.connection = connection;
 		this.disconnectCallback = disconnectCallback;

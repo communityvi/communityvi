@@ -4,12 +4,15 @@ import type {Transport} from '$lib/client/transport';
 import {Peer, VersionedMedium} from '$lib/client/model';
 import ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_client';
+import {RESTClient} from '$lib/client/RESTClient';
 
 export default class Client {
 	readonly transport: Transport;
+	readonly restClient: RESTClient;
 
-	constructor(transport: Transport) {
+	constructor(transport: Transport, restClient: RESTClient) {
 		this.transport = transport;
+		this.restClient = restClient;
 	}
 
 	async register(name: string, disconnectCallback: DisconnectCallback): Promise<RegisteredClient> {
@@ -30,6 +33,7 @@ export default class Client {
 			referenceTimeSynchronizer,
 			versionedMedium,
 			peers,
+			this.restClient,
 			connection,
 			disconnectCallback,
 		);
