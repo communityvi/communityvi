@@ -16,6 +16,8 @@ use rweb::filters::BoxedFilter;
 use rweb::Reply;
 use tokio_tungstenite::tungstenite;
 
+mod rest_api;
+
 #[tokio::test]
 async fn should_respond_to_websocket_messages() {
 	let filter = test_filter();
@@ -180,7 +182,7 @@ async fn websocket_test_client(filter: &BoxedFilter<(impl Reply + 'static,)>) ->
 		.into()
 }
 
-fn test_filter() -> BoxedFilter<(impl Reply,)> {
+pub(self) fn test_filter() -> BoxedFilter<(impl Reply,)> {
 	let room = Room::new(10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),

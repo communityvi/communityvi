@@ -15,6 +15,7 @@ use rweb::{Filter, Reply};
 use std::future::ready;
 
 mod file_bundle;
+mod rest_api;
 
 pub async fn run_server(application_context: ApplicationContext) {
 	let room = Room::new(application_context.configuration.room_size_limit);
@@ -23,7 +24,8 @@ pub async fn run_server(application_context: ApplicationContext) {
 }
 
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
-	websocket_filter(application_context, room)
+	websocket_filter(application_context, room.clone())
+		.or(rweb::path("api").and(rest_api::rest_api(room)))
 		.or(bundled_frontend_filter())
 		.boxed()
 }
