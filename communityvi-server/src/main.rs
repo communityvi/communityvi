@@ -20,6 +20,7 @@ mod context;
 mod error;
 mod lifecycle;
 mod message;
+mod reference_time;
 mod room;
 mod server;
 #[cfg(test)]
