@@ -16,6 +16,7 @@ governor = { version = "0.4", default-features = false, features = ["std", "jitt
 hex = '0.4'
 humantime-serde = "1.0"
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
+lazy_static = "1"
 log = "0.4"
 mime = "0.3"
 mime_guess = {version = "2", default-features = false}
@@ -23,9 +24,11 @@ nonzero_ext = "0.3"
 parking_lot = "0.11"
 pin-project = "1"
 rust-embed = { version = "6", features = ["interpolate-folder-path"] }
+rust-embed5 = {package = "rust-embed", version = "5"}
 rweb = { version = "0.15", default-features = false, features = ["openapi", "websocket"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
