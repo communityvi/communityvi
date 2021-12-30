@@ -1,7 +1,7 @@
 import ReferenceTimeSynchronizer, {AlreadyRunningError} from '$lib/client/reference_time_synchronizer';
 import {CalledWithMock, mock, mockReset} from 'jest-mock-extended';
 import TimeMock from './helper/time_mock';
-import {RESTClient} from '$lib/client/RESTClient';
+import {ReferenceTimeResponse, RESTClient} from '$lib/client/RESTClient';
 
 describe('The reference time synchronizer', () => {
 	it('should not allow starting synchronization twice', async () => {
@@ -85,12 +85,13 @@ function scheduleReferenceTimeResponse(
 ) {
 	mockReset(restClient);
 	restClient.getReferenceTimeMilliseconds.mockImplementationOnce(async () => {
+		const sentAt = performance.now();
 		if (timeMock !== undefined) {
 			await timeMock?.advanceTimeByMilliseconds(pingMilliseconds);
 		}
 
-		return referenceTime + pingMilliseconds / 2;
+		return new ReferenceTimeResponse(referenceTime + pingMilliseconds / 2, sentAt, sentAt + pingMilliseconds);
 	});
 }
 
-type RESTClientMock = {getReferenceTimeMilliseconds: CalledWithMock<Promise<number>, []>} & RESTClient;
+type RESTClientMock = {getReferenceTimeMilliseconds: CalledWithMock<Promise<ReferenceTimeResponse>, []>} & RESTClient;

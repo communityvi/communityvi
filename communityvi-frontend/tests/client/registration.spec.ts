@@ -2,7 +2,7 @@ import Client from '$lib/client/client';
 import TestTransport from './helper/test_transport';
 import RegisteredClient from '$lib/client/registered_client';
 import {mock} from 'jest-mock-extended';
-import {RESTClient} from '$lib/client/RESTClient';
+import {ReferenceTimeResponse, RESTClient} from '$lib/client/RESTClient';
 
 describe('Client registrations', () => {
 	// eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -10,7 +10,7 @@ describe('Client registrations', () => {
 
 	const transport = new TestTransport();
 	const restClient = mock<RESTClient>();
-	restClient.getReferenceTimeMilliseconds.mockImplementation(async () => 0);
+	restClient.getReferenceTimeMilliseconds.mockImplementation(async () => new ReferenceTimeResponse(0, 0, 0));
 	const client = new Client(transport, restClient);
 
 	it('registers a client', async () => {

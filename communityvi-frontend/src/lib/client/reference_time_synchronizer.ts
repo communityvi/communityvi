@@ -53,17 +53,13 @@ export default class ReferenceTimeSynchronizer {
 	}
 
 	private static async fetchReferenceTimeAndCalculateOffset(restClient: RESTClient): Promise<number> {
-		// NOTE: If this isn't accurate enough, it might be worth investigating the use of XMLHttpRequest and the
-		// 'onloadstart' events timeStamp property.
-		const sentAt = performance.now();
-		const referenceTime = await restClient.getReferenceTimeMilliseconds();
-		const receivedAt = performance.now();
+		const response = await restClient.getReferenceTimeMilliseconds();
 
 		// We assume that the request takes the same time to the server as the response takes back to us.
 		// Therefore, the server's reference time represents our time half way the message exchange.
-		const ourTime = sentAt + (receivedAt - sentAt) / 2;
+		const ourTime = response.sentAtMilliseconds + response.roundtripTimeInMilliseconds / 2;
 
-		return referenceTime - ourTime;
+		return response.referenceTimeInMilliseconds - ourTime;
 	}
 
 	calculateServerTimeFromLocalTime(localTimeInMilliseconds: number): number {
