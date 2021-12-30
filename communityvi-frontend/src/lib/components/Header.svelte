@@ -39,7 +39,7 @@
 
 <Notifications />
 
-<style type="text/sass">
+<style lang="sass">
 	.is-teaser
 		font-weight: bold
 
