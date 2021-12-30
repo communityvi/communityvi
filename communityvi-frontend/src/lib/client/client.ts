@@ -21,7 +21,9 @@ export default class Client {
 		const response = (await connection.performRequest(new RegisterRequest(name))).response as HelloMessage;
 		const peers = response.clients.map(Peer.fromClientResponse);
 
-		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(connection);
+		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
+			this.restClient,
+		);
 		const versionedMedium = VersionedMedium.fromVersionedMediumResponseAndReferenceTimeOffset(
 			response.current_medium,
 			referenceTimeSynchronizer.offset,

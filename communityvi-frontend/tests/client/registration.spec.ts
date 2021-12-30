@@ -10,6 +10,7 @@ describe('Client registrations', () => {
 
 	const transport = new TestTransport();
 	const restClient = mock<RESTClient>();
+	restClient.getReferenceTimeMilliseconds.mockImplementation(async () => 0);
 	const client = new Client(transport, restClient);
 
 	it('registers a client', async () => {
