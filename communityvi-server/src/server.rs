@@ -18,14 +18,18 @@ mod file_bundle;
 mod rest_api;
 
 pub async fn run_server(application_context: ApplicationContext) {
-	let room = Room::new(application_context.configuration.room_size_limit);
+	let room = Room::new(
+		application_context.reference_timer,
+		application_context.configuration.room_size_limit,
+	);
 	let address = application_context.configuration.address;
 	rweb::serve(create_filter(application_context, room)).run(address).await;
 }
 
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
-	websocket_filter(application_context, room.clone())
-		.or(rweb::path("api").and(rest_api::rest_api(room)))
+	let reference_timer = application_context.reference_timer;
+	websocket_filter(application_context, room)
+		.or(rweb::path("api").and(rest_api::rest_api(reference_timer)))
 		.or(bundled_frontend_filter())
 		.boxed()
 }

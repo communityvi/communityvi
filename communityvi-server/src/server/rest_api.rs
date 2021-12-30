@@ -1,16 +1,14 @@
-#![allow(clippy::needless_pass_by_value)] // #[data] requires owned values
-use crate::room::Room;
+use crate::reference_time::ReferenceTimer;
 use rweb::filters::BoxedFilter;
 use rweb::{get, openapi, Filter, Json, Reply};
 
-pub fn rest_api(room: Room) -> BoxedFilter<(impl Reply,)> {
-	let (_spec, filter) = openapi::spec().build(move || reference_time_milliseconds(room));
+pub fn rest_api(reference_timer: ReferenceTimer) -> BoxedFilter<(impl Reply,)> {
+	let (_spec, filter) = openapi::spec().build(move || reference_time_milliseconds(reference_timer));
 	filter.boxed()
 }
 
 #[get("/reference_time_milliseconds")]
-fn reference_time_milliseconds(#[data] room: Room) -> Json<u64> {
-	#[allow(clippy::cast_possible_truncation)]
-	let milliseconds = room.current_reference_time().as_millis() as u64;
+fn reference_time_milliseconds(#[data] reference_timer: ReferenceTimer) -> Json<u64> {
+	let milliseconds = u64::from(reference_timer.reference_time_milliseconds());
 	Json::from(milliseconds)
 }

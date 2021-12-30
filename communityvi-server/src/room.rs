@@ -1,5 +1,6 @@
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::clients::Clients;
@@ -9,7 +10,6 @@ use chrono::Duration;
 use js_int::UInt;
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
-use std::time::Instant;
 
 pub mod client;
 pub mod client_id;
@@ -26,15 +26,15 @@ pub struct Room {
 struct Inner {
 	clients: RwLock<Clients>,
 	medium: Mutex<VersionedMedium>,
-	start_of_reference_time: Instant,
+	reference_timer: ReferenceTimer,
 }
 
 impl Room {
-	pub fn new(room_size_limit: usize) -> Self {
+	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
 		let inner = Inner {
 			clients: RwLock::new(Clients::with_limit(room_size_limit)),
 			medium: Mutex::default(),
-			start_of_reference_time: std::time::Instant::now(),
+			reference_timer,
 		};
 		Self { inner: Arc::new(inner) }
 	}
@@ -63,10 +63,6 @@ impl Room {
 		self.inner.clients.read().broadcast(response.into());
 	}
 
-	pub fn current_reference_time(&self) -> std::time::Duration {
-		self.inner.start_of_reference_time.elapsed()
-	}
-
 	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
 	/// and `None` is returned. This is similar to compare and swap.
 	#[must_use]
@@ -83,7 +79,7 @@ impl Room {
 
 	#[must_use = "returns a `VersionedMedium` with new version that must be propagated"]
 	pub fn play_medium(&self, start_time: Duration, previous_version: UInt) -> Option<VersionedMedium> {
-		let reference_now = Duration::from_std(self.current_reference_time())
+		let reference_now = Duration::from_std(self.inner.reference_timer.reference_time())
 			.expect("This won't happen unless you run the server for more than 9_223_372_036_854_775_807 seconds :)");
 		self.inner
 			.medium
@@ -116,7 +112,7 @@ mod test {
 
 	#[test]
 	fn should_not_allow_adding_more_clients_than_room_size() {
-		let room = Room::new(2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
@@ -132,7 +128,7 @@ mod test {
 
 	#[test]
 	fn should_eject_the_inserted_medium_once_all_clients_have_left_the_room() {
-		let room = Room::new(10);
+		let room = Room::new(ReferenceTimer::default(), 10);
 		let name = "牧瀬 紅莉栖";
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
@@ -155,7 +151,7 @@ mod test {
 
 	#[test]
 	fn should_not_insert_medium_with_smaller_previous_version() {
-		let room = Room::new(1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		room.insert_medium(Medium::Empty, uint!(0))
 			.expect("Failed to insert medium"); // increase the version
 		assert_eq!(room.medium().version, uint!(1));
@@ -169,7 +165,7 @@ mod test {
 
 	#[test]
 	fn should_not_insert_medium_with_larger_previous_version() {
-		let room = Room::new(1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		assert!(
 			room.insert_medium(Medium::Empty, uint!(1)).is_none(),
 			"Must not be able to insert"
@@ -179,7 +175,7 @@ mod test {
 
 	#[test]
 	fn add_client_should_return_list_of_existing_clients() {
-		let room = Room::new(10);
+		let room = Room::new(ReferenceTimer::default(), 10);
 		let jake_sender = FakeMessageSender::default();
 		let (jake, existing_clients) = room
 			.add_client_and_return_existing("Jake".to_string(), jake_sender.into())

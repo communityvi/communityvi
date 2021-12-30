@@ -6,6 +6,7 @@ use crate::message::outgoing::broadcast_message::{
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::SuccessMessage;
+use crate::reference_time::ReferenceTimer;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_filter;
@@ -183,7 +184,7 @@ async fn websocket_test_client(filter: &BoxedFilter<(impl Reply + 'static,)>) ->
 }
 
 pub(self) fn test_filter() -> BoxedFilter<(impl Reply,)> {
-	let room = Room::new(10);
+	let room = Room::new(ReferenceTimer::default(), 10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
 		log_filters: "".to_string(),
