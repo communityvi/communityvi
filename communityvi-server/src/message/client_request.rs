@@ -21,7 +21,6 @@ pub struct ClientRequestWithId {
 pub enum ClientRequest {
 	Register(RegisterRequest),
 	Chat(ChatRequest),
-	GetReferenceTime,
 	InsertMedium(InsertMediumRequest),
 	Play(PlayRequest),
 	Pause(PauseRequest),
@@ -33,7 +32,6 @@ impl ClientRequest {
 		match self {
 			Register(_) => "Register",
 			Chat(_) => "Chat",
-			GetReferenceTime => "GetReferenceTime",
 			InsertMedium(_) => "InsertMedium",
 			Play(_) => "Play",
 			Pause(_) => "Pause",
@@ -228,18 +226,6 @@ mod test {
 		let deserialized_register_request: ClientRequestWithId =
 			serde_json::from_str(&json).expect("Failed to deserialize Register request from JSON");
 		assert_eq!(register_request, deserialized_register_request);
-	}
-
-	#[test]
-	fn get_reference_time_request_should_serialize_and_deserialize() {
-		let get_reference_time_request = ClientRequest::GetReferenceTime.with_id(uint!(42));
-		let json = serde_json::to_string(&get_reference_time_request)
-			.expect("Failed to serialize GetReferenceTime request to JSON");
-		assert_eq!(r#"{"request_id":42,"type":"get_reference_time"}"#, json);
-
-		let deserialized_get_reference_time_request: ClientRequestWithId =
-			serde_json::from_str(&json).expect("Failed to deserialize GetReferenceTime request from JSON");
-		assert_eq!(get_reference_time_request, deserialized_get_reference_time_request);
 	}
 
 	#[test]

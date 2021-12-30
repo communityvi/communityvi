@@ -24,10 +24,6 @@ export class PlayRequest implements ClientRequest {
 	}
 }
 
-export class GetReferenceTimeRequest implements ClientRequest {
-	type = RequestType.GetReferenceTime;
-}
-
 export class InsertMediumRequest implements ClientRequest {
 	type = RequestType.InsertMedium;
 	readonly previous_version: number;
@@ -93,7 +89,6 @@ enum RequestType {
 	Register = 'register',
 	Chat = 'chat',
 	InsertMedium = 'insert_medium',
-	GetReferenceTime = 'get_reference_time',
 	Play = 'play',
 	Pause = 'pause',
 }

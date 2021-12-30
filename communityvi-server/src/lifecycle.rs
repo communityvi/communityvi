@@ -9,7 +9,6 @@ use crate::message::outgoing::broadcast_message::{
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
-use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
@@ -38,7 +37,7 @@ pub async fn run_client(
 		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
 
 		let left_reason = tokio::select! {
-			_ = handle_messages(&room, application_context.reference_timer, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
+			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
 			_ = send_broadcasts(client.clone()) => LeftReason::Closed,
 			left_reason = heartbeat(
 				client,
@@ -203,7 +202,6 @@ const QUOTA: Quota = Quota::per_second(nonzero!(1u32)).allow_burst(nonzero!(10u3
 
 async fn handle_messages(
 	room: &Room,
-	reference_timer: ReferenceTimer,
 	client: Client,
 	mut message_receiver: MessageReceiver,
 	mut pong_sender: mpsc::Sender<Vec<u8>>,
@@ -231,24 +229,18 @@ async fn handle_messages(
 			client.id(),
 		);
 
-		match handle_request(room, reference_timer, &client, message.request) {
+		match handle_request(room, &client, message.request) {
 			Ok(success_message) => client.send_success_message(success_message, message.request_id).await,
 			Err(error_message) => client.send_error_message(error_message, Some(message.request_id)).await,
 		};
 	}
 }
 
-fn handle_request(
-	room: &Room,
-	reference_timer: ReferenceTimer,
-	client: &Client,
-	request: ClientRequest,
-) -> Result<SuccessMessage, ErrorMessage> {
+fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
 	use ClientRequest::*;
 	match request {
 		Chat(chat_request) => handle_chat_request(room, client, chat_request),
 		Register { .. } => handle_register_request(client),
-		GetReferenceTime => Ok(handle_get_reference_time_request(reference_timer)),
 		InsertMedium(insert_medium_request) => handle_insert_medium_request(room, client, insert_medium_request),
 		Play(play_request) => handle_play_request(room, client, play_request),
 		Pause(pause_request) => handle_pause_request(room, client, pause_request),
@@ -279,12 +271,6 @@ fn handle_register_request(client: &Client) -> Result<SuccessMessage, ErrorMessa
 		.error(ErrorMessageType::InvalidOperation)
 		.message("Already registered".to_string())
 		.build())
-}
-
-fn handle_get_reference_time_request(reference_timer: ReferenceTimer) -> SuccessMessage {
-	SuccessMessage::ReferenceTime {
-		milliseconds: reference_timer.reference_time_milliseconds(),
-	}
 }
 
 fn handle_insert_medium_request(
@@ -393,45 +379,17 @@ mod test {
 	use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, MediumBroadcast};
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse, VersionedMediumResponse};
+	use crate::reference_time::ReferenceTimer;
 	use crate::room::client_id::ClientId;
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::room::medium::VersionedMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
 	use js_int::{int, uint};
-	use tokio::time::sleep;
-
-	#[tokio::test]
-	async fn the_client_should_get_access_to_the_server_reference_time() {
-		const TEST_DELAY: std::time::Duration = std::time::Duration::from_millis(2);
-
-		let (message_sender, _message_receiver, _test_client) = WebsocketTestClient::new();
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 10);
-		let (client, _) = room
-			.add_client_and_return_existing("Alice".to_string(), message_sender)
-			.expect("Did not get client handle!");
-
-		sleep(TEST_DELAY).await; // ensure that some time has passed
-		let response = handle_request(&room, reference_timer, &client, ClientRequest::GetReferenceTime)
-			.expect("Failed to get reference time message");
-
-		match response {
-			SuccessMessage::ReferenceTime { milliseconds } => {
-				assert!(
-					(milliseconds >= UInt::try_from(TEST_DELAY.as_millis()).unwrap()) && (milliseconds < uint!(1000)),
-					"milliseconds = {}",
-					milliseconds
-				);
-			}
-			_ => panic!("Invalid response"),
-		};
-	}
 
 	#[tokio::test]
 	async fn the_client_should_get_an_error_for_empty_chat_messages() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 
 		let empty_chat_request = ChatRequest {
@@ -440,9 +398,9 @@ mod test {
 		let non_empty_chat_request = ChatRequest {
 			message: "Hi!".to_string(),
 		};
-		let error = handle_request(&room, reference_timer, &client, empty_chat_request.into())
-			.expect_err("Accepted empty chat message.");
-		handle_request(&room, reference_timer, &client, non_empty_chat_request.clone().into())
+		let error =
+			handle_request(&room, &client, empty_chat_request.into()).expect_err("Accepted empty chat message.");
+		handle_request(&room, &client, non_empty_chat_request.clone().into())
 			.expect("Failed to send proper chat message");
 
 		assert_eq!(
@@ -468,15 +426,13 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&alice,
 			InsertMediumRequest {
 				medium: Medium::from(medium.clone()).into(),
@@ -510,8 +466,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_insert_a_too_large_medium() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
@@ -523,8 +478,7 @@ mod test {
 			},
 			previous_version: uint!(0),
 		};
-		let response =
-			handle_request(&room, reference_timer, &alice, request.into()).expect_err("Failed to ger error response");
+		let response = handle_request(&room, &alice, request.into()).expect_err("Failed to ger error response");
 
 		assert_eq!(
 			response,
@@ -537,8 +491,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
@@ -549,7 +502,6 @@ mod test {
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&alice,
 			PlayRequest {
 				previous_version: inserted_medium.version,
@@ -586,8 +538,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
@@ -601,7 +552,6 @@ mod test {
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&bob,
 			PauseRequest {
 				previous_version: played_medium.version,
@@ -638,8 +588,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = Room::new(ReferenceTimer::default(), 2);
 		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
@@ -650,7 +599,6 @@ mod test {
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&bob,
 			PauseRequest {
 				previous_version: inserted_medium.version,
@@ -689,8 +637,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_play_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
@@ -700,7 +647,6 @@ mod test {
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&alice,
 			PlayRequest {
 				previous_version: inserted_medium.version + uint!(1),
@@ -723,8 +669,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_pause_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
@@ -734,7 +679,6 @@ mod test {
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&alice,
 			PauseRequest {
 				previous_version: inserted_medium.version + uint!(1),
@@ -757,15 +701,13 @@ mod test {
 	async fn the_client_should_not_be_able_to_insert_medium_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = Room::new(ReferenceTimer::default(), 1);
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice".to_string(), alice_message_sender)
 			.expect("Did not get client handle!");
 
 		let response = handle_request(
 			&room,
-			reference_timer,
 			&alice,
 			InsertMediumRequest {
 				previous_version: uint!(1),
@@ -797,7 +739,7 @@ mod test {
 			async move {
 				let room = &room;
 				let (pong_sender, _pong_receiver) = mpsc::channel(0);
-				handle_messages(room, reference_timer, client_handle, message_receiver, pong_sender).await;
+				handle_messages(room, client_handle, message_receiver, pong_sender).await;
 			}
 		});
 
