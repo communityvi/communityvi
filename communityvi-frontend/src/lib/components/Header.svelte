@@ -32,7 +32,7 @@
 
 	<div class="navbar-menu" class:is-active={isBurgerMenuExpanded}>
 		<div class="navbar-start">
-			<a class="navbar-item" class:is-active={$page.path === '/about'} href="/about">About</a>
+			<a class="navbar-item" class:is-active={$page.url.pathname === '/about'} href="/about">About</a>
 		</div>
 	</div>
 </nav>
