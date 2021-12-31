@@ -1,15 +1,15 @@
 use crate::room::client_id::ClientId;
 use js_int::UInt;
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 pub struct ClientIdSequence {
-	id_pool: Range<u64>,
+	id_pool: RangeInclusive<u64>,
 }
 
 impl Default for ClientIdSequence {
 	fn default() -> Self {
 		Self {
-			id_pool: UInt::MIN.into()..UInt::MAX.into(),
+			id_pool: UInt::MIN.into()..=UInt::MAX.into(),
 		}
 	}
 }
@@ -17,12 +17,8 @@ impl Default for ClientIdSequence {
 impl ClientIdSequence {
 	pub fn next(&mut self) -> ClientId {
 		ClientId::from(
-			UInt::try_from(
-				self.id_pool
-					.next()
-					.expect("This only happens if 9007199254740991 ClientIDs are created."),
-			)
-			.unwrap_or_else(|_| unreachable!()),
+			UInt::try_from(self.id_pool.next().expect("Ran out of available ClientIds."))
+				.unwrap_or_else(|_| unreachable!()),
 		)
 	}
 }

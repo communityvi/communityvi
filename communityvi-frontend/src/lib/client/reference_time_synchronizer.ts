@@ -1,26 +1,26 @@
-import type {Connection} from '$lib/client/connection';
-import {GetReferenceTimeRequest} from '$lib/client/request';
-import type {ReferenceTimeMessage} from '$lib/client/response';
+import {RESTClient} from '$lib/client/RESTClient';
 
 export default class ReferenceTimeSynchronizer {
-	private readonly connection: Connection;
+	private readonly restClient: RESTClient;
 	private callback?: TimeUpdatedCallback;
 	private intervalId?: NodeJS.Timeout;
 
 	private storedOffset: number;
 
+	static UPDATE_INTERVAL_MILLISECONDS = 15_000;
+
 	get offset(): number {
 		return this.storedOffset;
 	}
 
-	static async createInitializedWithConnection(connection: Connection): Promise<ReferenceTimeSynchronizer> {
-		const initialOffset = await ReferenceTimeSynchronizer.fetchReferenceTimeAndCalculateOffset(connection);
-		return new ReferenceTimeSynchronizer(initialOffset, connection);
+	static async createInitializedWithRESTClient(restClient: RESTClient): Promise<ReferenceTimeSynchronizer> {
+		const initialOffset = await ReferenceTimeSynchronizer.fetchReferenceTimeAndCalculateOffset(restClient);
+		return new ReferenceTimeSynchronizer(initialOffset, restClient);
 	}
 
-	private constructor(initialOffset: number, connection: Connection) {
+	private constructor(initialOffset: number, restClient: RESTClient) {
+		this.restClient = restClient;
 		this.storedOffset = initialOffset;
-		this.connection = connection;
 	}
 
 	start(callback: TimeUpdatedCallback): void {
@@ -30,12 +30,14 @@ export default class ReferenceTimeSynchronizer {
 
 		this.callback = callback;
 
-		// Schedule reference time updates every 15s
-		this.intervalId = setInterval(() => this.synchronizeReferenceTime(), 15_000);
+		this.intervalId = setInterval(
+			() => this.synchronizeReferenceTime(),
+			ReferenceTimeSynchronizer.UPDATE_INTERVAL_MILLISECONDS,
+		);
 	}
 
 	private async synchronizeReferenceTime(): Promise<void> {
-		const newOffset = await ReferenceTimeSynchronizer.fetchReferenceTimeAndCalculateOffset(this.connection);
+		const newOffset = await ReferenceTimeSynchronizer.fetchReferenceTimeAndCalculateOffset(this.restClient);
 		if (this.storedOffset === newOffset) {
 			console.debug('Reference time did not need updating.');
 			return;
@@ -50,15 +52,14 @@ export default class ReferenceTimeSynchronizer {
 		}
 	}
 
-	private static async fetchReferenceTimeAndCalculateOffset(connection: Connection): Promise<number> {
-		const response = await connection.performRequest(new GetReferenceTimeRequest());
+	private static async fetchReferenceTimeAndCalculateOffset(restClient: RESTClient): Promise<number> {
+		const response = await restClient.getReferenceTimeMilliseconds();
 
 		// We assume that the request takes the same time to the server as the response takes back to us.
 		// Therefore, the server's reference time represents our time half way the message exchange.
-		const ourTime = response.metadata.sentAt + response.metadata.roundTripTimeInMilliseconds / 2;
-		const referenceTime = (response.response as ReferenceTimeMessage).milliseconds;
+		const ourTime = response.sentAtMilliseconds + response.roundtripTimeInMilliseconds / 2;
 
-		return referenceTime - ourTime;
+		return response.referenceTimeInMilliseconds - ourTime;
 	}
 
 	calculateServerTimeFromLocalTime(localTimeInMilliseconds: number): number {

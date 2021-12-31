@@ -1,23 +1,13 @@
-use std::error::Error;
-use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum RoomError {
+	#[error("Name was empty or whitespace-only.")]
 	EmptyClientName,
+	#[error("Client name is already in use.")]
 	ClientNameAlreadyInUse,
+	#[error("Client name is too long. (>256 bytes UTF-8)")]
 	ClientNameTooLong,
+	#[error("Can't join, room is already full.")]
 	RoomFull,
 }
-
-impl Display for RoomError {
-	fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
-		match self {
-			RoomError::EmptyClientName => formatter.write_str("Name was empty or whitespace-only."),
-			RoomError::ClientNameAlreadyInUse => formatter.write_str("Client name is already in use."),
-			RoomError::ClientNameTooLong => formatter.write_str("Client name is too long. (>256 bytes UTF-8)"),
-			RoomError::RoomFull => formatter.write_str("Can't join, room is already full."),
-		}
-	}
-}
-
-impl Error for RoomError {}

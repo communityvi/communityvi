@@ -15,15 +15,21 @@ use rweb::{Filter, Reply};
 use std::future::ready;
 
 mod file_bundle;
+mod rest_api;
 
 pub async fn run_server(application_context: ApplicationContext) {
-	let room = Room::new(application_context.configuration.room_size_limit);
+	let room = Room::new(
+		application_context.reference_timer,
+		application_context.configuration.room_size_limit,
+	);
 	let address = application_context.configuration.address;
 	rweb::serve(create_filter(application_context, room)).run(address).await;
 }
 
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
+	let reference_timer = application_context.reference_timer;
 	websocket_filter(application_context, room)
+		.or(rest_api::rest_api(reference_timer))
 		.or(bundled_frontend_filter())
 		.boxed()
 }
@@ -68,20 +74,12 @@ fn websocket_filter(application_context: ApplicationContext, room: Room) -> Boxe
 fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 	use crate::server::file_bundle::BundledFileHandler;
 	use rust_embed::RustEmbed;
-	use rweb::filters;
-	use rweb::http::HeaderMap;
-	use rweb::path::Tail;
 
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
 	struct FrontendBundle;
 
-	let bundled_file_handler = BundledFileHandler::new::<FrontendBundle>();
-
-	filters::path::tail()
-		.and(filters::header::headers_cloned())
-		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.request(path.as_str(), &headers))
-		.boxed()
+	BundledFileHandler::new::<FrontendBundle>().into_rweb_filter().boxed()
 }
 
 #[cfg(not(feature = "bundle-frontend"))]

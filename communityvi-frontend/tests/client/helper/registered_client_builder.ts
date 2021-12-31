@@ -4,6 +4,7 @@ import {mock} from 'jest-mock-extended';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import type {Connection} from '$lib/client/connection';
 import Faker from 'faker';
+import {RESTClient} from '$lib/client/RESTClient';
 
 export class RegisteredClientBuilder {
 	private storedID = Faker.datatype.number({min: 0});
@@ -12,6 +13,7 @@ export class RegisteredClientBuilder {
 	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private storedVersionedMedium = new VersionedMedium(Faker.datatype.number({min: 0}));
 	private storedPeers = new Array<Peer>();
+	private storedRestClient: RESTClient = mock<RESTClient>();
 	private storedConnection: Connection = mock<Connection>();
 	private storedDisconnectCallback: DisconnectCallback = jest.fn();
 
@@ -71,6 +73,12 @@ export class RegisteredClientBuilder {
 		return this;
 	}
 
+	restClient(restClient: RESTClient): RegisteredClientBuilder {
+		this.storedRestClient = restClient;
+
+		return this;
+	}
+
 	connection(connection: Connection): RegisteredClientBuilder {
 		this.storedConnection = connection;
 
@@ -90,6 +98,7 @@ export class RegisteredClientBuilder {
 			this.storedReferenceTimeSynchronizer,
 			this.storedVersionedMedium,
 			this.storedPeers,
+			this.storedRestClient,
 			this.storedConnection,
 			this.storedDisconnectCallback,
 		);

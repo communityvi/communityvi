@@ -1,8 +1,8 @@
 use serde::Deserialize;
-use std::fmt::{Display, Formatter};
 use std::fs::read_to_string;
 use std::net::SocketAddr;
 use std::path::Path;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Configuration {
@@ -31,33 +31,12 @@ impl TryFrom<&str> for Configuration {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ConfigurationError {
-	DeserializationError(String),
-	IoError(String),
-}
-
-impl Display for ConfigurationError {
-	fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
-		match self {
-			ConfigurationError::DeserializationError(message) => {
-				write!(formatter, "Failed to deserialize with error: {}", message)
-			}
-			ConfigurationError::IoError(message) => write!(formatter, "IO operation failed: {}", message),
-		}
-	}
-}
-
-impl From<std::io::Error> for ConfigurationError {
-	fn from(io_error: std::io::Error) -> Self {
-		ConfigurationError::IoError(io_error.to_string())
-	}
-}
-
-impl From<toml::de::Error> for ConfigurationError {
-	fn from(toml_error: toml::de::Error) -> Self {
-		ConfigurationError::DeserializationError(toml_error.to_string())
-	}
+	#[error("Failed to deserialize with error: {0}")]
+	DeserializationError(#[from] toml::de::Error),
+	#[error("IO operation failed: {0}")]
+	IoError(#[from] std::io::Error),
 }
 
 // See https://serde.rs/custom-date-format.html

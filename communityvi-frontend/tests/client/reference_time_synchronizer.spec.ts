@@ -1,19 +1,15 @@
 import ReferenceTimeSynchronizer, {AlreadyRunningError} from '$lib/client/reference_time_synchronizer';
-import type {Connection} from '$lib/client/connection';
-import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
-import {CalledWithMock, isA, mock, mockReset} from 'jest-mock-extended';
-import {ClientRequest, GetReferenceTimeRequest} from '$lib/client/request';
-import type {ReferenceTimeMessage} from '$lib/client/response';
-import {SuccessMessageType} from '$lib/client/response';
+import {CalledWithMock, mock, mockReset} from 'jest-mock-extended';
 import TimeMock from './helper/time_mock';
+import {ReferenceTimeResponse, RESTClient} from '$lib/client/RESTClient';
 
 describe('The reference time synchronizer', () => {
 	it('should not allow starting synchronization twice', async () => {
-		const connectionMock = mock<Connection>();
-		scheduleReferenceTimeResponse(connectionMock, 1337, 0, 0);
+		const restClientMock = mock<RESTClient>();
+		scheduleReferenceTimeResponse(restClientMock, 1337);
 
-		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
-			connectionMock,
+		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
+			restClientMock,
 		);
 
 		referenceTimeSynchronizer.start(jest.fn());
@@ -22,22 +18,25 @@ describe('The reference time synchronizer', () => {
 	});
 
 	it('should have the correct initial offset after construction', async () => {
-		const connectionMock = mock<Connection>();
-		scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
+		await TimeMock.run(async (timeMock: TimeMock) => {
+			const restClientMock = mock<RESTClient>();
+			scheduleReferenceTimeResponse(restClientMock, 1337, timeMock, 1_000);
 
-		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
-			connectionMock,
-		);
+			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
+				restClientMock,
+			);
 
-		expect(referenceTimeSynchronizer.offset).toBe(1337);
+			expect(referenceTimeSynchronizer.offset).toBe(1337);
+		});
 	});
 
 	it('should inform its subscriber about offset updates', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			const connectionMock = mock<Connection>();
-			scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
-			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
-				connectionMock,
+			const initialReferenceTime = 1337;
+			const restClientMock = mock<RESTClient>();
+			scheduleReferenceTimeResponse(restClientMock, initialReferenceTime);
+			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
+				restClientMock,
 			);
 
 			const subscriber = jest.fn();
@@ -45,8 +44,10 @@ describe('The reference time synchronizer', () => {
 
 			// 15s passed and server and client are out of sync by 230ms.
 			const outOfSyncMilliseconds = 230;
-			scheduleReferenceTimeResponse(connectionMock, 16_337 + outOfSyncMilliseconds, 15_000, 16_000);
-			await timeMock.advanceTimeByMilliseconds(15_000);
+			const responseReferenceTime =
+				ReferenceTimeSynchronizer.UPDATE_INTERVAL_MILLISECONDS + initialReferenceTime + outOfSyncMilliseconds;
+			scheduleReferenceTimeResponse(restClientMock, responseReferenceTime, timeMock, 1_000);
+			await timeMock.advanceTimeByMilliseconds(ReferenceTimeSynchronizer.UPDATE_INTERVAL_MILLISECONDS);
 
 			expect(setInterval).toHaveBeenCalledTimes(1);
 			expect(subscriber).toHaveBeenCalledWith(outOfSyncMilliseconds);
@@ -55,18 +56,20 @@ describe('The reference time synchronizer', () => {
 
 	it('should not inform its subscriber if the offset stays the same', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			const connectionMock = mock<Connection>();
-			scheduleReferenceTimeResponse(connectionMock, 1337, 0, 1000);
-			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithConnection(
-				connectionMock,
+			const initialReferenceTime = 1337;
+			const restClientMock = mock<RESTClient>();
+			scheduleReferenceTimeResponse(restClientMock, initialReferenceTime, timeMock, 0);
+			const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
+				restClientMock,
 			);
 
 			const subscriber = jest.fn();
 			referenceTimeSynchronizer.start(subscriber);
 
 			// 15s passed and server and client are in sync.
-			scheduleReferenceTimeResponse(connectionMock, 16_337, 15_000, 16_000);
-			await timeMock.advanceTimeByMilliseconds(15_000);
+			const responseReferenceTime = ReferenceTimeSynchronizer.UPDATE_INTERVAL_MILLISECONDS + initialReferenceTime;
+			scheduleReferenceTimeResponse(restClientMock, responseReferenceTime, timeMock, 1_000);
+			await timeMock.advanceTimeByMilliseconds(ReferenceTimeSynchronizer.UPDATE_INTERVAL_MILLISECONDS);
 
 			expect(setInterval).toHaveBeenCalledTimes(1);
 			expect(subscriber).not.toHaveBeenCalled();
@@ -75,21 +78,20 @@ describe('The reference time synchronizer', () => {
 });
 
 function scheduleReferenceTimeResponse(
-	mock: ConnectionMock,
+	restClient: RESTClientMock,
 	referenceTime: number,
-	sentAt: number,
-	receivedAt: number,
+	timeMock?: TimeMock,
+	pingMilliseconds = 0,
 ) {
-	mockReset(mock);
-	mock.performRequest.calledWith(isA(GetReferenceTimeRequest)).mockResolvedValueOnce(
-		new EnrichedResponse(
-			<ReferenceTimeMessage>{
-				type: SuccessMessageType.ReferenceTime,
-				milliseconds: referenceTime + (receivedAt - sentAt) / 2,
-			},
-			new ResponseMetadata(sentAt, receivedAt),
-		),
-	);
+	mockReset(restClient);
+	restClient.getReferenceTimeMilliseconds.mockImplementationOnce(async () => {
+		const sentAt = performance.now();
+		if (timeMock !== undefined) {
+			await timeMock?.advanceTimeByMilliseconds(pingMilliseconds);
+		}
+
+		return new ReferenceTimeResponse(referenceTime + pingMilliseconds / 2, sentAt, sentAt + pingMilliseconds);
+	});
 }
 
-type ConnectionMock = {performRequest: CalledWithMock<Promise<EnrichedResponse>, [ClientRequest]>} & Connection;
+type RESTClientMock = {getReferenceTimeMilliseconds: CalledWithMock<Promise<ReferenceTimeResponse>, []>} & RESTClient;

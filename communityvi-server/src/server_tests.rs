@@ -6,6 +6,7 @@ use crate::message::outgoing::broadcast_message::{
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::SuccessMessage;
+use crate::reference_time::ReferenceTimer;
 use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_filter;
@@ -15,6 +16,8 @@ use js_int::uint;
 use rweb::filters::BoxedFilter;
 use rweb::Reply;
 use tokio_tungstenite::tungstenite;
+
+mod rest_api;
 
 #[tokio::test]
 async fn should_respond_to_websocket_messages() {
@@ -180,8 +183,8 @@ async fn websocket_test_client(filter: &BoxedFilter<(impl Reply + 'static,)>) ->
 		.into()
 }
 
-fn test_filter() -> BoxedFilter<(impl Reply,)> {
-	let room = Room::new(10);
+pub(self) fn test_filter() -> BoxedFilter<(impl Reply,)> {
+	let room = Room::new(ReferenceTimer::default(), 10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
 		log_filters: "".to_string(),

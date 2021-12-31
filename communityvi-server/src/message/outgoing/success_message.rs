@@ -15,9 +15,6 @@ pub enum SuccessMessage {
 		clients: Vec<ClientResponse>,
 		current_medium: VersionedMediumResponse,
 	},
-	ReferenceTime {
-		milliseconds: UInt,
-	},
 	Success,
 }
 
@@ -169,20 +166,6 @@ mod test {
 		let deserialized_hello_response: SuccessMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
 		assert_eq!(hello_response, deserialized_hello_response);
-	}
-
-	#[test]
-	fn reference_time_response_should_serialize_and_deserialize() {
-		let reference_time_response = SuccessMessage::ReferenceTime {
-			milliseconds: uint!(1337),
-		};
-		let json = serde_json::to_string(&reference_time_response)
-			.expect("Failed to serialize ReferenceTime response to JSON");
-		assert_eq!(r#"{"type":"reference_time","milliseconds":1337}"#, json);
-
-		let deserialized_reference_time_response: SuccessMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize ReferenceTime response from JSON");
-		assert_eq!(reference_time_response, deserialized_reference_time_response);
 	}
 
 	#[test]
