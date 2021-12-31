@@ -6,8 +6,9 @@ use rweb::{get, openapi, router, Filter, Json, Reply};
 mod api_docs;
 
 pub fn rest_api(reference_timer: ReferenceTimer) -> BoxedFilter<(impl Reply,)> {
-	let (spec, filter) = openapi::spec().build(move || api(reference_timer));
-	filter.or(openapi_filter(spec)).boxed()
+	let (spec, api) = openapi::spec().build(move || api(reference_timer));
+	let cors = rweb::cors().allow_any_origin().build();
+	api.with(cors).or(openapi_filter(spec)).boxed()
 }
 
 pub fn openapi_filter(spec: openapi::Spec) -> BoxedFilter<(impl Reply,)> {
