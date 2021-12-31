@@ -4,6 +4,9 @@ use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
+use rweb::path::Tail;
+use rweb::{filters, Filter};
+use std::convert::Infallible;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -18,6 +21,12 @@ impl BundledFileHandler {
 		Self {
 			file_getter: Bundle::get,
 		}
+	}
+
+	pub fn into_rweb_filter(self) -> impl Filter<Extract = (Response<Body>,), Error = Infallible> {
+		filters::path::tail()
+			.and(filters::header::headers_cloned())
+			.map(move |path: Tail, headers: HeaderMap| self.request(path.as_str(), &headers))
 	}
 
 	pub fn request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {

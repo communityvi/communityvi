@@ -74,20 +74,12 @@ fn websocket_filter(application_context: ApplicationContext, room: Room) -> Boxe
 fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 	use crate::server::file_bundle::BundledFileHandler;
 	use rust_embed::RustEmbed;
-	use rweb::filters;
-	use rweb::http::HeaderMap;
-	use rweb::path::Tail;
 
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
 	struct FrontendBundle;
 
-	let bundled_file_handler = BundledFileHandler::new::<FrontendBundle>();
-
-	filters::path::tail()
-		.and(filters::header::headers_cloned())
-		.map(move |path: Tail, headers: HeaderMap| bundled_file_handler.request(path.as_str(), &headers))
-		.boxed()
+	BundledFileHandler::new::<FrontendBundle>().into_rweb_filter().boxed()
 }
 
 #[cfg(not(feature = "bundle-frontend"))]
