@@ -2,7 +2,7 @@ use crate::server_tests::test_filter;
 use rweb::http::StatusCode;
 
 #[tokio::test]
-async fn should_display_overriden_swagger_ui_index_html() {
+async fn should_serve_overriden_swagger_ui_index_html() {
 	let filter = test_filter();
 	let aliases = ["/api/docs", "/api/docs/"];
 
@@ -30,6 +30,27 @@ async fn should_display_overriden_swagger_ui_index_html() {
 			response_to_explicit_path.body(),
 			"Response for alias '{}' was different from the explicit path.",
 			alias
+		);
+	}
+}
+
+#[tokio::test]
+async fn should_serve_bundled_swagger_ui() {
+	let filter = test_filter();
+
+	for filename in swagger_ui::Assets::iter().filter(|filename| filename != "index.html") {
+		let response = rweb::test::request()
+			.method("GET")
+			.path(&format!("/api/docs/{}", filename))
+			.reply(&filter)
+			.await;
+
+		assert_eq!(response.status(), StatusCode::OK, "Missing file '{}'", filename);
+		assert_eq!(
+			response.body().as_ref(),
+			swagger_ui::Assets::get(&filename).unwrap().as_ref(),
+			"File '{}' has an incorrect content.",
+			filename
 		);
 	}
 }
