@@ -29,7 +29,7 @@ pub async fn run_server(application_context: ApplicationContext) {
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
 	let reference_timer = application_context.reference_timer;
 	websocket_filter(application_context, room)
-		.or(rweb::path("api").and(rest_api::rest_api(reference_timer)))
+		.or(rest_api::rest_api(reference_timer))
 		.or(bundled_frontend_filter())
 		.boxed()
 }

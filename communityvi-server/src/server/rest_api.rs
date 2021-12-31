@@ -1,11 +1,31 @@
 use crate::reference_time::ReferenceTimer;
 use rweb::filters::BoxedFilter;
-use rweb::{get, openapi, Filter, Json, Reply};
+use rweb::{get, openapi, router, Filter, Json, Reply};
+
+#[cfg(feature = "api-docs")]
+mod api_docs;
 
 pub fn rest_api(reference_timer: ReferenceTimer) -> BoxedFilter<(impl Reply,)> {
-	let (_spec, filter) = openapi::spec().build(move || reference_time_milliseconds(reference_timer));
-	filter.boxed()
+	let (spec, filter) = openapi::spec().build(move || api(reference_timer));
+	filter.or(openapi_filter(spec)).boxed()
 }
+
+pub fn openapi_filter(spec: openapi::Spec) -> BoxedFilter<(impl Reply,)> {
+	let api = rweb::path("api");
+	let spec_json = rweb::path("openapi.json").map(move || rweb::reply::json(&spec));
+	#[cfg(not(feature = "api-docs"))]
+	{
+		api.and(spec_json).boxed()
+	}
+	#[cfg(feature = "api-docs")]
+	{
+		api.and(spec_json.or(rweb::path("docs").and(api_docs::api_docs())))
+			.boxed()
+	}
+}
+
+#[router("/api", services(reference_time_milliseconds))]
+fn api(#[data] _reference_timer: ReferenceTimer) {}
 
 #[get("/reference_time_milliseconds")]
 fn reference_time_milliseconds(#[data] reference_timer: ReferenceTimer) -> Json<u64> {

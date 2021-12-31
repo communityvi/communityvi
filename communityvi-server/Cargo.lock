@@ -177,6 +177,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.0",
+ "swagger-ui",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -1034,6 +1035,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rust-embed-utils 5.1.0",
+ "shellexpand",
  "syn",
  "walkdir",
 ]
@@ -1270,6 +1272,17 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
+name = "swagger-ui"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7a59ee5a3b7e7310ec7b20be06090c0ed3019590cfea6e99cb4d26c4c45cc2c"
+dependencies = [
+ "rust-embed 5.9.0",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "syn"
