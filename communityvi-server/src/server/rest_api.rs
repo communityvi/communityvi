@@ -28,7 +28,7 @@ pub fn openapi_filter(spec: openapi::Spec) -> BoxedFilter<(impl Reply,)> {
 #[router("/api", services(reference_time_milliseconds))]
 fn api(#[data] _reference_timer: ReferenceTimer) {}
 
-#[get("/reference_time_milliseconds")]
+#[get("/reference-time-milliseconds")]
 fn reference_time_milliseconds(#[data] reference_timer: ReferenceTimer) -> Json<u64> {
 	let milliseconds = u64::from(reference_timer.reference_time_milliseconds());
 	Json::from(milliseconds)

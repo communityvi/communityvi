@@ -11,7 +11,7 @@ async fn should_return_reference_time() {
 	let filter = test_filter();
 	let response = rweb::test::request()
 		.method("GET")
-		.path("/api/reference_time_milliseconds")
+		.path("/api/reference-time-milliseconds")
 		.reply(&filter)
 		.await;
 

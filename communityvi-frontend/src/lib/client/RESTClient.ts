@@ -6,10 +6,7 @@ export class RESTClient {
 	}
 
 	async getReferenceTimeMilliseconds(): Promise<ReferenceTimeResponse> {
-		const request = new XMLHttpRequest();
-		request.open('GET', `${this.apiBaseURL}/reference_time_milliseconds`, true);
-
-		const response = await RESTClient.getWithTimings(`${this.apiBaseURL}/reference_time_milliseconds`);
+		const response = await RESTClient.getWithTimings(`${this.apiBaseURL}/reference-time-milliseconds`);
 
 		const milliseconds = JSON.parse(response.text);
 		if (typeof milliseconds !== 'number') {
