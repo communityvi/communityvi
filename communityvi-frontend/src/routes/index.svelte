@@ -11,6 +11,7 @@
 	import Peers from '$lib/components/Peers.svelte';
 	import Player from '$lib/components/player/Player.svelte';
 	import {page} from '$app/stores';
+	import {browser} from '$app/env';
 
 	const transport = new WebSocketTransport(determineBackendURL());
 	const client = new Client(transport);
@@ -20,10 +21,18 @@
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
 		// as when the frontend is bundled with the backend.
-		const url = new URL(`ws://${$page.url.host}/ws`);
+		const url = new URL(`ws://${pageHost()}/ws`);
 		url.port = '8000';
 
 		return url;
+	}
+
+	function pageHost(): string {
+		if (browser) {
+			return new URL(window.location.href).host;
+		} else {
+			return $page.url.host;
+		}
 	}
 </script>
 
