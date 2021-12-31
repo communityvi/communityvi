@@ -11,6 +11,31 @@ defaults:
 env:
   CARGO_TERM_COLOR: always
 jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install NodeJS
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+      - name: Check
+        run: cargo check
+      - name: Check without defaults
+        run: cargo check --no-default-features
+      - name: Check api-docs
+        run: cargo check --features api-docs
+      - name: Check bundle-frontend
+        run: cargo check --features bundle-frontend
+      - name: Check all features
+        run: cargo check --all-features
   lint:
     name: Lint
     runs-on: ubuntu-latest
