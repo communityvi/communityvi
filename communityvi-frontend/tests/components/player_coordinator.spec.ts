@@ -122,9 +122,9 @@ describe('The PlayerCoordinator', () => {
 		});
 
 		it('starts a paused player', async () => {
-			const initialPerformanceNow = 1000;
-
 			await TimeMock.run(async () => {
+				const initialPerformanceNow = performance.now();
+
 				const player = mock<HTMLMediaElement>({
 					paused: true,
 				});
@@ -140,13 +140,13 @@ describe('The PlayerCoordinator', () => {
 
 				expect(player.play).toHaveBeenCalledTimes(1);
 				expect(player.currentTime).toBe((initialPerformanceNow - 42) / 1000);
-			}, initialPerformanceNow);
+			});
 		});
 
 		it('skips an already playing player if new position is above threshold', async () => {
-			const initialPerformanceNow = 1000;
-
 			await TimeMock.run(async () => {
+				const initialPerformanceNow = performance.now();
+
 				const player = mock<HTMLMediaElement>({
 					paused: false,
 					currentTime: 0,
@@ -167,13 +167,13 @@ describe('The PlayerCoordinator', () => {
 				expect(player.play).not.toHaveBeenCalled();
 				expect(player.pause).not.toHaveBeenCalled();
 				expect(player.currentTime).toBe(thresholdMilliseconds / 1000);
-			}, initialPerformanceNow);
+			});
 		});
 
 		it('does not skip an already playing player if the new position is below the threshold', async () => {
-			const initialPerformanceNow = 1000;
-
 			await TimeMock.run(async () => {
+				const initialPerformanceNow = performance.now();
+
 				const player = mock<HTMLMediaElement>({
 					paused: false,
 					currentTime: 0,
@@ -194,7 +194,7 @@ describe('The PlayerCoordinator', () => {
 				expect(player.play).not.toHaveBeenCalled();
 				expect(player.pause).not.toHaveBeenCalled();
 				expect(player.currentTime).toBe(0);
-			}, initialPerformanceNow);
+			});
 		});
 	});
 

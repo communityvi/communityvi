@@ -1,50 +1,48 @@
 /**
  * Test helper for mocking time.
  *
- * Regular time mocking by jest (https://jestjs.io/docs/26.x/timer-mocks) has two shortcomings which this
- * class fixes.
+ * Regular time mocking by jest (https://jestjs.io/docs/timer-mocks) has a problem with scheduling promises in timers.
  *
- * 1. It doesn't support performance.now()
- * 2. When scheduling asynchronous functions in setTimeout or setInterval, jest.advanceTimersByTime does
- *    not guarantee that the function has been run completely.
+ * Namely when scheduling asynchronous functions in setTimeout or setInterval, jest.advanceTimersByTime does not
+ * guarantee that the function has been run completely.
  */
 export default class TimeMock {
-	private readonly originalPerformanceNow: () => DOMTimeStamp | DOMHighResTimeStamp;
-	private nowInMilliseconds: number;
-	private readonly performanceNow = jest.fn(() => this.nowInMilliseconds);
+	private readonly realSetTimeout: typeof setTimeout;
 
-	static async run(test: (timeMock: TimeMock) => Promise<void>, initialNowInMilliseconds = 0): Promise<void> {
-		const timeMock = new TimeMock(initialNowInMilliseconds);
+	static async run(test: (timeMock: TimeMock) => Promise<void>): Promise<void> {
+		const timeMock = new TimeMock();
 		try {
 			await test(timeMock);
 		} finally {
-			timeMock.reset();
+			TimeMock.reset();
 		}
 	}
 
-	private constructor(nowInMilliseconds: number) {
-		this.originalPerformanceNow = performance.now;
-		this.nowInMilliseconds = nowInMilliseconds;
-		performance.now = this.performanceNow;
+	private constructor() {
+		this.realSetTimeout = setTimeout;
 
 		jest.useFakeTimers();
 	}
 
-	private reset(): void {
+	private static reset(): void {
 		jest.clearAllTimers();
 		jest.useRealTimers();
-		performance.now = this.originalPerformanceNow;
 	}
 
 	async advanceTimeByMilliseconds(milliseconds: number): Promise<void> {
-		this.nowInMilliseconds += milliseconds;
 		jest.advanceTimersByTime(milliseconds);
-		await TimeMock.flushPromises();
+		await this.flushPromises();
 	}
 
 	// See: https://stackoverflow.com/questions/52177631/jest-timer-and-promise-dont-work-well-settimeout-and-async-function
-	// NOTE: This is only intended for use in NodeJS, which is the case in the test cases.
-	private static flushPromises(): Promise<void> {
-		return new Promise(resolve => setImmediate(resolve));
+	// https://github.com/sinonjs/fake-timers/issues/114#issuecomment-777238105
+	// and https://github.com/kentor/flush-promises/blob/f33ac564190c784019f1f689dd544187f4b77eb2/index.js
+	//
+	// The setTimeout(resolve, 0) should put the callback at the end of the event queue, behind any currently scheduled
+	// Promises, therefore hopefully resolving only once all previous promises have run.
+	//
+	// Note that setImmediate isn't available anymore since Jest 27
+	private flushPromises(): Promise<void> {
+		return new Promise(resolve => this.realSetTimeout(resolve, 0));
 	}
 }
