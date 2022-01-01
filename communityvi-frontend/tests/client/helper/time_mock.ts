@@ -9,7 +9,8 @@
  *    not guarantee that the function has been run completely.
  */
 export default class TimeMock {
-	private readonly originalPerformanceNow: () => DOMTimeStamp | DOMHighResTimeStamp;
+	private readonly realPerformanceNow: typeof performance.now;
+	private readonly realSetTimeout: typeof setTimeout;
 	private nowInMilliseconds: number;
 	private readonly performanceNow = jest.fn(() => this.nowInMilliseconds);
 
@@ -23,7 +24,8 @@ export default class TimeMock {
 	}
 
 	private constructor(nowInMilliseconds: number) {
-		this.originalPerformanceNow = performance.now;
+		this.realPerformanceNow = performance.now;
+		this.realSetTimeout = setTimeout;
 		this.nowInMilliseconds = nowInMilliseconds;
 		performance.now = this.performanceNow;
 
@@ -33,18 +35,24 @@ export default class TimeMock {
 	private reset(): void {
 		jest.clearAllTimers();
 		jest.useRealTimers();
-		performance.now = this.originalPerformanceNow;
+		performance.now = this.realPerformanceNow;
 	}
 
 	async advanceTimeByMilliseconds(milliseconds: number): Promise<void> {
 		this.nowInMilliseconds += milliseconds;
 		jest.advanceTimersByTime(milliseconds);
-		await TimeMock.flushPromises();
+		await this.flushPromises();
 	}
 
 	// See: https://stackoverflow.com/questions/52177631/jest-timer-and-promise-dont-work-well-settimeout-and-async-function
-	// NOTE: This is only intended for use in NodeJS, which is the case in the test cases.
-	private static flushPromises(): Promise<void> {
-		return new Promise(resolve => setImmediate(resolve));
+	// https://github.com/sinonjs/fake-timers/issues/114#issuecomment-777238105
+	// and https://github.com/kentor/flush-promises/blob/f33ac564190c784019f1f689dd544187f4b77eb2/index.js
+	//
+	// The setTimeout(resolve, 0) should put the callback at the end of the event queue, behind any currently scheduled
+	// Promises, therefore hopefully resolving only once all previous promises have run.
+	//
+	// Note that setImmediate isn't available anymore since Jest 27
+	private flushPromises(): Promise<void> {
+		return new Promise(resolve => this.realSetTimeout(resolve, 0));
 	}
 }
