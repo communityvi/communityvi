@@ -1,45 +1,35 @@
 /**
  * Test helper for mocking time.
  *
- * Regular time mocking by jest (https://jestjs.io/docs/26.x/timer-mocks) has two shortcomings which this
- * class fixes.
+ * Regular time mocking by jest (https://jestjs.io/docs/timer-mocks) has a problem with scheduling promises in timers.
  *
- * 1. It doesn't support performance.now()
- * 2. When scheduling asynchronous functions in setTimeout or setInterval, jest.advanceTimersByTime does
- *    not guarantee that the function has been run completely.
+ * Namely when scheduling asynchronous functions in setTimeout or setInterval, jest.advanceTimersByTime does not
+ * guarantee that the function has been run completely.
  */
 export default class TimeMock {
-	private readonly realPerformanceNow: typeof performance.now;
 	private readonly realSetTimeout: typeof setTimeout;
-	private nowInMilliseconds: number;
-	private readonly performanceNow = jest.fn(() => this.nowInMilliseconds);
 
-	static async run(test: (timeMock: TimeMock) => Promise<void>, initialNowInMilliseconds = 0): Promise<void> {
-		const timeMock = new TimeMock(initialNowInMilliseconds);
+	static async run(test: (timeMock: TimeMock) => Promise<void>): Promise<void> {
+		const timeMock = new TimeMock();
 		try {
 			await test(timeMock);
 		} finally {
-			timeMock.reset();
+			TimeMock.reset();
 		}
 	}
 
-	private constructor(nowInMilliseconds: number) {
-		this.realPerformanceNow = performance.now;
+	private constructor() {
 		this.realSetTimeout = setTimeout;
-		this.nowInMilliseconds = nowInMilliseconds;
-		performance.now = this.performanceNow;
 
 		jest.useFakeTimers();
 	}
 
-	private reset(): void {
+	private static reset(): void {
 		jest.clearAllTimers();
 		jest.useRealTimers();
-		performance.now = this.realPerformanceNow;
 	}
 
 	async advanceTimeByMilliseconds(milliseconds: number): Promise<void> {
-		this.nowInMilliseconds += milliseconds;
 		jest.advanceTimersByTime(milliseconds);
 		await this.flushPromises();
 	}
