@@ -1,11 +1,10 @@
 use crate::server::file_bundle::BundledFileHandler;
-use crate::utils::rust_embed_adapter::RustEmbedAdapter;
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
 use rweb::Reply;
 
 pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
-	let swagger_ui_bundle = BundledFileHandler::new::<RustEmbedAdapter<swagger_ui::Assets>>();
+	let swagger_ui_bundle = BundledFileHandler::new_with_rust_embed5::<swagger_ui::Assets>();
 	rweb::path::end()
 		.or(rweb::path("index.html")) // NOTE: overrides the index.html in the swagger_ui_bundle
 		.map(|_| rweb::reply::html(INDEX_HTML))

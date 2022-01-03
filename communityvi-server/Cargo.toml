@@ -16,7 +16,7 @@ governor = { version = "0.4", default-features = false, features = ["std", "jitt
 hex = '0.4'
 humantime-serde = "1.0"
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
-lazy_static = {version = "1", optional = true}
+lazy_static = "1"
 log = "0.4"
 mime = "0.3"
 mime_guess = {version = "2", default-features = false}
@@ -28,7 +28,7 @@ rust-embed5 = {package = "rust-embed", version = "5", optional = true}
 rweb = { version = "0.15", default-features = false, features = ["openapi", "websocket"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = {version = "0.10", optional = true}
+sha2 = "0.10"
 swagger-ui = {version = "0.1", optional = true}
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
@@ -49,4 +49,4 @@ ignore = "0.4.18"
 [features]
 default = ["api-docs"]
 bundle-frontend = []
-api-docs = ["lazy_static", "rust-embed5", "sha2", "swagger-ui"]
+api-docs = ["rust-embed5", "swagger-ui"]

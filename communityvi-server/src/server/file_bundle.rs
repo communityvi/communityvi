@@ -1,26 +1,39 @@
 use chrono::{DateTime, TimeZone, Utc};
+use lazy_static::lazy_static;
 use mime_guess::MimeGuess;
+use parking_lot::RwLock;
 use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
 use rweb::path::Tail;
 use rweb::{filters, Filter};
+use sha2::{Digest, Sha256};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::convert::Infallible;
+use std::path::{Path, PathBuf};
 
 #[allow(unused)]
 #[derive(Clone)]
 pub struct BundledFileHandler {
-	file_getter: fn(path: &str) -> Option<EmbeddedFile>,
+	file_getter: fn(path: &str) -> Option<BundledFile>,
 }
 
 #[allow(unused)]
 impl BundledFileHandler {
 	/// Creates a new [`BundledFileHandler`] from a [`RustEmbed`] asset type, erasing the type in the process.
-	pub fn new<Bundle: RustEmbed>() -> Self {
+	pub fn new_with_rust_embed<Bundle: RustEmbed>() -> Self {
 		Self {
-			file_getter: Bundle::get,
+			file_getter: |path| Bundle::get(path).map(|file| BundledFile::from_embedded_file(path, file)),
+		}
+	}
+
+	#[cfg(feature = "api-docs")]
+	/// Creates a new [`BundledFileHandler`] from a [`rust_embed5::RustEmbed`] asset type, erasing the type in the process.
+	pub fn new_with_rust_embed5<Bundle: rust_embed5::RustEmbed>() -> Self {
+		Self {
+			file_getter: |path| Bundle::get(path).map(|content| BundledFile::new(path, content)),
 		}
 	}
 
@@ -52,7 +65,7 @@ impl BundledFileHandler {
 
 	fn look_up_file(&self, path: &str) -> Option<BundledFile> {
 		let path = normalize_path(path);
-		(self.file_getter)(path).map(|file| BundledFile::from_embedded_file(path, file))
+		(self.file_getter)(path)
 	}
 }
 
@@ -64,6 +77,16 @@ pub struct BundledFile {
 }
 
 impl BundledFile {
+	fn new(path: &str, content: Cow<'static, [u8]>) -> Self {
+		let hash = cached_sha256(path.as_ref(), &content);
+		Self {
+			path: path.into(),
+			content,
+			hash,
+			last_modified: None,
+		}
+	}
+
 	fn from_embedded_file(path: &str, file: EmbeddedFile) -> Self {
 		Self {
 			path: path.to_string(),
@@ -138,6 +161,25 @@ fn not_modified() -> Response<Body> {
 		.status(STATUS)
 		.body(Body::from(STATUS.canonical_reason().unwrap()))
 		.unwrap()
+}
+
+fn cached_sha256(path: &Path, bytes: &[u8]) -> [u8; 32] {
+	lazy_static! {
+		static ref CACHE: RwLock<HashMap<PathBuf, [u8; 32]>> = RwLock::default();
+	};
+
+	{
+		let cache = CACHE.read();
+		if let Some(&hash) = cache.get(path) {
+			return hash;
+		}
+	}
+
+	*CACHE.write().entry(path.into()).or_insert_with(|| {
+		let mut hasher = Sha256::default();
+		hasher.update(bytes);
+		hasher.finalize().into()
+	})
 }
 
 #[cfg(test)]
@@ -333,7 +375,7 @@ mod test {
 	}
 
 	fn test_handler() -> BundledFileHandler {
-		BundledFileHandler::new::<TestBundle>()
+		BundledFileHandler::new_with_rust_embed::<TestBundle>()
 	}
 
 	fn bundled_file(path: &str) -> BundledFile {
