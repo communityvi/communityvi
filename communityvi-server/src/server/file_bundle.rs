@@ -6,6 +6,7 @@ use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
 use rweb::path::Tail;
 use rweb::{filters, Filter};
+use std::borrow::Cow;
 use std::convert::Infallible;
 
 #[allow(unused)]
@@ -51,48 +52,53 @@ impl BundledFileHandler {
 
 	fn look_up_file(&self, path: &str) -> Option<BundledFile> {
 		let path = normalize_path(path);
-		(self.file_getter)(path).map(|file| BundledFile {
-			file,
-			path: path.to_string(),
-		})
+		(self.file_getter)(path).map(|file| BundledFile::from_embedded_file(path, file))
 	}
 }
 
 pub struct BundledFile {
-	file: EmbeddedFile,
 	path: String,
+	content: Cow<'static, [u8]>,
+	hash: [u8; 32],
+	last_modified: Option<DateTime<Utc>>,
 }
 
 impl BundledFile {
+	fn from_embedded_file(path: &str, file: EmbeddedFile) -> Self {
+		Self {
+			path: path.to_string(),
+			content: file.data,
+			hash: file.metadata.sha256_hash(),
+			last_modified: file
+				.metadata
+				.last_modified()
+				.and_then(|timestamp| i64::try_from(timestamp).ok())
+				.map(|timestamp| Utc.timestamp(timestamp, 0)),
+		}
+	}
+
 	fn to_response(&self) -> Response<Body> {
 		let mime = MimeGuess::from_path(&self.path).first_or_octet_stream();
 		let builder = Response::builder()
 			.status(StatusCode::OK)
 			.header(CONTENT_TYPE, mime.as_ref())
-			.header(CONTENT_LENGTH, self.file.data.len())
+			.header(CONTENT_LENGTH, self.content.len())
 			// Tell browsers to always make the request with If-None-Match instead
 			// of relying on a maximum age.
 			.header(CACHE_CONTROL, "must-revalidate")
 			.header(ETAG, self.etag());
 
-		#[allow(clippy::option_if_let_else)] // False positive, see: https://github.com/rust-lang/rust-clippy/pull/7573
-		let builder = if let Some(last_modified) = self.last_modified() {
+		let builder = if let Some(last_modified) = self.last_modified.map(last_modified_header_value) {
 			builder.header(LAST_MODIFIED, last_modified)
 		} else {
 			builder
 		};
 
-		builder.body(Body::from(self.file.data.clone())).unwrap()
+		builder.body(Body::from(self.content.clone())).unwrap()
 	}
 
 	fn etag(&self) -> String {
-		format!(r#""{}""#, hex::encode(&self.file.metadata.sha256_hash()))
-	}
-
-	fn last_modified(&self) -> Option<String> {
-		let unix_timestamp = i64::try_from(self.file.metadata.last_modified()?).ok()?;
-		let date_time = Utc.timestamp(unix_timestamp, 0);
-		Some(last_modified(date_time))
+		format!(r#""{}""#, hex::encode(&self.hash))
 	}
 
 	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
@@ -104,11 +110,11 @@ impl BundledFile {
 
 	#[cfg(test)]
 	fn content(&self) -> &[u8] {
-		self.file.data.as_ref()
+		self.content.as_ref()
 	}
 }
 
-fn last_modified(date_time: DateTime<Utc>) -> String {
+fn last_modified_header_value(date_time: DateTime<Utc>) -> String {
 	// https://httpwg.org/specs/rfc7231.html#http.date
 	date_time.format("%a, %d %b %Y %H:%M:%S GMT").to_string()
 }
@@ -251,7 +257,7 @@ mod test {
 	fn last_modified_should_have_the_expected_format() {
 		let date_time = Utc.ymd(2021, 10, 12).and_hms(13, 37, 42);
 
-		let last_modified = last_modified(date_time);
+		let last_modified = last_modified_header_value(date_time);
 
 		assert_eq!("Tue, 12 Oct 2021 13:37:42 GMT", last_modified);
 	}
@@ -332,10 +338,7 @@ mod test {
 
 	fn bundled_file(path: &str) -> BundledFile {
 		let file = TestBundle::get(path).unwrap();
-		BundledFile {
-			file,
-			path: path.to_string(),
-		}
+		BundledFile::from_embedded_file(path, file)
 	}
 
 	async fn content(response: Response<Body>) -> Bytes {
