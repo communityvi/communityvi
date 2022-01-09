@@ -1,14 +1,13 @@
-use crate::server::file_bundle::BundledFileHandler;
+use crate::server::file_bundle::{BundledFile, BundledFileHandler};
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
 use rweb::Reply;
+use std::borrow::Cow;
 
 pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
-	let swagger_ui_bundle = BundledFileHandler::new_with_rust_embed5::<swagger_ui::Assets>();
-	rweb::path::end()
-		.or(rweb::path("index.html")) // NOTE: overrides the index.html in the swagger_ui_bundle
-		.map(|_| rweb::reply::html(INDEX_HTML))
-		.or(swagger_ui_bundle.into_rweb_filter().boxed())
+	BundledFileHandler::new_with_rust_embed5::<swagger_ui::Assets>()
+		.with_override(BundledFile::new("index.html", Cow::Borrowed(INDEX_HTML.as_bytes())))
+		.into_rweb_filter()
 		.boxed()
 }
 
