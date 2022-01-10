@@ -5,6 +5,9 @@ authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.
 edition = "2021"
 repository = "https://github.com/communityvi/communityvi"
 
+[workspace]
+members = [".", "hyper-test"]
+
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
