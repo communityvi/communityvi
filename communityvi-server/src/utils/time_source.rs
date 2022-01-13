@@ -436,7 +436,6 @@ mod test {
 		assert_poll(Poll::Ready(()), time_source.wait_for_time_request()).await;
 	}
 
-	#[must_use = "async functions must be awaited."]
 	async fn assert_poll<OutputType: Debug + PartialEq>(
 		expected: Poll<OutputType>,
 		mut future: impl Future<Output = OutputType>,
