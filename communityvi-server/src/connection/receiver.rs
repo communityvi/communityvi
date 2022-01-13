@@ -54,12 +54,11 @@ impl MessageReceiver {
 						.map(|request| request.request_id)
 						.ok();
 					let message = match message_error {
-						MessageError::DeserializationFailed { error, json } => format!(
-							"Failed to deserialize client message with error: {}, message was: {}",
-							error, json
-						),
+						MessageError::DeserializationFailed { error, json } => {
+							format!("Failed to deserialize client message with error: {error}, message was: {json}")
+						}
 						MessageError::WrongMessageType(message) => {
-							format!("Client request has incorrect message type. Message was: {:?}", message)
+							format!("Client request has incorrect message type. Message was: {message:?}")
 						}
 					};
 					error!("{}", message);

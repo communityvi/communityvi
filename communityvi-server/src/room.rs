@@ -116,8 +116,8 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client_and_return_existing(format!("{}", count), message_sender.clone()) {
-				panic!("Failed to add client {}: {}", count, error);
+			if let Err(error) = room.add_client_and_return_existing(format!("{count}"), message_sender.clone()) {
+				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
