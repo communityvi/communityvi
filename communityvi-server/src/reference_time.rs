@@ -40,8 +40,7 @@ mod test {
 		let elapsed = final_time - initial_time;
 		assert!(
 			(1..10).contains(&elapsed.as_millis()),
-			"Expected the elapsed time to be between 1ms and 10ms, but was: {:?}",
-			elapsed
+			"Expected the elapsed time to be between 1ms and 10ms, but was: {elapsed:?}",
 		);
 	}
 
@@ -56,8 +55,7 @@ mod test {
 		let elapsed = final_milliseconds - initial_milliseconds;
 		assert!(
 			(1..10).contains(&u64::from(elapsed)),
-			"Expected the elapsed time to be between 1ms and 10ms, but was: {}ms",
-			elapsed
+			"Expected the elapsed time to be between 1ms and 10ms, but was: {elapsed}ms",
 		);
 	}
 }

@@ -211,7 +211,7 @@ mod test {
 		fn enqueue_client_joined(&mut self, id: UInt) {
 			let message = ClientJoinedBroadcast {
 				id: id.into(),
-				name: format!("{}", id),
+				name: format!("{id}"),
 			};
 			self.enqueue_next(message.into());
 		}
@@ -219,7 +219,7 @@ mod test {
 		fn enqueue_client_left(&mut self, id: UInt) {
 			let message = ClientLeftBroadcast {
 				id: id.try_into().unwrap(),
-				name: format!("{}", id),
+				name: format!("{id}"),
 				reason: LeftReason::Closed,
 			};
 			self.enqueue_next(message.into());
@@ -227,7 +227,7 @@ mod test {
 
 		fn enqueue_medium_state(&mut self, id: ClientId, version: UInt) {
 			let medium_state = MediumStateChangedBroadcast {
-				changed_by_name: format!("{}", id),
+				changed_by_name: format!("{id}"),
 				changed_by_id: id,
 				medium: VersionedMediumBroadcast {
 					version,
@@ -240,8 +240,8 @@ mod test {
 		fn enqueue_chat_message(&mut self, id: ClientId, number: UInt) {
 			let chat_message = ChatBroadcast {
 				sender_id: id,
-				sender_name: format!("{}", id),
-				message: format!("{}", number),
+				sender_name: format!("{id}"),
+				message: format!("{number}"),
 				counter: number,
 			};
 			self.enqueue_next(chat_message.into());

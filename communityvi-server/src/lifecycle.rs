@@ -288,9 +288,8 @@ fn handle_insert_medium_request(
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
-					"Medium version is incorrect. Request had {} but current version is {}.",
-					previous_version,
-					room.medium().version
+					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+					current_version = room.medium().version
 				),
 			})
 		}
@@ -322,9 +321,8 @@ fn handle_play_request(
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
-					"Medium version is incorrect. Request had {} but current version is {}.",
-					previous_version,
-					room.medium().version
+					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+					current_version = room.medium().version
 				),
 			})
 		}
@@ -355,9 +353,8 @@ fn handle_pause_request(
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
-					"Medium version is incorrect. Request had {} but current version is {}.",
-					previous_version,
-					room.medium().version
+					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+					current_version = room.medium().version
 				),
 			})
 		}
@@ -1092,7 +1089,7 @@ mod test {
 		let id = if let SuccessMessage::Hello { id, .. } = response {
 			id
 		} else {
-			panic!("Expected Hello-Response, got '{:?}'", response);
+			panic!("Expected Hello-Response, got '{response:?}'");
 		};
 		assert_eq!(client.id(), id);
 

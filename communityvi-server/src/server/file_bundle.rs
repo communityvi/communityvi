@@ -59,7 +59,7 @@ impl BundledFileHandler {
 	fn look_up_file_falling_back_to_index_html(&self, path: &str) -> Option<BundledFile> {
 		match self.look_up_file(path) {
 			Some(file) => Some(file),
-			None => self.look_up_file(&format!("{}/index.html", path)),
+			None => self.look_up_file(&format!("{path}/index.html")),
 		}
 	}
 
