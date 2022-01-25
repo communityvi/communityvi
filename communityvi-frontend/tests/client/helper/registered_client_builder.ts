@@ -3,7 +3,7 @@ import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_clien
 import {mock} from 'jest-mock-extended';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import type {Connection} from '$lib/client/connection';
-import Faker from 'faker';
+import Faker from '@faker-js/faker';
 import {RESTClient} from '$lib/client/RESTClient';
 
 export class RegisteredClientBuilder {
