@@ -21,7 +21,7 @@ log = "0.4"
 mime = "0.3"
 mime_guess = {version = "2", default-features = false}
 nonzero_ext = "0.3"
-parking_lot = "0.11"
+parking_lot = "0.12"
 pin-project = "1"
 rust-embed = { version = "6", features = ["interpolate-folder-path"] }
 rust-embed5 = {package = "rust-embed", version = "5", optional = true}
