@@ -160,6 +160,7 @@ dependencies = [
  "governor",
  "hex",
  "humantime-serde",
+ "hyper-test",
  "ignore",
  "js_int",
  "lazy_static",

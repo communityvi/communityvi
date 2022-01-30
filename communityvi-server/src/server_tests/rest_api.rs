@@ -1,4 +1,4 @@
-use crate::server_tests::test_filter;
+use crate::server_tests::start_test_server;
 use js_int::{uint, UInt};
 use rweb::http::StatusCode;
 use serde::Deserialize;
@@ -8,40 +8,42 @@ mod api_docs;
 
 #[tokio::test]
 async fn should_return_reference_time() {
-	let filter = test_filter();
-	let response = rweb::test::request()
-		.method("GET")
-		.path("/api/reference-time-milliseconds")
-		.reply(&filter)
-		.await;
+	let http_client = start_test_server();
+	let mut response = http_client
+		.get("/api/reference-time-milliseconds")
+		.send()
+		.await
+		.expect("Request failed.");
 
-	let status_code = response.status();
-	let content = serde_json::from_slice::<UInt>(response.body()).expect("Failed to parse reference time JSON");
+	let reference_time = response
+		.deserialize_json::<UInt>()
+		.await
+		.expect("Failed to parse reference time JSON");
 
-	assert_eq!(status_code, StatusCode::OK);
-	assert!(content >= uint!(0));
-	assert!(content <= uint!(1_000));
+	assert_eq!(response.status(), StatusCode::OK);
+	assert!(reference_time >= uint!(0));
+	assert!(reference_time <= uint!(1_000));
 }
 
 #[tokio::test]
 async fn should_provide_openapi_json() {
-	let filter = test_filter();
-	let response = rweb::test::request()
-		.method("GET")
-		.path("/api/openapi.json")
-		.reply(&filter)
-		.await;
+	let http_client = start_test_server();
+	let mut response = http_client
+		.get("/api/openapi.json")
+		.send()
+		.await
+		.expect("Request failed.");
 
-	let status_code = response.status();
-
-	// custom struct since rweb::openapi::Spec can't be deserialized from it's own serialization ...
+	// custom struct since rweb_server::openapi::Spec can't be deserialized from it's own serialization ...
 	#[derive(Deserialize)]
 	struct OpenApi {
 		openapi: String,
 	}
-	let specification = serde_json::from_slice::<OpenApi>(response.body())
+	let specification = response
+		.deserialize_json::<OpenApi>()
+		.await
 		.expect("Failed to deserialize OpenAPI specification from JSON");
 
-	assert_eq!(status_code, StatusCode::OK);
+	assert_eq!(response.status(), StatusCode::OK);
 	assert!(specification.openapi.starts_with("3."));
 }

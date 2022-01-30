@@ -13,24 +13,31 @@ use crate::server::create_filter;
 use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
 use js_int::uint;
-use rweb::filters::BoxedFilter;
-use rweb::Reply;
-use tokio_tungstenite::tungstenite;
+use rweb::http::header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE};
+use rweb::http::StatusCode;
+use rweb::hyper::service::make_service_fn;
+use rweb::hyper::upgrade;
+use rweb::service;
+use std::convert::Infallible;
+use tokio_tungstenite::tungstenite::protocol::Role;
+use tokio_tungstenite::{tungstenite, WebSocketStream};
+
+type TestClient = hyper_test::Client;
 
 mod rest_api;
 
 #[tokio::test]
 async fn should_respond_to_websocket_messages() {
-	let filter = test_filter();
-	let mut test_client = websocket_test_client(&filter).await;
+	let http_client = start_test_server();
+	let mut test_client = websocket_test_client(&http_client).await;
 	let client_id = register_client("Ferris", &mut test_client).await;
 	assert_eq!(ClientId::from(0), client_id);
 }
 
 #[tokio::test]
 async fn should_not_allow_invalid_messages_during_registration() {
-	let filter = test_filter();
-	let mut test_client = websocket_test_client(&filter).await;
+	let http_client = start_test_server();
+	let mut test_client = websocket_test_client(&http_client).await;
 	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 	test_client.send_raw(invalid_message).await;
 
@@ -45,8 +52,8 @@ async fn should_not_allow_invalid_messages_during_registration() {
 
 #[tokio::test]
 async fn should_not_allow_invalid_messages_after_successful_registration() {
-	let filter = test_filter();
-	let (_client_id, mut test_client) = registered_websocket_test_client("Ferris", &filter).await;
+	let http_client = start_test_server();
+	let (_client_id, mut test_client) = registered_websocket_test_client("Ferris", &http_client).await;
 	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 	test_client.send_raw(invalid_message).await;
 	let response = test_client.receive_error_message(None).await;
@@ -60,14 +67,14 @@ async fn should_not_allow_invalid_messages_after_successful_registration() {
 
 #[tokio::test]
 async fn should_broadcast_messages() {
-	let filter = test_filter();
+	let http_client = start_test_server();
 	let message = r#"Hello everyone \o/"#;
 	let request = ChatRequest {
 		message: message.to_string(),
 	};
-	let (alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &filter).await;
+	let (alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &http_client).await;
 	assert_eq!(ClientId::from(0), alice_client_id);
-	let (bob_client_id, mut bob_test_client) = registered_websocket_test_client("Bob", &filter).await;
+	let (bob_client_id, mut bob_test_client) = registered_websocket_test_client("Bob", &http_client).await;
 	assert_eq!(ClientId::from(1), bob_client_id);
 
 	let expected_bob_joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
@@ -102,9 +109,9 @@ async fn should_broadcast_messages() {
 
 #[tokio::test]
 async fn should_broadcast_when_client_leaves_the_room() {
-	let filter = test_filter();
-	let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &filter).await;
-	let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", &filter).await;
+	let http_client = start_test_server();
+	let (_alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &http_client).await;
+	let (bob_client_id, bob_test_client) = registered_websocket_test_client("Bob", &http_client).await;
 
 	let _bobs_join_message = alice_test_client.receive_broadcast_message().await;
 	std::mem::drop(bob_test_client);
@@ -120,8 +127,8 @@ async fn should_broadcast_when_client_leaves_the_room() {
 
 #[tokio::test]
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
-	let filter = test_filter();
-	let mut test_client = websocket_test_client(&filter).await;
+	let http_client = start_test_server();
+	let mut test_client = websocket_test_client(&http_client).await;
 	test_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
 	let pong = test_client.receive_raw().await;
@@ -133,21 +140,19 @@ async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 async fn test_server_should_serve_bundled_frontend() {
 	use rweb::hyper::StatusCode;
 
-	let filter = test_filter();
-	let response = rweb::test::request().method("GET").path("/").reply(&filter).await;
+	let http_client = start_test_server();
+	let mut response = http_client.get("/").send().await.expect("Request failed.");
 
-	let status_code = response.status();
-	let content = response.body();
-
-	assert_eq!(StatusCode::OK, status_code);
+	let content = response.content().await.expect("Failed to get responsed bytes");
+	assert_eq!(response.status(), StatusCode::OK);
 	assert!(content.starts_with(b"<!DOCTYPE html>"));
 }
 
 async fn registered_websocket_test_client(
 	name: &'static str,
-	filter: &BoxedFilter<(impl Reply + 'static,)>,
+	http_client: &TestClient,
 ) -> (ClientId, WebsocketTestClient) {
-	let mut test_client = websocket_test_client(filter).await;
+	let mut test_client = websocket_test_client(http_client).await;
 	let client_id = register_client(name, &mut test_client).await;
 	(client_id, test_client)
 }
@@ -174,16 +179,27 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 	id
 }
 
-async fn websocket_test_client(filter: &BoxedFilter<(impl Reply + 'static,)>) -> WebsocketTestClient {
-	rweb::test::ws()
-		.path("/ws")
-		.handshake(filter.clone())
+async fn websocket_test_client(http_client: &TestClient) -> WebsocketTestClient {
+	let response = http_client
+		.get("ws://localhost/ws")
+		.header(CONNECTION, "upgrade")
+		.header(UPGRADE, "websocket")
+		.header(SEC_WEBSOCKET_KEY, "dGhlIHNhbXBsZSBub25jZQ==")
+		.header(SEC_WEBSOCKET_VERSION, "13")
+		.send()
 		.await
-		.expect("Websocket handshake failed")
+		.expect("Websocket request failed.");
+	assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
+
+	let upgraded = upgrade::on(response.into_response())
+		.await
+		.expect("Failed to upgrade client websocket.");
+	WebSocketStream::from_raw_socket(upgraded, Role::Client, None)
+		.await
 		.into()
 }
 
-pub(self) fn test_filter() -> BoxedFilter<(impl Reply,)> {
+pub(self) fn start_test_server() -> TestClient {
 	let room = Room::new(ReferenceTimer::default(), 10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
@@ -194,5 +210,11 @@ pub(self) fn test_filter() -> BoxedFilter<(impl Reply,)> {
 	};
 	let time_source = TimeSource::test();
 	let application_context = ApplicationContext::new(configuration, time_source);
-	create_filter(application_context, room)
+
+	let service = service(create_filter(application_context, room));
+	let make_service = make_service_fn(move |_| {
+		let service = service.clone();
+		async move { Ok::<_, Infallible>(service) }
+	});
+	hyper_test::Client::new_with_host(make_service, "localhost").expect("Failed to start test server")
 }
