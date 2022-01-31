@@ -5,6 +5,9 @@ authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.
 edition = "2021"
 repository = "https://github.com/communityvi/communityvi"
 
+[workspace]
+members = [".", "hyper-test"]
+
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
@@ -15,6 +18,7 @@ futures-channel = "0.3.19"
 governor = { version = "0.4", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
+hyper-test = {path = "hyper-test"}
 js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
 lazy_static = "1"
 log = "0.4"
@@ -41,6 +45,7 @@ unicode_skeleton = "0.1"
 [dev-dependencies]
 rand = "0.8"
 async-trait = "0.1.52"
+hyper-test = {path = "hyper-test"}
 
 [build-dependencies]
 npm_rs = "0.2"
