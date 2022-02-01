@@ -1,4 +1,4 @@
-use crate::{connection, ConnectionIncoming, Connector, Host};
+use crate::{connection, ConnectionIncoming, Connector, Executor, Host};
 use hyper::body::HttpBody;
 use hyper::service::Service;
 use hyper::{Body, Request, Response, Server};
@@ -10,7 +10,7 @@ pub fn serve<MakeService, HttpService, ResponseBody, MakeError, MakeFuture>(
 	bind_host: Option<Host>,
 ) -> (
 	hyper::Client<Connector, Body>,
-	hyper::Server<ConnectionIncoming, MakeService>,
+	hyper::Server<ConnectionIncoming, MakeService, Executor>,
 )
 where
 	MakeService:
@@ -26,13 +26,13 @@ where
 {
 	let (sender, receiver) = mpsc::channel(1);
 	let incoming = ConnectionIncoming::new(receiver);
-	let server = Server::builder(incoming).serve(make_service);
+	let server = Server::builder(incoming).executor(Executor).serve(make_service);
 
 	let connector = match bind_host {
 		Some(host) => Connector::new(sender).bind_to_host(host),
 		None => Connector::new(sender),
 	};
-	let client = hyper::client::Client::builder().build(connector);
+	let client = hyper::client::Client::builder().executor(Executor).build(connector);
 
 	(client, server)
 }
