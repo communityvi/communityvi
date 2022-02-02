@@ -3,14 +3,16 @@ updates:
   - package-ecosystem: "npm"
     directory: "/communityvi-frontend/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "saturday"
     allow:
       - dependency-type: "all"
 
   - package-ecosystem: "cargo"
     directory: "/communityvi-server/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "saturday"
     allow:
       - dependency-type: "all"
 
