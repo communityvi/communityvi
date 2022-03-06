@@ -183,4 +183,4 @@ export class ResponseMetadata {
 	}
 }
 
-export type TimeStamp = DOMHighResTimeStamp | DOMTimeStamp;
+export type TimeStamp = DOMHighResTimeStamp;

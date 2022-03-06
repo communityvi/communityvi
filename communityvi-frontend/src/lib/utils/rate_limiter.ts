@@ -1,7 +1,7 @@
 export default class RateLimiter {
 	private readonly intervalInMilliseconds: number;
 
-	private timeOfLastCall: DOMTimeStamp | DOMHighResTimeStamp;
+	private timeOfLastCall: DOMHighResTimeStamp;
 	private pendingTimeout?: NodeJS.Timeout;
 
 	constructor(intervalInMilliseconds: number) {
