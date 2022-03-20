@@ -29,7 +29,7 @@
 		"eslint-plugin-svelte3": "^3.4",
 		"jest": "^27.4.7",
 		"jest-mock-extended": "^2.0.4",
-		"prettier": "~2.5",
+		"prettier": "~2.6",
 		"prettier-plugin-svelte": "^2.6",
 		"sass": "^1.49",
 		"svelte": "^3.46",
