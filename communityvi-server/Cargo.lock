@@ -637,7 +637,8 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 [[package]]
 name = "js_int"
 version = "0.2.2"
-source = "git+https://github.com/ruma/js_int?branch=main#cc8e1a077b46f880e5bb0ed775d662532e118e05"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d937f95470b270ce8b8950207715d71aa8e153c0d44c6684d59397ed4949160a"
 dependencies = [
  "serde",
 ]

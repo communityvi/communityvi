@@ -19,7 +19,7 @@ governor = { version = "0.4", default-features = false, features = ["std", "jitt
 hex = '0.4'
 humantime-serde = "1.0"
 hyper-test = {path = "hyper-test"}
-js_int = {git = "https://github.com/ruma/js_int", branch = "main", features = ["serde", "float_deserialize"]}
+js_int = { version = "0.2.2", features = ["serde", "float_deserialize"]}
 lazy_static = "1"
 log = "0.4"
 mime = "0.3"
