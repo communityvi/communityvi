@@ -1,11 +1,8 @@
 use crate::server::file_bundle::BundledFileHandler;
 use rust_embed::RustEmbed;
-use rweb::filters::BoxedFilter;
-use rweb::Filter;
-use rweb::Reply;
 use std::borrow::Cow;
 
-pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
+pub fn api_docs() -> BundledFileHandler {
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/swagger-ui/node_modules/swagger-ui-dist"]
 	struct SwaggerUi;
@@ -14,8 +11,6 @@ pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 		.with_rust_embed::<SwaggerUi>()
 		.with_file(Cow::Borrowed("index.html"), INDEX_HTML)
 		.build()
-		.into_rweb_filter()
-		.boxed()
 }
 
 // See https://github.com/swagger-api/swagger-ui/blob/8718d4b267921b00fd616755760cc21cf4953ba9/dist/index.html

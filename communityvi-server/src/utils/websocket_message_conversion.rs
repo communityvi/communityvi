@@ -2,48 +2,41 @@ use anyhow::bail;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 
-pub fn rweb_websocket_message_to_tungstenite_message(rweb_message: rweb::ws::Message) -> tungstenite::Message {
-	if let Ok(text) = rweb_message.to_str() {
-		assert!(rweb_message.is_text());
-		return tungstenite::Message::Text(text.into());
-	}
+pub fn axum_websocket_message_to_tungstenite_message(axum_message: axum::extract::ws::Message) -> tungstenite::Message {
+	use axum::extract::ws::CloseFrame;
+	use axum::extract::ws::Message::*;
 
-	if rweb_message.is_binary() {
-		return tungstenite::Message::Binary(rweb_message.into_bytes());
-	}
-
-	if rweb_message.is_ping() {
-		return tungstenite::Message::Ping(rweb_message.into_bytes());
-	}
-
-	if rweb_message.is_pong() {
-		return tungstenite::Message::Pong(rweb_message.into_bytes());
-	}
-
-	if rweb_message.is_close() {
-		return match rweb_message.close_frame() {
-			Some((code, reason)) => tungstenite::Message::Close(Some(CloseFrame {
+	match axum_message {
+		Text(text) => tungstenite::Message::Text(text),
+		Binary(data) => tungstenite::Message::Binary(data),
+		Ping(data) => tungstenite::Message::Ping(data),
+		Pong(data) => tungstenite::Message::Pong(data),
+		Close(Some(CloseFrame { code, reason })) => {
+			tungstenite::Message::Close(Some(tungstenite::protocol::CloseFrame {
 				code: code.into(),
-				reason: reason.to_string().into(),
-			})),
-			None => tungstenite::Message::Close(None),
-		};
+				reason,
+			}))
+		}
+		Close(None) => tungstenite::Message::Close(None),
 	}
-
-	unreachable!("Unknown type of rweb message: {:?}", rweb_message);
 }
 
-pub fn tungstenite_message_to_rweb_websocket_message(
+pub fn tungstenite_message_to_axum_websocket_message(
 	tungstenite_message: tungstenite::Message,
-) -> anyhow::Result<rweb::ws::Message> {
+) -> anyhow::Result<axum::extract::ws::Message> {
+	use axum::extract::ws;
 	use tungstenite::Message::*;
+
 	Ok(match tungstenite_message {
-		Text(text) => rweb::ws::Message::text(text),
-		Binary(data) => rweb::ws::Message::binary(data),
-		Ping(data) => rweb::ws::Message::ping(data),
-		Pong(data) => rweb::ws::Message::pong(data),
-		Close(Some(frame)) => rweb::ws::Message::close_with(frame.code, frame.reason),
-		Close(None) => rweb::ws::Message::close(),
-		Frame(_frame) => bail!("Websocket frames are not supported by rweb at the moment"),
+		Text(text) => ws::Message::Text(text),
+		Binary(data) => ws::Message::Binary(data),
+		Ping(data) => ws::Message::Ping(data),
+		Pong(data) => ws::Message::Pong(data),
+		Close(Some(CloseFrame { code, reason })) => ws::Message::Close(Some(ws::CloseFrame {
+			code: code.into(),
+			reason,
+		})),
+		Close(None) => ws::Message::Close(None),
+		Frame(_frame) => bail!("Websocket frames are not supported by axum at the moment"),
 	})
 }

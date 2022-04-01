@@ -1,18 +1,18 @@
+use axum::body::{Body, HttpBody};
+use axum::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
+use axum::http::{HeaderMap, Request, Response, StatusCode};
+use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use hyper::body::Bytes;
 use mime::Mime;
 use mime_guess::MimeGuess;
 use rust_embed::{EmbeddedFile, RustEmbed};
-use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
-use rweb::http::{HeaderMap, Response, StatusCode};
-use rweb::hyper::Body;
-use rweb::path::Tail;
-use rweb::{filters, hyper, Filter};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use tower_service::Service;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -24,12 +24,6 @@ pub struct BundledFileHandler {
 impl BundledFileHandler {
 	pub fn builder() -> BundledFileHandlerBuilder {
 		BundledFileHandlerBuilder::default()
-	}
-
-	pub fn into_rweb_filter(self) -> impl Filter<Extract = (Response<Body>,), Error = Infallible> {
-		filters::path::tail()
-			.and(filters::header::headers_cloned())
-			.map(move |path: Tail, headers: HeaderMap| self.request(path.as_str(), &headers))
 	}
 
 	pub fn request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {
@@ -87,6 +81,25 @@ impl BundledFileHandlerBuilder {
 		BundledFileHandler {
 			files_by_path: Arc::new(self.files_by_path),
 		}
+	}
+}
+
+impl<B> Service<Request<B>> for BundledFileHandler
+where
+	B: HttpBody + Send + 'static,
+{
+	type Response = Response<Body>;
+	type Error = Infallible;
+	type Future = std::future::Ready<Result<Self::Response, Self::Error>>;
+
+	fn poll_ready(&mut self, _context: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		Poll::Ready(Ok(()))
+	}
+
+	fn call(&mut self, request: Request<B>) -> Self::Future {
+		let path = request.uri().path();
+		let headers = request.headers();
+		std::future::ready(Ok(self.request(path, headers)))
 	}
 }
 
@@ -195,8 +208,9 @@ fn hash_sha256(bytes: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use rweb::http::HeaderValue;
-	use rweb::hyper::body::Bytes;
+	use axum::body::Bytes;
+	use axum::http::HeaderValue;
+	use hyper_test::hyper;
 
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/test/bundled_files"]
@@ -413,6 +427,6 @@ mod test {
 	}
 
 	async fn response_content(response: Response<Body>) -> Bytes {
-		rweb::hyper::body::to_bytes(response.into_body()).await.unwrap()
+		hyper::body::to_bytes(response.into_body()).await.unwrap()
 	}
 }

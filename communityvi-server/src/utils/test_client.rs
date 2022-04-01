@@ -9,15 +9,11 @@ use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use crate::room::client::Client;
 use crate::room::Room;
-use crate::utils::websocket_message_conversion::{
-	rweb_websocket_message_to_tungstenite_message, tungstenite_message_to_rweb_websocket_message,
-};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures_channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 use js_int::UInt;
-use rweb::test::WsClient;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -156,20 +152,6 @@ where
 pub trait WebSocketClient {
 	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()>;
 	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage>;
-}
-
-#[async_trait]
-impl WebSocketClient for WsClient {
-	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {
-		let rweb_message = tungstenite_message_to_rweb_websocket_message(message)?;
-		self.send(rweb_message).await;
-		Ok(())
-	}
-
-	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage> {
-		let rweb_message = self.recv().await?;
-		Ok(rweb_websocket_message_to_tungstenite_message(rweb_message))
-	}
 }
 
 #[async_trait]
