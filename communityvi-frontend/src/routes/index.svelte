@@ -1,7 +1,3 @@
-<script context="module" lang="ts">
-	export const prerender = true;
-</script>
-
 <script lang="ts">
 	import Registration from '$lib/components/Registration.svelte';
 	import {WebSocketTransport} from '$lib/client/transport';

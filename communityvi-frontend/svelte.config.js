@@ -9,6 +9,9 @@ const config = {
 
 	kit: {
 		adapter: static_adapter(),
+		prerender: {
+			default: true,
+		},
 	},
 };
 
