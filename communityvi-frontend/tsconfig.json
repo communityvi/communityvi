@@ -1,9 +1,12 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
+		"moduleResolution": "node",
+		"esModuleInterop": true,
+		"lib": ["DOM"],
+		"target": "ES2022",
 		"strict": true,
 		"noImplicitReturns": true,
-		"module": "es2022",
 		"importsNotUsedAsValues": "remove",
 		"preserveValueImports": false,
 		"paths": {
