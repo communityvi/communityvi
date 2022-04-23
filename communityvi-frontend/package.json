@@ -31,7 +31,7 @@
 		"jest-mock-extended": "^2.0.4",
 		"prettier": "~2.6",
 		"prettier-plugin-svelte": "^2.6",
-		"sass": "^1.49",
+		"sass": "^1.50",
 		"svelte": "^3.46",
 		"svelte-check": "^2.4",
 		"svelte-jester": "^2.3.1",
