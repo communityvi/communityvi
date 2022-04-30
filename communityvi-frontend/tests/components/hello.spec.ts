@@ -1,3 +1,7 @@
+/*
+ * @jest-environment jsdom
+ */
+
 import Hello from '$lib/components/Hello.svelte';
 import {render} from '@testing-library/svelte';
 import '@testing-library/jest-dom';
