@@ -26,6 +26,9 @@ jobs:
         with:
           toolchain: stable
           default: true
+      - uses: Swatinem/rust-cache@v1
+        with:
+          target-dir: ./communityvi-server
       - name: Check
         run: cargo check --all
       - name: Check without defaults
@@ -48,6 +51,9 @@ jobs:
           toolchain: stable
           default: true
           components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          target-dir: ./communityvi-server
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -71,6 +77,9 @@ jobs:
           toolchain: stable
           default: true
           components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          target-dir: ./communityvi-server
       - name: Build
         run: cargo build --all
       - name: Run tests
