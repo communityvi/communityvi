@@ -37,7 +37,7 @@ swagger-ui = {version = "0.1", optional = true}
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
-tokio-tungstenite = "0.16"
+tokio-tungstenite = "0.17"
 toml = "0.5"
 typed-builder = "0.10"
 unicode_skeleton = "0.1"

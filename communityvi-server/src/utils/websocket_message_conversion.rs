@@ -1,3 +1,4 @@
+use anyhow::bail;
 use tokio_tungstenite::tungstenite;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 
@@ -32,14 +33,17 @@ pub fn rweb_websocket_message_to_tungstenite_message(rweb_message: rweb::ws::Mes
 	unreachable!("Unknown type of rweb message: {:?}", rweb_message);
 }
 
-pub fn tungstenite_message_to_rweb_websocket_message(tungstenite_message: tungstenite::Message) -> rweb::ws::Message {
+pub fn tungstenite_message_to_rweb_websocket_message(
+	tungstenite_message: tungstenite::Message,
+) -> anyhow::Result<rweb::ws::Message> {
 	use tungstenite::Message::*;
-	match tungstenite_message {
+	Ok(match tungstenite_message {
 		Text(text) => rweb::ws::Message::text(text),
 		Binary(data) => rweb::ws::Message::binary(data),
 		Ping(data) => rweb::ws::Message::ping(data),
 		Pong(data) => rweb::ws::Message::pong(data),
 		Close(Some(frame)) => rweb::ws::Message::close_with(frame.code, frame.reason),
 		Close(None) => rweb::ws::Message::close(),
-	}
+		Frame(_frame) => bail!("Websocket frames are not supported by rweb at the moment"),
+	})
 }

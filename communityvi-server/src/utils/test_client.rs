@@ -161,7 +161,7 @@ pub trait WebSocketClient {
 #[async_trait]
 impl WebSocketClient for WsClient {
 	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()> {
-		let rweb_message = tungstenite_message_to_rweb_websocket_message(message);
+		let rweb_message = tungstenite_message_to_rweb_websocket_message(message)?;
 		self.send(rweb_message).await;
 		Ok(())
 	}
