@@ -49,8 +49,7 @@ fn websocket_filter(application_context: ApplicationContext, room: Room) -> Boxe
 						let (sink, stream) = websocket.split();
 
 						let message_sender = MessageSender::from(
-							sink.with(|message| ready(tungstenite_message_to_rweb_websocket_message(message)))
-								.sink_map_err(Into::into),
+							sink.with(|message| ready(tungstenite_message_to_rweb_websocket_message(message))),
 						);
 						let message_receiver = MessageReceiver::new(
 							stream
