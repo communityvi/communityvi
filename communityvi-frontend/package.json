@@ -20,7 +20,7 @@
 		"@sveltejs/kit": "next",
 		"@testing-library/jest-dom": "^5.16",
 		"@testing-library/svelte": "^3.0",
-		"@faker-js/faker": "^6.0.0-alpha.5",
+		"@faker-js/faker": "^7.1.0",
 		"@typescript-eslint/eslint-plugin": "^5.10",
 		"@typescript-eslint/parser": "^5.10",
 		"bulma": "^0.9",
