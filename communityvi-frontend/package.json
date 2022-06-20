@@ -30,7 +30,7 @@
 		"jest": "^28.1.0",
 		"jest-environment-jsdom": "^28.1.0",
 		"jest-mock-extended": "^2.0.6",
-		"prettier": "~2.6",
+		"prettier": "~2.7",
 		"prettier-plugin-svelte": "^2.6",
 		"sass": "^1.49",
 		"svelte": "^3.46",
