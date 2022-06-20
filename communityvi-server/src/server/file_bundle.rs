@@ -1,5 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
+use mime::Mime;
 use mime_guess::MimeGuess;
 use parking_lot::RwLock;
 use rust_embed::{EmbeddedFile, RustEmbed};
@@ -13,11 +14,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[allow(unused)]
 #[derive(Clone)]
 pub struct BundledFileHandler {
-	file_getter: fn(path: &str) -> Option<BundledFile>,
+	file_getter: Arc<dyn Fn(&str) -> Option<BundledFile> + Send + Sync>,
 }
 
 #[allow(unused)]
@@ -25,7 +27,7 @@ impl BundledFileHandler {
 	/// Creates a new [`BundledFileHandler`] from a [`RustEmbed`] asset type, erasing the type in the process.
 	pub fn new_with_rust_embed<Bundle: RustEmbed>() -> Self {
 		Self {
-			file_getter: |path| Bundle::get(path).map(|file| BundledFile::from_embedded_file(path, file)),
+			file_getter: Arc::new(|path| Bundle::get(path).map(|file| BundledFile::from_embedded_file(path, file))),
 		}
 	}
 
@@ -33,7 +35,21 @@ impl BundledFileHandler {
 	/// Creates a new [`BundledFileHandler`] from a [`rust_embed5::RustEmbed`] asset type, erasing the type in the process.
 	pub fn new_with_rust_embed5<Bundle: rust_embed5::RustEmbed>() -> Self {
 		Self {
-			file_getter: |path| Bundle::get(path).map(|content| BundledFile::new(path, content)),
+			file_getter: Arc::new(|path| Bundle::get(path).map(|content| BundledFile::new(path, content))),
+		}
+	}
+
+	pub fn with_override(self, file: BundledFile) -> Self {
+		let Self { file_getter } = self;
+
+		Self {
+			file_getter: Arc::new(move |path| {
+				if path == file.path {
+					Some(file.clone())
+				} else {
+					file_getter(path)
+				}
+			}),
 		}
 	}
 
@@ -53,7 +69,7 @@ impl BundledFileHandler {
 			return not_modified();
 		}
 
-		file.to_response()
+		file.into_response()
 	}
 
 	fn look_up_file_falling_back_to_index_html(&self, path: &str) -> Option<BundledFile> {
@@ -69,6 +85,7 @@ impl BundledFileHandler {
 	}
 }
 
+#[derive(Clone)]
 pub struct BundledFile {
 	path: String,
 	content: Cow<'static, [u8]>,
@@ -77,7 +94,7 @@ pub struct BundledFile {
 }
 
 impl BundledFile {
-	fn new(path: &str, content: Cow<'static, [u8]>) -> Self {
+	pub fn new(path: &str, content: Cow<'static, [u8]>) -> Self {
 		let hash = cached_sha256(path.as_ref(), &content);
 		Self {
 			path: path.into(),
@@ -100,11 +117,10 @@ impl BundledFile {
 		}
 	}
 
-	fn to_response(&self) -> Response<Body> {
-		let mime = MimeGuess::from_path(&self.path).first_or_octet_stream();
+	fn into_response(self) -> Response<Body> {
 		let builder = Response::builder()
 			.status(StatusCode::OK)
-			.header(CONTENT_TYPE, mime.as_ref())
+			.header(CONTENT_TYPE, self.mime_type().as_ref())
 			.header(CONTENT_LENGTH, self.content.len())
 			// Tell browsers to always make the request with If-None-Match instead
 			// of relying on a maximum age.
@@ -117,7 +133,11 @@ impl BundledFile {
 			builder
 		};
 
-		builder.body(Body::from(self.content.clone())).unwrap()
+		builder.body(Body::from(self.content)).unwrap()
+	}
+
+	fn mime_type(&self) -> Mime {
+		MimeGuess::from_path(&self.path).first_or_octet_stream()
 	}
 
 	fn etag(&self) -> String {
@@ -129,11 +149,6 @@ impl BundledFile {
 			Some(if_none_match) => &self.etag() == if_none_match,
 			None => false,
 		}
-	}
-
-	#[cfg(test)]
-	fn content(&self) -> &[u8] {
-		self.content.as_ref()
 	}
 }
 
@@ -195,12 +210,13 @@ mod test {
 	#[tokio::test]
 	async fn request_handler_should_return_files() {
 		let index = bundled_file("index.html");
+		let expected_content = index.content;
 
 		let response = test_handler().request("index.html", &HeaderMap::default());
 		let status_code = response.status();
-		let content = content(response).await;
+		let content = response_content(response).await;
 
-		assert_eq!(index.content(), content);
+		assert_eq!(expected_content.as_ref(), content);
 		assert_eq!(StatusCode::OK, status_code);
 	}
 
@@ -248,17 +264,18 @@ mod test {
 	#[tokio::test]
 	async fn request_handler_should_normalize_path() {
 		let index = bundled_file("index.html");
+		let content = index.content;
 
 		let response = test_handler().request("/index.html/", &HeaderMap::default());
 
-		assert_eq!(index.content(), content(response).await);
+		assert_eq!(content.as_ref(), response_content(response).await);
 	}
 
 	#[test]
 	fn ok_responses_should_contain_the_expected_cache_control_header() {
 		let file = bundled_file("index.html");
 
-		let response = file.to_response();
+		let response = file.into_response();
 		let headers = response.headers();
 
 		assert_eq!("must-revalidate", headers[CACHE_CONTROL]);
@@ -267,29 +284,31 @@ mod test {
 	#[test]
 	fn ok_responses_should_contain_the_expected_content_headers() {
 		let file = bundled_file("index.html");
+		let content = file.content.clone();
 
-		let response = file.to_response();
+		let response = file.into_response();
 		let headers = response.headers();
 
 		assert_eq!("text/html", headers[CONTENT_TYPE]);
-		assert_eq!(file.content().len().to_string(), headers[CONTENT_LENGTH]);
+		assert_eq!(content.len().to_string(), headers[CONTENT_LENGTH]);
 	}
 
 	#[test]
 	fn ok_responses_should_have_an_etag_header() {
 		let file = bundled_file("index.html");
+		let etag = file.etag();
 
-		let response = file.to_response();
+		let response = file.into_response();
 		let headers = response.headers();
 
-		assert_eq!(file.etag().as_bytes(), headers[ETAG].as_bytes());
+		assert_eq!(etag.as_bytes(), headers[ETAG].as_bytes());
 	}
 
 	#[test]
 	fn ok_responses_should_have_a_last_modified_header() {
 		let file = bundled_file("index.html");
 
-		let response = file.to_response();
+		let response = file.into_response();
 		let headers = response.headers();
 
 		assert!(headers.contains_key(LAST_MODIFIED));
@@ -307,17 +326,18 @@ mod test {
 	#[tokio::test]
 	async fn ok_response_should_contain_the_content() {
 		let file = bundled_file("index.html");
+		let content = file.content.clone();
 
-		let response = file.to_response();
+		let response = file.into_response();
 
-		assert_eq!(file.content(), content(response).await);
+		assert_eq!(content.as_ref(), response_content(response).await);
 	}
 
 	#[test]
 	fn ok_response_should_have_the_correct_status_code() {
 		let file = bundled_file("index.html");
 
-		let response = file.to_response();
+		let response = file.into_response();
 		let status_code = response.status();
 
 		assert_eq!(StatusCode::OK, status_code);
@@ -336,7 +356,7 @@ mod test {
 	async fn not_modified_response_should_have_explanatory_content() {
 		let response = not_modified();
 
-		assert_eq!("Not Modified", content(response).await);
+		assert_eq!("Not Modified", response_content(response).await);
 	}
 
 	#[test]
@@ -361,7 +381,7 @@ mod test {
 	async fn not_found_response_should_have_explanatory_content() {
 		let response = not_found();
 
-		assert_eq!("Not Found", content(response).await);
+		assert_eq!("Not Found", response_content(response).await);
 	}
 
 	#[test]
@@ -383,7 +403,7 @@ mod test {
 		BundledFile::from_embedded_file(path, file)
 	}
 
-	async fn content(response: Response<Body>) -> Bytes {
+	async fn response_content(response: Response<Body>) -> Bytes {
 		rweb::hyper::body::to_bytes(response.into_body()).await.unwrap()
 	}
 }
