@@ -75,5 +75,5 @@ jobs:
         run: cargo build --all
       - name: Run tests
         run: cargo test --all
-      - name: Run tests with bundled frontend
-        run: cargo test --all --features bundle-frontend
+      - name: Run tests with bundled frontend and api-docs
+        run: cargo test --all --features bundle-frontend,api-docs
