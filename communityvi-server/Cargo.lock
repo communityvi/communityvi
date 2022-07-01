@@ -181,13 +181,11 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "rand",
- "rust-embed 5.9.0",
- "rust-embed 6.4.0",
+ "rust-embed",
  "rweb",
  "serde",
  "serde_json",
  "sha2 0.10.2",
- "swagger-ui",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -980,37 +978,12 @@ checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "rust-embed"
-version = "5.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fe1fe6aac5d6bb9e1ffd81002340363272a7648234ec7bdfac5ee202cb65523"
-dependencies = [
- "rust-embed-impl 5.9.0",
- "rust-embed-utils 5.1.0",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed"
 version = "6.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a17e5ac65b318f397182ae94e532da0ba56b88dd1200b774715d36c4943b1c3"
 dependencies = [
- "rust-embed-impl 6.2.0",
- "rust-embed-utils 7.2.0",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed-impl"
-version = "5.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ed91c41c42ef7bf687384439c312e75e0da9c149b0390889b94de3c7d9d9e66"
-dependencies = [
- "proc-macro2",
- "quote",
- "rust-embed-utils 5.1.0",
- "shellexpand",
- "syn",
+ "rust-embed-impl",
+ "rust-embed-utils",
  "walkdir",
 ]
 
@@ -1022,18 +995,9 @@ checksum = "94e763e24ba2bf0c72bc6be883f967f794a019fafd1b86ba1daff9c91a7edd30"
 dependencies = [
  "proc-macro2",
  "quote",
- "rust-embed-utils 7.2.0",
+ "rust-embed-utils",
  "shellexpand",
  "syn",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed-utils"
-version = "5.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a512219132473ab0a77b52077059f1c47ce4af7fbdc94503e9862a34422876d"
-dependencies = [
  "walkdir",
 ]
 
@@ -1263,17 +1227,6 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
-
-[[package]]
-name = "swagger-ui"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7a59ee5a3b7e7310ec7b20be06090c0ed3019590cfea6e99cb4d26c4c45cc2c"
-dependencies = [
- "rust-embed 5.9.0",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "syn"
