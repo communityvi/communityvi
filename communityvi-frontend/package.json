@@ -28,7 +28,7 @@
 		"eslint-config-prettier": "^8.1",
 		"eslint-plugin-svelte3": "^4.0",
 		"jest": "^28.1.0",
-		"jest-environment-jsdom": "^28.1.0",
+		"jest-environment-jsdom": "^28.1.2",
 		"jest-mock-extended": "^2.0.6",
 		"prettier": "~2.7",
 		"prettier-plugin-svelte": "^2.6",
