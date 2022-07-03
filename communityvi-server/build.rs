@@ -4,28 +4,60 @@ use std::env;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let frontend_path = Path::new("../communityvi-frontend");
-	match env::var("CARGO_FEATURE_BUNDLE_FRONTEND") {
-		Ok(_) => {
-			if is_debug_profile() {
-				limit_rerun_to_frontend_changes(frontend_path);
-			}
-
-			let exit_status = NpmEnv::default()
-				.set_path(frontend_path)
-				.init_env()
-				.install(None)
-				.run("build")
-				.exec()?;
-			if !exit_status.success() {
-				return Err("Npm build failed".into());
-			}
-		}
-		Err(_) => {
-			// don't always rerun build.rs
-			println!("cargo:rerun-if-changed=build.rs")
-		}
+	let should_bundle_frontend = env::var("CARGO_FEATURE_BUNDLE_FRONTEND").is_ok();
+	let should_bundle_swagger_ui = env::var("CARGO_FEATURE_API_DOCS").is_ok();
+	if should_bundle_frontend {
+		bundle_frontend()?;
 	}
+
+	if should_bundle_swagger_ui {
+		bundle_swagger_ui()?;
+	}
+
+	if !should_bundle_frontend && !should_bundle_swagger_ui {
+		// don't always rerun build.rs
+		println!("cargo:rerun-if-changed=build.rs")
+	}
+
+	Ok(())
+}
+
+fn bundle_frontend() -> Result<(), Box<dyn std::error::Error>> {
+	let frontend_path = Path::new("../communityvi-frontend");
+
+	if is_debug_profile() {
+		limit_rerun_to_frontend_changes(frontend_path);
+	}
+
+	let exit_status = NpmEnv::default()
+		.set_path(frontend_path)
+		.init_env()
+		.install(None)
+		.run("build")
+		.exec()?;
+	if !exit_status.success() {
+		return Err("Npm build of frontend failed".into());
+	}
+
+	Ok(())
+}
+
+fn bundle_swagger_ui() -> Result<(), Box<dyn std::error::Error>> {
+	let swagger_ui_path = Path::new("swagger-ui");
+
+	if is_debug_profile() {
+		limit_rerun_to_frontend_changes(swagger_ui_path);
+	}
+
+	let exit_status = NpmEnv::default()
+		.set_path(swagger_ui_path)
+		.init_env()
+		.install(None)
+		.exec()?;
+	if !exit_status.success() {
+		return Err("Npm install of swagger-ui failed".into());
+	}
+
 	Ok(())
 }
 

@@ -8,6 +8,14 @@ updates:
     allow:
       - dependency-type: "all"
 
+  - package-ecosystem: "npm"
+    directory: "/communityvi-server/swagger-ui"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    allow:
+      - dependency-type: "all"
+
   - package-ecosystem: "cargo"
     directory: "/communityvi-server/"
     schedule:

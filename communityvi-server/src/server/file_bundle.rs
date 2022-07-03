@@ -31,14 +31,6 @@ impl BundledFileHandler {
 		}
 	}
 
-	#[cfg(feature = "api-docs")]
-	/// Creates a new [`BundledFileHandler`] from a [`rust_embed5::RustEmbed`] asset type, erasing the type in the process.
-	pub fn new_with_rust_embed5<Bundle: rust_embed5::RustEmbed>() -> Self {
-		Self {
-			file_getter: Arc::new(|path| Bundle::get(path).map(|content| BundledFile::new(path, content))),
-		}
-	}
-
 	pub fn with_override(self, file: BundledFile) -> Self {
 		let Self { file_getter } = self;
 

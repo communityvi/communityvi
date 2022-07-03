@@ -28,12 +28,10 @@ nonzero_ext = "0.3"
 parking_lot = "0.12"
 pin-project = "1"
 rust-embed = { version = "6", features = ["interpolate-folder-path"] }
-rust-embed5 = {package = "rust-embed", version = "5", optional = true}
 rweb = { version = "0.15", default-features = false, features = ["openapi", "websocket"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
-swagger-ui = {version = "0.1", optional = true}
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
@@ -52,6 +50,8 @@ npm_rs = "0.2"
 ignore = "0.4.18"
 
 [features]
-default = ["api-docs"]
+default = []
+# Bundle the JS frontend.
 bundle-frontend = []
-api-docs = ["rust-embed5", "swagger-ui"]
+# Bundle Swagger-UI
+api-docs = []
