@@ -3,15 +3,15 @@ import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_clien
 import {mock} from 'jest-mock-extended';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import type {Connection} from '$lib/client/connection';
-import Faker from '@faker-js/faker';
+import {faker} from '@faker-js/faker';
 import {RESTClient} from '$lib/client/RESTClient';
 
 export class RegisteredClientBuilder {
-	private storedID = Faker.datatype.number({min: 0});
-	private storedName = Faker.internet.userName();
+	private storedID = faker.datatype.number({min: 0});
+	private storedName = faker.internet.userName();
 	private storedReferenceTimeOffset = 0;
 	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer;
-	private storedVersionedMedium = new VersionedMedium(Faker.datatype.number({min: 0}));
+	private storedVersionedMedium = new VersionedMedium(faker.datatype.number({min: 0}));
 	private storedPeers = new Array<Peer>();
 	private storedRestClient: RESTClient = mock<RESTClient>();
 	private storedConnection: Connection = mock<Connection>();
