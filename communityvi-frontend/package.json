@@ -4,9 +4,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"watch": "svelte-kit dev",
-		"build": "svelte-kit build",
-		"preview": "svelte-kit preview",
+		"watch": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
 		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings --fail-on-hints && echo 'Svelte validate OK!'",
 		"lint:fix": "prettier -w --plugin-search-dir=. . && eslint --ignore-path .gitignore . --fix && echo 'ESLint Fixed!'",
 		"test": "jest tests",
@@ -15,12 +15,12 @@
 		"format": "prettier --write --plugin-search-dir=. ."
 	},
 	"devDependencies": {
+		"@faker-js/faker": "^7.3.0",
 		"@fortawesome/fontawesome-free": "^6.0.0",
 		"@sveltejs/adapter-static": "next",
 		"@sveltejs/kit": "next",
 		"@testing-library/jest-dom": "^5.16",
 		"@testing-library/svelte": "^3.0",
-		"@faker-js/faker": "^7.3.0",
 		"@typescript-eslint/eslint-plugin": "^5.10",
 		"@typescript-eslint/parser": "^5.10",
 		"bulma": "^0.9",
@@ -39,6 +39,7 @@
 		"svelte-preprocess": "^4.10",
 		"ts-jest": "^28.0.0",
 		"tslib": "^2.3",
-		"typescript": "^4.6"
+		"typescript": "^4.6",
+		"vite": "^2.9.14"
 	}
 }
