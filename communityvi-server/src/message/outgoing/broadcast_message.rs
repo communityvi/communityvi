@@ -5,7 +5,7 @@ use crate::room::medium::{Medium, VersionedMedium};
 use js_int::UInt;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BroadcastMessage {
@@ -25,7 +25,7 @@ macro_rules! broadcast_from_struct {
 	};
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientJoinedBroadcast {
 	pub id: ClientId,
 	pub name: String,
@@ -33,14 +33,14 @@ pub struct ClientJoinedBroadcast {
 
 broadcast_from_struct!(ClientJoined, ClientJoinedBroadcast);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientLeftBroadcast {
 	pub id: ClientId,
 	pub name: String,
 	pub reason: LeftReason,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LeftReason {
 	Closed,
@@ -49,7 +49,7 @@ pub enum LeftReason {
 
 broadcast_from_struct!(ClientLeft, ClientLeftBroadcast);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatBroadcast {
 	pub sender_id: ClientId,
 	pub sender_name: String,
@@ -59,14 +59,14 @@ pub struct ChatBroadcast {
 
 broadcast_from_struct!(Chat, ChatBroadcast);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MediumStateChangedBroadcast {
 	pub changed_by_name: String,
 	pub changed_by_id: ClientId,
 	pub medium: VersionedMediumBroadcast,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct VersionedMediumBroadcast {
 	pub version: UInt,
 	#[serde(flatten)]
@@ -82,7 +82,7 @@ impl VersionedMediumBroadcast {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum MediumBroadcast {

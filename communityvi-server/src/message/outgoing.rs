@@ -9,7 +9,7 @@ pub mod broadcast_message;
 pub mod error_message;
 pub mod success_message;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum OutgoingMessage {
