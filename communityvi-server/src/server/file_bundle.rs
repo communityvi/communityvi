@@ -16,10 +16,12 @@ use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+type FileGetter = Arc<dyn Fn(&str) -> Option<BundledFile> + Send + Sync>;
+
 #[allow(unused)]
 #[derive(Clone)]
 pub struct BundledFileHandler {
-	file_getter: Arc<dyn Fn(&str) -> Option<BundledFile> + Send + Sync>,
+	file_getter: FileGetter,
 }
 
 #[allow(unused)]

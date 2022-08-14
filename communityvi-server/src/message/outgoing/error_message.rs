@@ -2,13 +2,13 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, TypedBuilder)]
 pub struct ErrorMessage {
 	pub error: ErrorMessageType,
 	pub message: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorMessageType {
 	InvalidFormat,

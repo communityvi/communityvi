@@ -6,7 +6,7 @@ use crate::room::client_id::ClientId;
 use crate::room::medium::playback_state::PlaybackState;
 use crate::room::medium::{Medium, VersionedMedium};
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum SuccessMessage {
@@ -18,7 +18,7 @@ pub enum SuccessMessage {
 	Success,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientResponse {
 	pub id: ClientId,
 	pub name: String,
@@ -33,14 +33,14 @@ impl From<Client> for ClientResponse {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct VersionedMediumResponse {
 	pub version: UInt,
 	#[serde(flatten)]
 	pub medium: MediumResponse,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum MediumResponse {
@@ -52,7 +52,7 @@ pub enum MediumResponse {
 	Empty,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum PlaybackStateResponse {

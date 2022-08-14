@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use thiserror::Error;
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Configuration {
 	#[serde(with = "socket_addr_deserializer")]
 	pub address: SocketAddr,

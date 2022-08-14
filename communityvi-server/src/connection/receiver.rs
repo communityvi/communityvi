@@ -94,7 +94,7 @@ impl MessageReceiver {
 	}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ReceivedMessage {
 	Request(ClientRequestWithId),
 	Pong { payload: Vec<u8> },

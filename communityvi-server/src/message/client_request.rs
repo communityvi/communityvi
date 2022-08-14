@@ -8,14 +8,14 @@ use chrono::Duration;
 use js_int::{Int, UInt};
 use log::error;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientRequestWithId {
 	pub request_id: UInt,
 	#[serde(flatten)]
 	pub request: ClientRequest,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ClientRequest {
@@ -68,27 +68,27 @@ macro_rules! client_request_from_struct {
 	};
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct RegisterRequest {
 	pub name: String,
 }
 
 client_request_from_struct!(Register, RegisterRequest);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatRequest {
 	pub message: String,
 }
 
 client_request_from_struct!(Chat, ChatRequest);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct InsertMediumRequest {
 	pub previous_version: UInt,
 	pub medium: MediumRequest,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum MediumRequest {
@@ -137,7 +137,7 @@ impl From<Medium> for MediumRequest {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PlayRequest {
 	pub previous_version: UInt,
 	pub skipped: bool,
@@ -146,7 +146,7 @@ pub struct PlayRequest {
 
 client_request_from_struct!(Play, PlayRequest);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PauseRequest {
 	pub previous_version: UInt,
 	pub skipped: bool,
@@ -178,7 +178,7 @@ impl TryFrom<&WebSocketMessage> for ClientRequestWithId {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct RequestIdOnly {
 	pub request_id: UInt,
 }
