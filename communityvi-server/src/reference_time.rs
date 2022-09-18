@@ -1,12 +1,15 @@
 use js_int::UInt;
-use std::time::Instant;
+use quanta::Clock;
 
-#[derive(Clone, Copy)]
-pub struct ReferenceTimer(Instant);
+#[derive(Clone)]
+pub struct ReferenceTimer {
+	start: quanta::Instant,
+	clock: Clock,
+}
 
 impl ReferenceTimer {
 	pub fn reference_time(&self) -> std::time::Duration {
-		self.0.elapsed()
+		self.clock.now().duration_since(self.start)
 	}
 
 	pub fn reference_time_milliseconds(&self) -> UInt {
@@ -15,47 +18,63 @@ impl ReferenceTimer {
 		UInt::try_from(milliseconds)
 			.expect("More milliseconds than can be represented by IEEE 754 doubles. This shouldn't happen unless the server was running for more than about 285000 years.")
 	}
+
+	#[cfg(test)]
+	fn with_clock(clock: Clock) -> Self {
+		Self {
+			start: clock.now(),
+			clock,
+		}
+	}
 }
 
 impl Default for ReferenceTimer {
 	fn default() -> Self {
-		Self(Instant::now())
+		let clock = Clock::default();
+		Self {
+			start: clock.now(),
+			clock,
+		}
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use super::*;
-	use std::thread::sleep;
+	use js_int::uint;
 	use std::time::Duration;
 
 	#[test]
-	fn reference_timer_should_time_the_reference_time() {
-		let reference_timer = ReferenceTimer::default();
+	fn should_time_the_passage_of_reference_time() {
+		let (clock, clock_mock) = Clock::mock();
+		let reference_timer = ReferenceTimer::with_clock(clock);
 
 		let initial_time = reference_timer.reference_time();
-		sleep(Duration::from_millis(1));
+		clock_mock.increment(Duration::from_millis(1));
 		let final_time = reference_timer.reference_time();
 
 		let elapsed = final_time - initial_time;
-		assert!(
-			(1..10).contains(&elapsed.as_millis()),
-			"Expected the elapsed time to be between 1ms and 10ms, but was: {elapsed:?}",
+		assert_eq!(
+			Duration::from_millis(1),
+			elapsed,
+			"Expected the elapsed time to be 1ms, but was: {elapsed:?}",
 		);
 	}
 
 	#[test]
-	fn reference_timer_should_time_reference_time_milliseconds() {
-		let reference_timer = ReferenceTimer::default();
+	fn should_provide_the_passage_of_reference_time_in_milliseconds() {
+		let (clock, clock_mock) = Clock::mock();
+		let reference_timer = ReferenceTimer::with_clock(clock);
 
 		let initial_milliseconds = reference_timer.reference_time_milliseconds();
-		sleep(Duration::from_millis(1));
+		clock_mock.increment(Duration::from_millis(1));
 		let final_milliseconds = reference_timer.reference_time_milliseconds();
 
 		let elapsed = final_milliseconds - initial_milliseconds;
-		assert!(
-			(1..10).contains(&u64::from(elapsed)),
-			"Expected the elapsed time to be between 1ms and 10ms, but was: {elapsed}ms",
+		assert_eq!(
+			uint!(1),
+			elapsed,
+			"Expected the elapsed time to be between 1ms, but was: {elapsed}ms",
 		);
 	}
 }

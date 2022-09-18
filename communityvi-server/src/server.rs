@@ -19,7 +19,7 @@ mod rest_api;
 
 pub async fn run_server(application_context: ApplicationContext) {
 	let room = Room::new(
-		application_context.reference_timer,
+		application_context.reference_timer.clone(),
 		application_context.configuration.room_size_limit,
 	);
 	let address = application_context.configuration.address;
@@ -27,7 +27,7 @@ pub async fn run_server(application_context: ApplicationContext) {
 }
 
 pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
-	let reference_timer = application_context.reference_timer;
+	let reference_timer = application_context.reference_timer.clone();
 	websocket_filter(application_context, room)
 		.or(rest_api::rest_api(reference_timer))
 		.or(bundled_frontend_filter())
