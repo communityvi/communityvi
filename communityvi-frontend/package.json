@@ -17,8 +17,8 @@
 	"devDependencies": {
 		"@faker-js/faker": "^7.3.0",
 		"@fortawesome/fontawesome-free": "^6.0.0",
-		"@sveltejs/adapter-static": "1.0.0-next.39",
-		"@sveltejs/kit": "1.0.0-next.405",
+		"@sveltejs/adapter-static": "next",
+		"@sveltejs/kit": "next",
 		"@testing-library/jest-dom": "^5.16",
 		"@testing-library/svelte": "^3.0",
 		"@typescript-eslint/eslint-plugin": "^5.10",

@@ -1,5 +1,5 @@
 import preprocess from 'svelte-preprocess';
-import static_adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-static';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -8,10 +8,8 @@ const config = {
 	preprocess: preprocess(),
 
 	kit: {
-		adapter: static_adapter(),
-		prerender: {
-			default: true,
-		},
+		adapter: adapter(),
+		trailingSlash: 'always',
 	},
 };
 
