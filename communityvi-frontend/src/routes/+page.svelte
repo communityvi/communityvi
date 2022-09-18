@@ -7,11 +7,11 @@
 	import Peers from '$lib/components/Peers.svelte';
 	import Player from '$lib/components/player/Player.svelte';
 	import {page} from '$app/stores';
-	import {browser} from '$app/env';
+	import {browser} from '$app/environment';
 	import {RESTClient} from '$lib/client/RESTClient';
 
 	const transport = new WebSocketTransport(determineWebSocketURL());
-	const restClient = new RESTClient(determineAPIUrl());
+	const restClient = new RESTClient(determineAPIURL());
 	const client = new Client(transport, restClient);
 
 	function determineWebSocketURL(): URL {
@@ -25,7 +25,7 @@
 		return url;
 	}
 
-	function determineAPIUrl(): URL {
+	function determineAPIURL(): URL {
 		// Just a stopgap measure for now. The (generally wrong) assumption is that
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
