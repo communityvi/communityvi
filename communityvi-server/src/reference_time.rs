@@ -30,7 +30,7 @@ mod test {
 	use std::time::Duration;
 
 	#[test]
-	fn reference_timer_should_time_the_reference_time() {
+	fn should_time_the_passage_of_reference_time() {
 		let reference_timer = ReferenceTimer::default();
 
 		let initial_time = reference_timer.reference_time();
@@ -45,7 +45,7 @@ mod test {
 	}
 
 	#[test]
-	fn reference_timer_should_time_reference_time_milliseconds() {
+	fn should_provide_the_passage_of_reference_time_in_milliseconds() {
 		let reference_timer = ReferenceTimer::default();
 
 		let initial_milliseconds = reference_timer.reference_time_milliseconds();
