@@ -1,3 +1,7 @@
+// Pass by reference doesn't seem to be supported by rweb here
+// NOTE: This is regarding `reference_time_milliseconds` below, but rweb throws these attributes away entirely
+//       therefore needs to be global to the module.
+#![allow(clippy::needless_pass_by_value)]
 use crate::reference_time::ReferenceTimer;
 use rweb::filters::BoxedFilter;
 use rweb::{get, openapi, router, Filter, Json, Reply};
