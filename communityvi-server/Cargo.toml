@@ -15,7 +15,7 @@ clap = {version = "3.0.14", features = ["derive"]}
 env_logger = "0.9"
 futures-util = "0.3.19"
 futures-channel = "0.3.21"
-governor = { version = "0.4", default-features = false, features = ["std", "jitter"] }
+governor = { version = "0.5", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
 hyper-test = {path = "hyper-test"}
