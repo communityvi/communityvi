@@ -387,7 +387,7 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_get_an_error_for_empty_chat_messages() {
 		let room = Room::new(ReferenceTimer::default(), 1);
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 
 		let empty_chat_request = ChatRequest {
 			message: " \t".to_string(),
@@ -424,8 +424,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
 		let room = Room::new(ReferenceTimer::default(), 2);
-		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
-		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let response = handle_request(
@@ -489,8 +489,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
 		let room = Room::new(ReferenceTimer::default(), 2);
-		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
-		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -536,8 +536,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
 		let room = Room::new(ReferenceTimer::default(), 2);
-		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
-		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -586,8 +586,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
 		let room = Room::new(ReferenceTimer::default(), 2);
-		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
-		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -970,7 +970,7 @@ mod test {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
 		let time_source = TimeSource::test();
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -995,7 +995,7 @@ mod test {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
 		let time_source = TimeSource::default();
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -1015,7 +1015,7 @@ mod test {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
 		let time_source = TimeSource::test();
-		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -1051,7 +1051,7 @@ mod test {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
 		let time_source = TimeSource::default();
-		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
