@@ -20,6 +20,11 @@
 			class="navbar-burger"
 			class:is-active={isBurgerMenuExpanded}
 			on:click={toggleBurgerMenu}
+			on:keypress={event => {
+				if (event.key === 'Enter') {
+					toggleBurgerMenu();
+				}
+			}}
 			aria-label="menu"
 			aria-expanded={isBurgerMenuExpanded}
 		>
