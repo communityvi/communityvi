@@ -1,17 +1,17 @@
 # communityvi
-communityvi (name subject to change) is a backend and frontend for watching movies together over the network, inspired by [syncplay](https://syncplay.pl) and [togethertube](https://togethertube.com/).
+communityvi (name subject to change) is a backend and frontend for consuming media together over the network, inspired by [syncplay](https://syncplay.pl) and [togethertube](https://togethertube.com/).
 
 It is currently still under heavy development. We're lacking mostly in frontend design, UX and layout.
 
 ## Vision
-We want to provide a platform that allows anyone to watch movies together without any technical expertise required.
+We want to provide a platform that allows anyone to consume media (i.e. watching movies, listening to music...) together without any technical expertise required.
 
 ### Goals
 * Synchronizing playback state between multiple people.
 * Providing a one-click solution that only requires a URL to participate.
 * Allow synchronized playback of video/audio files stored locally on the device where a user is watching/listening. (all participants need a local copy)
 * Allow playback of video/audio from streaming sites like YouTube, Vimeo, Soundcloud etc.
-* Providing a backend API that allows for additional client implementations
+* Providing a backend API that allows for additional client implementations.
 	* e.g. native desktop or mobile apps
 	* e.g. WebExtensions that hook directly into third party streaming sites that don't allow being embedded
 * Making the hosting of your own instance as easy as possible.
@@ -21,7 +21,7 @@ We want to provide a platform that allows anyone to watch movies together withou
 
 ### Non-Goals
 * Video or Audio chat
-	* Although bundling an existing, working solution isn't completely out of question
+	* Bundling an existing, working solution isn't completely out of question
 * Distributing video or audio files
 * Circumventing Ads played by video streaming sites or any form or DRM
 * Supporting outdated versions of browsers or operating systems that don't get security updates anymore.
@@ -33,9 +33,9 @@ Features that are currently implemented:
 * Bundling the frontend files in the backend binary, so only a binary is required to use it.
 
 ## Roadmap
-Although we have an MVP that can (and has) already been used to watch videos together, there's still a lot to do.
+Although we have a first working prototype that can (and has) already been used to watch videos together, there's still a lot to do.
 
-This roadmap provides our current plan, it is preliminary though and most likely subject to change:
+This roadmap provides our current, preliminary plan which is subject to change:
 1. Converting request/response style websocket requests to HTTP requests, see #233
 2. Support streaming sites in the backend
 	1. Provide a working YouTube implementation.
@@ -46,16 +46,16 @@ This roadmap provides our current plan, it is preliminary though and most likely
 
 ## Contributing
 This is a passion project we (@winf34k and @FSMaxB) are developing in our free time, mostly in pair programming sessions.
-Note though that development is slow and can sometimes stagnate for months at a time.
+Note that development is slow and can sometimes stagnate for months at a time.
 The idea has been floating around in our heads since around 2013 and we've been working on this code base since early 2019 to get us to the point we're currently at.
 
-Help is always appreciated. Note though that we don't yet have written guidelines of what we value in code contributions. We are generally trying to achieve readable and well tested code though.
+Help is always appreciated. Note that we don't yet have written guidelines of what we value in code contributions. We are generally aiming for readable and well tested code though.
 
 If you plan to contribute, please open an issue with your intentions first, to reduce potential waste of effort if it isn't in line with what we're trying to achieve.
 
 There are several things we don't have a good answer for yet, if you do, feel free to open a GitHub issue:
 
-### Project Naming
+### [The Name](https://youtu.be/nmQxzBHmWjs?t=495)
 The current name "communityvi" is a combination of "community" and "TV" but it isn't a very good name.
 Not only because we as project founders don't even get its spelling right most of the time.
 
@@ -70,6 +70,6 @@ But for know there hasn't been any attempt on making the frontend look nice or s
 
 We also don't have a logo design. There have been initial attempts but they don't really scale down well to small icon sizes.
 
-### Frontend expertise
+### Frontend Expertise
 We are new to frontend development and are doing the best we can, but having someone with actual experience in that area taking a look at what we've done would be greatly appreciated.
 
