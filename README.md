@@ -3,6 +3,11 @@ communityvi (name subject to change) is a backend and frontend for consuming med
 
 It is currently still under heavy development. We're lacking mostly in frontend design, UX and layout.
 
+## TL;DR: I just want to try it out
+
+Great! Just follow the server and frontend README's Getting Started sections and you'll arrive at a working system in minutes.
+This is also an excellent way of getting started with development in general, after reading the passage about contributing down bwlow.
+
 ## Vision
 We want to provide a platform that allows anyone to consume media (i.e. watching movies, listening to music...) together without any technical expertise required.
 
