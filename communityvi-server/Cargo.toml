@@ -13,8 +13,8 @@ anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = {version = "4", features = ["derive"]}
 env_logger = "0.9"
-futures-util = "0.3.19"
-futures-channel = "0.3.21"
+futures-util = "0.3.25"
+futures-channel = "0.3.25"
 governor = { version = "0.5", default-features = false, features = ["std", "jitter"] }
 hex = '0.4'
 humantime-serde = "1.0"
