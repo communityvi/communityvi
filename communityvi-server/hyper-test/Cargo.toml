@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-base64 = "0.13.0"
+base64 = "0.13.1"
 futures-util = {version = "0.3", default-features = false, features = ["alloc"]}
 hyper = {version = "0.14", features = ["client", "server", "http1"]}
 serde = {version = "1", default-features = false}
