@@ -171,7 +171,7 @@ mod test {
 		let mut clients = Clients::with_limit(10);
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 
-		let result = clients.add_and_return_existing("".to_string(), message_sender);
+		let result = clients.add_and_return_existing(String::new(), message_sender);
 
 		assert!(matches!(result, Err(RoomError::EmptyClientName)));
 	}
