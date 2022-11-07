@@ -203,7 +203,7 @@ pub(self) fn start_test_server() -> TestClient {
 	let room = Room::new(ReferenceTimer::default(), 10);
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
-		log_filters: "".to_string(),
+		log_filters: String::new(),
 		room_size_limit: 10,
 		heartbeat_interval: std::time::Duration::from_secs(2),
 		missed_heartbeat_limit: 3,

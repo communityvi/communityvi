@@ -135,7 +135,7 @@ impl BundledFile {
 	}
 
 	fn etag(&self) -> String {
-		format!(r#""{}""#, hex::encode(&self.hash))
+		format!(r#""{}""#, hex::encode(self.hash))
 	}
 
 	fn is_cached(&self, request_headers: &HeaderMap) -> bool {
