@@ -47,7 +47,7 @@ async-trait = "0.1"
 hyper-test = {path = "hyper-test"}
 
 [build-dependencies]
-npm_rs = "0.2"
+npm_rs = "1.0"
 ignore = "0.4"
 
 [features]
