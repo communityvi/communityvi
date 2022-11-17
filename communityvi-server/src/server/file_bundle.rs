@@ -107,7 +107,7 @@ impl BundledFile {
 				.metadata
 				.last_modified()
 				.and_then(|timestamp| i64::try_from(timestamp).ok())
-				.map(|timestamp| Utc.timestamp(timestamp, 0)),
+				.and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single()),
 		}
 	}
 
@@ -310,7 +310,10 @@ mod test {
 
 	#[test]
 	fn last_modified_should_have_the_expected_format() {
-		let date_time = Utc.ymd(2021, 10, 12).and_hms(13, 37, 42);
+		let date_time = Utc
+			.with_ymd_and_hms(2021, 10, 12, 13, 37, 42)
+			.single()
+			.unwrap_or_else(|| unreachable!("Hardcoded date was not valid"));
 
 		let last_modified = last_modified_header_value(date_time);
 
