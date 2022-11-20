@@ -1,4 +1,5 @@
 use chrono::{DateTime, TimeZone, Utc};
+use hyper::body::Bytes;
 use lazy_static::lazy_static;
 use mime::Mime;
 use mime_guess::MimeGuess;
@@ -8,7 +9,7 @@ use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_N
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
 use rweb::path::Tail;
-use rweb::{filters, Filter};
+use rweb::{filters, hyper, Filter};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -82,13 +83,14 @@ impl BundledFileHandler {
 #[derive(Clone)]
 pub struct BundledFile {
 	path: String,
-	content: Cow<'static, [u8]>,
+	content: Bytes,
 	hash: [u8; 32],
 	last_modified: Option<DateTime<Utc>>,
 }
 
 impl BundledFile {
-	pub fn new(path: &str, content: Cow<'static, [u8]>) -> Self {
+	pub fn new(path: &str, content: impl Into<Bytes>) -> Self {
+		let content = content.into();
 		let hash = cached_sha256(path.as_ref(), &content);
 		Self {
 			path: path.into(),
@@ -99,9 +101,13 @@ impl BundledFile {
 	}
 
 	fn from_embedded_file(path: &str, file: EmbeddedFile) -> Self {
+		let content = match file.data {
+			Cow::Borrowed(slice) => slice.into(),
+			Cow::Owned(owned) => owned.into(),
+		};
 		Self {
 			path: path.to_string(),
-			content: file.data,
+			content,
 			hash: file.metadata.sha256_hash(),
 			last_modified: file
 				.metadata

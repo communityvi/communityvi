@@ -3,7 +3,6 @@ use rust_embed::RustEmbed;
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
 use rweb::Reply;
-use std::borrow::Cow;
 
 pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 	#[derive(RustEmbed)]
@@ -11,7 +10,7 @@ pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 	struct SwaggerUi;
 
 	BundledFileHandler::new_with_rust_embed::<SwaggerUi>()
-		.with_override(BundledFile::new("index.html", Cow::Borrowed(INDEX_HTML.as_bytes())))
+		.with_override(BundledFile::new("index.html", INDEX_HTML.as_bytes()))
 		.into_rweb_filter()
 		.boxed()
 }
