@@ -28,7 +28,7 @@ jobs:
           default: true
       - uses: Swatinem/rust-cache@v2
         with:
-          target-dir: ./communityvi-server
+          workspaces: "communityvi-server"
       - name: Check
         run: cargo check --all
       - name: Check without defaults
@@ -53,7 +53,7 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          target-dir: ./communityvi-server
+          workspaces: "communityvi-server"
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -79,7 +79,7 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
-          target-dir: ./communityvi-server
+          workspaces: "communityvi-server"
       - name: Build
         run: cargo build --all
       - name: Run tests
