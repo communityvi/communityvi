@@ -69,13 +69,17 @@ impl BundledFileHandlerBuilder {
 		self.files_by_path.extend(
 			Bundle::iter()
 				.filter_map(|path| Bundle::get(&path).map(|file| (path, file)))
-				.map(|(path, file)| (path.clone(), BundledFile::from_embedded_file(path, file))),
+				.map(|(path, file)| {
+					let file = BundledFile::from_embedded_file(&path, file);
+					(path, file)
+				}),
 		);
 		self
 	}
 
-	pub fn with_file(mut self, file: BundledFile) -> Self {
-		self.files_by_path.insert(file.path.clone(), file);
+	pub fn with_file(mut self, path: Cow<'static, str>, content: impl Into<Bytes>) -> Self {
+		let file = BundledFile::new(&path, content);
+		self.files_by_path.insert(path, file);
 		self
 	}
 
@@ -87,34 +91,36 @@ impl BundledFileHandlerBuilder {
 }
 
 #[derive(Clone)]
-pub struct BundledFile {
-	path: Cow<'static, str>,
+struct BundledFile {
 	content: Bytes,
 	hash: [u8; 32],
+	mime_type: Mime,
 	last_modified: Option<DateTime<Utc>>,
 }
 
 impl BundledFile {
-	pub fn new(path: Cow<'static, str>, content: impl Into<Bytes>) -> Self {
+	fn new(path: &str, content: impl Into<Bytes>) -> Self {
 		let content = content.into();
 		let hash = hash_sha256(&content);
+		let mime_type = MimeGuess::from_path(path).first_or_octet_stream();
 		Self {
-			path,
 			content,
 			hash,
+			mime_type,
 			last_modified: None,
 		}
 	}
 
-	fn from_embedded_file(path: Cow<'static, str>, file: EmbeddedFile) -> Self {
+	fn from_embedded_file(path: &str, file: EmbeddedFile) -> Self {
 		let content = match file.data {
 			Cow::Borrowed(slice) => slice.into(),
 			Cow::Owned(owned) => owned.into(),
 		};
+		let mime_type = MimeGuess::from_path(path).first_or_octet_stream();
 		Self {
-			path,
 			content,
 			hash: file.metadata.sha256_hash(),
+			mime_type,
 			last_modified: file
 				.metadata
 				.last_modified()
@@ -126,7 +132,7 @@ impl BundledFile {
 	fn as_response(&self) -> Response<Body> {
 		let builder = Response::builder()
 			.status(StatusCode::OK)
-			.header(CONTENT_TYPE, self.mime_type().as_ref())
+			.header(CONTENT_TYPE, self.mime_type.as_ref())
 			.header(CONTENT_LENGTH, self.content.len())
 			// Tell browsers to always make the request with If-None-Match instead
 			// of relying on a maximum age.
@@ -140,10 +146,6 @@ impl BundledFile {
 		};
 
 		builder.body(Body::from(self.content.clone())).unwrap()
-	}
-
-	fn mime_type(&self) -> Mime {
-		MimeGuess::from_path(&*self.path).first_or_octet_stream()
 	}
 
 	fn etag(&self) -> String {
@@ -396,7 +398,7 @@ mod test {
 
 	fn bundled_file(path: &'static str) -> BundledFile {
 		let file = TestBundle::get(path).unwrap();
-		BundledFile::from_embedded_file(Cow::Borrowed(path), file)
+		BundledFile::from_embedded_file(path, file)
 	}
 
 	async fn response_content(response: Response<Body>) -> Bytes {

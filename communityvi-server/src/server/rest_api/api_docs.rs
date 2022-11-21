@@ -1,4 +1,4 @@
-use crate::server::file_bundle::{BundledFile, BundledFileHandler};
+use crate::server::file_bundle::BundledFileHandler;
 use rust_embed::RustEmbed;
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
@@ -12,7 +12,7 @@ pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 
 	BundledFileHandler::builder()
 		.with_rust_embed::<SwaggerUi>()
-		.with_file(BundledFile::new(Cow::Borrowed("index.html"), INDEX_HTML.as_bytes()))
+		.with_file(Cow::Borrowed("index.html"), INDEX_HTML)
 		.build()
 		.into_rweb_filter()
 		.boxed()
