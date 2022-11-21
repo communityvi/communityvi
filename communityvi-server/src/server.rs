@@ -74,7 +74,9 @@ fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
 	#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
 	struct FrontendBundle;
 
-	BundledFileHandler::new_with_rust_embed::<FrontendBundle>()
+	BundledFileHandler::builder()
+		.with_rust_embed::<FrontendBundle>()
+		.build()
 		.into_rweb_filter()
 		.boxed()
 }

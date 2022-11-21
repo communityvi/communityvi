@@ -3,14 +3,17 @@ use rust_embed::RustEmbed;
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
 use rweb::Reply;
+use std::borrow::Cow;
 
 pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/swagger-ui/node_modules/swagger-ui-dist"]
 	struct SwaggerUi;
 
-	BundledFileHandler::new_with_rust_embed::<SwaggerUi>()
-		.with_override(BundledFile::new("index.html", INDEX_HTML.as_bytes()))
+	BundledFileHandler::builder()
+		.with_rust_embed::<SwaggerUi>()
+		.with_file(BundledFile::new(Cow::Borrowed("index.html"), INDEX_HTML.as_bytes()))
+		.build()
 		.into_rweb_filter()
 		.boxed()
 }
