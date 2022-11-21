@@ -1,9 +1,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use hyper::body::Bytes;
-use lazy_static::lazy_static;
 use mime::Mime;
 use mime_guess::MimeGuess;
-use parking_lot::RwLock;
 use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
@@ -14,8 +12,6 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[allow(unused)]
@@ -101,7 +97,7 @@ pub struct BundledFile {
 impl BundledFile {
 	pub fn new(path: Cow<'static, str>, content: impl Into<Bytes>) -> Self {
 		let content = content.into();
-		let hash = cached_sha256(path.deref().as_ref(), &content);
+		let hash = hash_sha256(&content);
 		Self {
 			path,
 			content,
@@ -188,23 +184,10 @@ fn not_modified() -> Response<Body> {
 		.unwrap()
 }
 
-fn cached_sha256(path: &Path, bytes: &[u8]) -> [u8; 32] {
-	lazy_static! {
-		static ref CACHE: RwLock<HashMap<PathBuf, [u8; 32]>> = RwLock::default();
-	};
-
-	{
-		let cache = CACHE.read();
-		if let Some(&hash) = cache.get(path) {
-			return hash;
-		}
-	}
-
-	*CACHE.write().entry(path.into()).or_insert_with(|| {
-		let mut hasher = Sha256::default();
-		hasher.update(bytes);
-		hasher.finalize().into()
-	})
+fn hash_sha256(bytes: &[u8]) -> [u8; 32] {
+	let mut hasher = Sha256::default();
+	hasher.update(bytes);
+	hasher.finalize().into()
 }
 
 #[cfg(test)]
