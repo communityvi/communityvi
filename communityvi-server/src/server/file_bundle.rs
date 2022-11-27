@@ -266,6 +266,17 @@ mod test {
 		assert_eq!(content.as_ref(), response_content(response).await);
 	}
 
+	#[ignore = "../ in paths is currently unsupported"]
+	#[tokio::test]
+	async fn request_handler_should_work_with_double_dot() {
+		let index = bundled_file("index.html");
+		let content = index.content;
+
+		let response = test_handler().request("foo/../index.html", &HeaderMap::default());
+
+		assert_eq!(content.as_ref(), response_content(response).await);
+	}
+
 	#[test]
 	fn ok_responses_should_contain_the_expected_cache_control_header() {
 		let file = bundled_file("index.html");
