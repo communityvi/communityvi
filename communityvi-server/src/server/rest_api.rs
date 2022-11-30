@@ -2,8 +2,9 @@
 // NOTE: This is regarding `reference_time_milliseconds` below, but rweb throws these attributes away entirely
 //       therefore needs to be global to the module.
 #![allow(clippy::needless_pass_by_value)]
+use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
-use axum::extract::Extension;
+use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
@@ -12,7 +13,7 @@ use okapi::openapi3::{self, Info, OpenApi, Operation, PathItem, Responses};
 #[cfg(feature = "api-docs")]
 mod api_docs;
 
-pub fn rest_api(reference_timer: ReferenceTimer) -> Router {
+pub fn rest_api() -> Router<ApplicationContext> {
 	let specification = OpenApi {
 		openapi: "3.0.1".into(),
 		info: Info {
@@ -41,11 +42,10 @@ pub fn rest_api(reference_timer: ReferenceTimer) -> Router {
 
 	Router::new()
 		.route("/reference-time-milliseconds", get(reference_time_milliseconds))
-		.route_layer(Extension(reference_timer))
 		.merge(openapi_router(specification))
 }
 
-fn openapi_router(specification: openapi3::OpenApi) -> Router {
+fn openapi_router(specification: openapi3::OpenApi) -> Router<ApplicationContext> {
 	let spec_json = move || async move { axum::response::Json(specification.clone()) };
 
 	#[cfg(not(feature = "api-docs"))]
@@ -60,7 +60,7 @@ fn openapi_router(specification: openapi3::OpenApi) -> Router {
 	}
 }
 
-async fn reference_time_milliseconds(Extension(reference_timer): Extension<ReferenceTimer>) -> impl IntoResponse {
+async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTimer>) -> impl IntoResponse {
 	let milliseconds = u64::from(reference_timer.reference_time_milliseconds());
 	axum::response::Json(milliseconds)
 }

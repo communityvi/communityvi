@@ -1,8 +1,9 @@
 use crate::configuration::Configuration;
 use crate::reference_time::ReferenceTimer;
 use crate::utils::time_source::TimeSource;
+use axum::extract::FromRef;
 
-#[derive(Clone)]
+#[derive(Clone, FromRef)]
 pub struct ApplicationContext {
 	pub configuration: Configuration,
 	pub time_source: TimeSource,

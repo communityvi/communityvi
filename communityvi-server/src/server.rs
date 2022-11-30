@@ -8,7 +8,7 @@ use crate::server::rest_api::rest_api;
 use crate::utils::websocket_message_conversion::{
 	axum_websocket_message_to_tungstenite_message, tungstenite_message_to_axum_websocket_message,
 };
-use axum::extract::{ws::WebSocket, Extension, WebSocketUpgrade};
+use axum::extract::{ws::WebSocket, Extension, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
@@ -30,13 +30,12 @@ pub async fn run_server(application_context: ApplicationContext) {
 		.unwrap();
 }
 
-pub fn create_router(application_context: ApplicationContext, room: Room) -> Router<()> {
-	let reference_timer = application_context.reference_timer.clone();
+pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
 	let router = Router::new()
 		.route("/ws", get(websocket_handler))
-		.nest("/api", rest_api(reference_timer))
-		.layer(Extension(room))
-		.layer(Extension(application_context));
+		.nest("/api", rest_api())
+		.with_state(application_context)
+		.layer(Extension(room));
 
 	#[cfg(feature = "bundle-frontend")]
 	{
@@ -59,7 +58,7 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 async fn websocket_handler(
 	websocket: WebSocketUpgrade,
 	Extension(room): Extension<Room>,
-	Extension(application_context): Extension<ApplicationContext>,
+	State(application_context): State<ApplicationContext>,
 ) -> impl IntoResponse {
 	websocket
 		.max_send_queue(1)
