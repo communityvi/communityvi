@@ -5,6 +5,7 @@
 
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
+use crate::server::OpenApiJson;
 use aide::axum::routing::get_with;
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::transform::TransformOpenApi;
@@ -12,8 +13,6 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
-use std::ops::Deref;
-use std::sync::Arc;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
@@ -50,9 +49,8 @@ fn stoplight_elements() -> Router<ApplicationContext> {
 	}
 }
 
-async fn openapi_specification(Extension(specification): Extension<Arc<aide::openapi::OpenApi>>) -> impl IntoResponse {
-	// TODO: Why does this not serialize with the Arc in place?
-	Json(specification.deref().clone())
+async fn openapi_specification(Extension(specification): Extension<OpenApiJson>) -> impl IntoResponse {
+	Json(specification)
 }
 
 async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTimer>) -> impl IntoApiResponse {

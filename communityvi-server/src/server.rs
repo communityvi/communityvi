@@ -14,6 +14,8 @@ use aide::openapi::OpenApi;
 use axum::extract::{ws::WebSocket, Extension, State, WebSocketUpgrade};
 use axum::Router;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
+use serde::{Serialize, Serializer};
+use serde_json::value::RawValue;
 use std::future::ready;
 use std::sync::Arc;
 
@@ -33,7 +35,7 @@ pub async fn run_server(application_context: ApplicationContext) {
 }
 
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
-	let mut open_api = OpenApi::default();
+	let mut api_specification = OpenApi::default();
 
 	aide::gen::infer_responses(true);
 	aide::gen::extract_schemas(true);
@@ -47,10 +49,12 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 			}),
 		)
 		.nest_api_service("/api", rest_api().with_state(application_context.clone()))
-		.finish_api_with(&mut open_api, finish_openapi_specification)
+		.finish_api_with(&mut api_specification, finish_openapi_specification)
 		.with_state(application_context)
 		.layer(Extension(room))
-		.layer(Extension(Arc::new(open_api)));
+		.layer(Extension(
+			OpenApiJson::try_from(api_specification).expect("Failed to serialize generated OpenAPI specification"),
+		));
 
 	#[cfg(feature = "bundle-frontend")]
 	{
@@ -67,6 +71,27 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 	#[cfg(not(feature = "bundle-frontend"))]
 	{
 		router
+	}
+}
+
+#[derive(Clone)]
+struct OpenApiJson(Arc<RawValue>);
+
+impl TryFrom<OpenApi> for OpenApiJson {
+	type Error = serde_json::Error;
+
+	fn try_from(value: OpenApi) -> Result<Self, Self::Error> {
+		let json = serde_json::to_string(&value)?;
+		serde_json::from_str::<Box<RawValue>>(&json).map(|raw_json| Self(raw_json.into()))
+	}
+}
+
+impl Serialize for OpenApiJson {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		RawValue::serialize(&self.0, serializer)
 	}
 }
 
