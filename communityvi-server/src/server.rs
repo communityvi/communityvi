@@ -4,16 +4,19 @@ use crate::connection::sender::MessageSender;
 use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
-use crate::server::rest_api::rest_api;
+use crate::server::rest_api::{finish_openapi_specification, rest_api};
 use crate::utils::websocket_message_conversion::{
 	axum_websocket_message_to_tungstenite_message, tungstenite_message_to_axum_websocket_message,
 };
+use aide::axum::ApiRouter;
+use aide::openapi::OpenApi;
 use axum::extract::{ws::WebSocket, Extension, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use std::future::ready;
+use std::sync::Arc;
 
 mod file_bundle;
 mod rest_api;
@@ -31,11 +34,15 @@ pub async fn run_server(application_context: ApplicationContext) {
 }
 
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
-	let router = Router::new()
+	let mut open_api = OpenApi::default();
+
+	let router = ApiRouter::new()
 		.route("/ws", get(websocket_handler))
-		.nest("/api", rest_api())
+		.nest_api_service("/api", rest_api().with_state(application_context.clone()))
+		.finish_api_with(&mut open_api, finish_openapi_specification)
 		.with_state(application_context)
-		.layer(Extension(room));
+		.layer(Extension(room))
+		.layer(Extension(Arc::new(open_api)));
 
 	#[cfg(feature = "bundle-frontend")]
 	{

@@ -2,65 +2,60 @@
 // NOTE: This is regarding `reference_time_milliseconds` below, but rweb throws these attributes away entirely
 //       therefore needs to be global to the module.
 #![allow(clippy::needless_pass_by_value)]
+
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
+use aide::axum::routing::get_with;
+use aide::axum::{ApiRouter, IntoApiResponse};
+use aide::transform::TransformOpenApi;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
-use okapi::openapi3::{self, Info, OpenApi, Operation, PathItem, Responses};
+use axum::{Extension, Json, Router};
+use std::ops::Deref;
+use std::sync::Arc;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
 
-pub fn rest_api() -> Router<ApplicationContext> {
-	let specification = OpenApi {
-		openapi: "3.0.1".into(),
-		info: Info {
-			title: "Communityvi REST API".into(),
-			..Default::default()
-		},
-		servers: vec![],
-		paths: [(
-			"/api/reference-time-milliseconds",
-			PathItem {
-				get: Some(Operation {
-					summary: Some("Returns the current server reference time in milliseconds.".into()),
-					description: Some("The reference time is the common time that all participants are synchronized on and that all operations refer to.".into()),
-					responses: Responses::default(),
-					..Default::default()
-				}),
-				..Default::default()
-			},
-		)].into_iter().map(|(path, item)| (path.to_string(), item)).collect(),
-		components: None,
-		security: vec![],
-		tags: vec![],
-		external_docs: None,
-		extensions: Default::default(),
-	};
-
-	Router::new()
-		.route("/reference-time-milliseconds", get(reference_time_milliseconds))
-		.merge(openapi_router(specification))
+pub fn rest_api() -> ApiRouter<ApplicationContext> {
+	ApiRouter::new()
+		.api_route(
+			"/reference-time-milliseconds",
+			get_with(reference_time_milliseconds,
+			|operation| operation
+				.summary("Returns the current server reference time in milliseconds.")
+				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
+			))
+		.route("/openapi.json", get(openapi_specification))
+		.merge(swagger_ui())
 }
 
-fn openapi_router(specification: openapi3::OpenApi) -> Router<ApplicationContext> {
-	let spec_json = move || async move { axum::response::Json(specification.clone()) };
+pub fn finish_openapi_specification(api: TransformOpenApi) -> TransformOpenApi {
+	use aide::openapi::Info;
+	api.info(Info {
+		title: "Communityvi REST API".to_owned(),
+		..Default::default()
+	})
+}
 
+fn swagger_ui() -> Router<ApplicationContext> {
 	#[cfg(not(feature = "api-docs"))]
 	{
-		Router::new().route("/openapi.json", get(spec_json))
+		Router::new()
 	}
 	#[cfg(feature = "api-docs")]
 	{
-		Router::new()
-			.route("/openapi.json", get(spec_json))
-			.nest_service("/docs", axum::routing::get_service(api_docs::api_docs()))
+		Router::new().nest_service("/docs", axum::routing::get_service(api_docs::api_docs()))
 	}
 }
 
-async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTimer>) -> impl IntoResponse {
+async fn openapi_specification(Extension(specification): Extension<Arc<aide::openapi::OpenApi>>) -> impl IntoResponse {
+	// TODO: Why does this not serialize with the Arc in place?
+	Json(specification.deref().clone())
+}
+
+async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTimer>) -> impl IntoApiResponse {
 	let milliseconds = u64::from(reference_timer.reference_time_milliseconds());
-	axum::response::Json(milliseconds)
+	Json(milliseconds)
 }
