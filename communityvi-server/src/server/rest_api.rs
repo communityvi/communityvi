@@ -28,7 +28,7 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
 			))
 		.route("/openapi.json", get(openapi_specification))
-		.merge(swagger_ui())
+		.merge(stoplight_elements())
 }
 
 pub fn finish_openapi_specification(api: TransformOpenApi) -> TransformOpenApi {
@@ -39,7 +39,7 @@ pub fn finish_openapi_specification(api: TransformOpenApi) -> TransformOpenApi {
 	})
 }
 
-fn swagger_ui() -> Router<ApplicationContext> {
+fn stoplight_elements() -> Router<ApplicationContext> {
 	#[cfg(not(feature = "api-docs"))]
 	{
 		Router::new()
