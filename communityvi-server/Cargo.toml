@@ -29,7 +29,6 @@ log = "0.4"
 mime = "0.3"
 mime_guess = {version = "2", default-features = false}
 nonzero_ext = "0.3"
-okapi = "0.7.0-rc.1"
 parking_lot = "0.12"
 pin-project = "1"
 quanta = "0.10"

@@ -285,7 +285,6 @@ dependencies = [
  "mime_guess",
  "nonzero_ext",
  "npm_rs",
- "okapi",
  "parking_lot",
  "pin-project",
  "quanta",
@@ -1012,18 +1011,6 @@ checksum = "f6058e64324c71e02bc2b150e4f3bc8286db6c83092132ffa3f6b1eab0f9def5"
 dependencies = [
  "hermit-abi 0.1.19",
  "libc",
-]
-
-[[package]]
-name = "okapi"
-version = "0.7.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce66b6366e049880a35c378123fddb630b1a1a3c37fa1ca70caaf4a09f6e2893"
-dependencies = [
- "log",
- "schemars",
- "serde",
- "serde_json",
 ]
 
 [[package]]
