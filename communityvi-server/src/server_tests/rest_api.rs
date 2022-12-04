@@ -22,7 +22,7 @@ async fn should_return_reference_time() {
 
 	assert_eq!(response.status(), StatusCode::OK);
 	assert!(reference_time >= uint!(0));
-	assert!(reference_time <= uint!(1_000));
+	assert!(reference_time <= uint!(2_000), "Was {reference_time} ms");
 }
 
 #[tokio::test]

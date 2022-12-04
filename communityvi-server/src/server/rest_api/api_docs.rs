@@ -1,4 +1,4 @@
-use crate::server::file_bundle::{BundledFile, BundledFileHandler};
+use crate::server::file_bundle::BundledFileHandler;
 use rust_embed::RustEmbed;
 use rweb::filters::BoxedFilter;
 use rweb::Filter;
@@ -10,8 +10,10 @@ pub fn api_docs() -> BoxedFilter<(impl Reply,)> {
 	#[folder = "$CARGO_MANIFEST_DIR/swagger-ui/node_modules/swagger-ui-dist"]
 	struct SwaggerUi;
 
-	BundledFileHandler::new_with_rust_embed::<SwaggerUi>()
-		.with_override(BundledFile::new("index.html", Cow::Borrowed(INDEX_HTML.as_bytes())))
+	BundledFileHandler::builder()
+		.with_rust_embed::<SwaggerUi>()
+		.with_file(Cow::Borrowed("index.html"), INDEX_HTML)
+		.build()
 		.into_rweb_filter()
 		.boxed()
 }

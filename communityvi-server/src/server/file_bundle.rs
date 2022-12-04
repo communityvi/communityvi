@@ -1,50 +1,29 @@
 use chrono::{DateTime, TimeZone, Utc};
-use lazy_static::lazy_static;
+use hyper::body::Bytes;
 use mime::Mime;
 use mime_guess::MimeGuess;
-use parking_lot::RwLock;
 use rust_embed::{EmbeddedFile, RustEmbed};
 use rweb::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG, IF_NONE_MATCH, LAST_MODIFIED};
 use rweb::http::{HeaderMap, Response, StatusCode};
 use rweb::hyper::Body;
 use rweb::path::Tail;
-use rweb::{filters, Filter};
+use rweb::{filters, hyper, Filter};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-type FileGetter = Arc<dyn Fn(&str) -> Option<BundledFile> + Send + Sync>;
 
 #[allow(unused)]
 #[derive(Clone)]
 pub struct BundledFileHandler {
-	file_getter: FileGetter,
+	files_by_path: Arc<HashMap<Cow<'static, str>, BundledFile>>,
 }
 
 #[allow(unused)]
 impl BundledFileHandler {
-	/// Creates a new [`BundledFileHandler`] from a [`RustEmbed`] asset type, erasing the type in the process.
-	pub fn new_with_rust_embed<Bundle: RustEmbed>() -> Self {
-		Self {
-			file_getter: Arc::new(|path| Bundle::get(path).map(|file| BundledFile::from_embedded_file(path, file))),
-		}
-	}
-
-	pub fn with_override(self, file: BundledFile) -> Self {
-		let Self { file_getter } = self;
-
-		Self {
-			file_getter: Arc::new(move |path| {
-				if path == file.path {
-					Some(file.clone())
-				} else {
-					file_getter(path)
-				}
-			}),
-		}
+	pub fn builder() -> BundledFileHandlerBuilder {
+		BundledFileHandlerBuilder::default()
 	}
 
 	pub fn into_rweb_filter(self) -> impl Filter<Extract = (Response<Body>,), Error = Infallible> {
@@ -63,46 +42,85 @@ impl BundledFileHandler {
 			return not_modified();
 		}
 
-		file.into_response()
+		file.as_response()
 	}
 
-	fn look_up_file_falling_back_to_index_html(&self, path: &str) -> Option<BundledFile> {
+	fn look_up_file_falling_back_to_index_html(&self, path: &str) -> Option<&BundledFile> {
 		match self.look_up_file(path) {
 			Some(file) => Some(file),
 			None => self.look_up_file(&format!("{path}/index.html")),
 		}
 	}
 
-	fn look_up_file(&self, path: &str) -> Option<BundledFile> {
+	fn look_up_file(&self, path: &str) -> Option<&BundledFile> {
 		let path = normalize_path(path);
-		(self.file_getter)(path)
+		self.files_by_path.get(path)
+	}
+}
+
+#[derive(Default)]
+pub struct BundledFileHandlerBuilder {
+	files_by_path: HashMap<Cow<'static, str>, BundledFile>,
+}
+
+impl BundledFileHandlerBuilder {
+	/// Add files from a [`RustEmbed`] asset type, erasing the type in the process.
+	pub fn with_rust_embed<Bundle: RustEmbed>(mut self) -> Self {
+		self.files_by_path.extend(
+			Bundle::iter()
+				.filter_map(|path| Bundle::get(&path).map(|file| (path, file)))
+				.map(|(path, file)| {
+					let file = BundledFile::from_embedded_file(&path, file);
+					(path, file)
+				}),
+		);
+		self
+	}
+
+	pub fn with_file(mut self, path: Cow<'static, str>, content: impl Into<Bytes>) -> Self {
+		let file = BundledFile::new(&path, content);
+		self.files_by_path.insert(path, file);
+		self
+	}
+
+	pub fn build(self) -> BundledFileHandler {
+		BundledFileHandler {
+			files_by_path: Arc::new(self.files_by_path),
+		}
 	}
 }
 
 #[derive(Clone)]
-pub struct BundledFile {
-	path: String,
-	content: Cow<'static, [u8]>,
+struct BundledFile {
+	content: Bytes,
 	hash: [u8; 32],
+	mime_type: Mime,
 	last_modified: Option<DateTime<Utc>>,
 }
 
 impl BundledFile {
-	pub fn new(path: &str, content: Cow<'static, [u8]>) -> Self {
-		let hash = cached_sha256(path.as_ref(), &content);
+	fn new(path: &str, content: impl Into<Bytes>) -> Self {
+		let content = content.into();
+		let hash = hash_sha256(&content);
+		let mime_type = MimeGuess::from_path(path).first_or_octet_stream();
 		Self {
-			path: path.into(),
 			content,
 			hash,
+			mime_type,
 			last_modified: None,
 		}
 	}
 
 	fn from_embedded_file(path: &str, file: EmbeddedFile) -> Self {
+		let content = match file.data {
+			Cow::Borrowed(slice) => slice.into(),
+			Cow::Owned(owned) => owned.into(),
+		};
+		let mime_type = MimeGuess::from_path(path).first_or_octet_stream();
 		Self {
-			path: path.to_string(),
-			content: file.data,
+			content,
 			hash: file.metadata.sha256_hash(),
+			mime_type,
 			last_modified: file
 				.metadata
 				.last_modified()
@@ -111,10 +129,10 @@ impl BundledFile {
 		}
 	}
 
-	fn into_response(self) -> Response<Body> {
+	fn as_response(&self) -> Response<Body> {
 		let builder = Response::builder()
 			.status(StatusCode::OK)
-			.header(CONTENT_TYPE, self.mime_type().as_ref())
+			.header(CONTENT_TYPE, self.mime_type.as_ref())
 			.header(CONTENT_LENGTH, self.content.len())
 			// Tell browsers to always make the request with If-None-Match instead
 			// of relying on a maximum age.
@@ -127,11 +145,7 @@ impl BundledFile {
 			builder
 		};
 
-		builder.body(Body::from(self.content)).unwrap()
-	}
-
-	fn mime_type(&self) -> Mime {
-		MimeGuess::from_path(&self.path).first_or_octet_stream()
+		builder.body(Body::from(self.content.clone())).unwrap()
 	}
 
 	fn etag(&self) -> String {
@@ -172,23 +186,10 @@ fn not_modified() -> Response<Body> {
 		.unwrap()
 }
 
-fn cached_sha256(path: &Path, bytes: &[u8]) -> [u8; 32] {
-	lazy_static! {
-		static ref CACHE: RwLock<HashMap<PathBuf, [u8; 32]>> = RwLock::default();
-	};
-
-	{
-		let cache = CACHE.read();
-		if let Some(&hash) = cache.get(path) {
-			return hash;
-		}
-	}
-
-	*CACHE.write().entry(path.into()).or_insert_with(|| {
-		let mut hasher = Sha256::default();
-		hasher.update(bytes);
-		hasher.finalize().into()
-	})
+fn hash_sha256(bytes: &[u8]) -> [u8; 32] {
+	let mut hasher = Sha256::default();
+	hasher.update(bytes);
+	hasher.finalize().into()
 }
 
 #[cfg(test)]
@@ -265,11 +266,22 @@ mod test {
 		assert_eq!(content.as_ref(), response_content(response).await);
 	}
 
+	#[ignore = "../ in paths is currently unsupported"]
+	#[tokio::test]
+	async fn request_handler_should_work_with_double_dot() {
+		let index = bundled_file("index.html");
+		let content = index.content;
+
+		let response = test_handler().request("foo/../index.html", &HeaderMap::default());
+
+		assert_eq!(content.as_ref(), response_content(response).await);
+	}
+
 	#[test]
 	fn ok_responses_should_contain_the_expected_cache_control_header() {
 		let file = bundled_file("index.html");
 
-		let response = file.into_response();
+		let response = file.as_response();
 		let headers = response.headers();
 
 		assert_eq!("must-revalidate", headers[CACHE_CONTROL]);
@@ -280,7 +292,7 @@ mod test {
 		let file = bundled_file("index.html");
 		let content = file.content.clone();
 
-		let response = file.into_response();
+		let response = file.as_response();
 		let headers = response.headers();
 
 		assert_eq!("text/html", headers[CONTENT_TYPE]);
@@ -292,7 +304,7 @@ mod test {
 		let file = bundled_file("index.html");
 		let etag = file.etag();
 
-		let response = file.into_response();
+		let response = file.as_response();
 		let headers = response.headers();
 
 		assert_eq!(etag.as_bytes(), headers[ETAG].as_bytes());
@@ -302,7 +314,7 @@ mod test {
 	fn ok_responses_should_have_a_last_modified_header() {
 		let file = bundled_file("index.html");
 
-		let response = file.into_response();
+		let response = file.as_response();
 		let headers = response.headers();
 
 		assert!(headers.contains_key(LAST_MODIFIED));
@@ -325,7 +337,7 @@ mod test {
 		let file = bundled_file("index.html");
 		let content = file.content.clone();
 
-		let response = file.into_response();
+		let response = file.as_response();
 
 		assert_eq!(content.as_ref(), response_content(response).await);
 	}
@@ -334,7 +346,7 @@ mod test {
 	fn ok_response_should_have_the_correct_status_code() {
 		let file = bundled_file("index.html");
 
-		let response = file.into_response();
+		let response = file.as_response();
 		let status_code = response.status();
 
 		assert_eq!(StatusCode::OK, status_code);
@@ -392,10 +404,10 @@ mod test {
 	}
 
 	fn test_handler() -> BundledFileHandler {
-		BundledFileHandler::new_with_rust_embed::<TestBundle>()
+		BundledFileHandler::builder().with_rust_embed::<TestBundle>().build()
 	}
 
-	fn bundled_file(path: &str) -> BundledFile {
+	fn bundled_file(path: &'static str) -> BundledFile {
 		let file = TestBundle::get(path).unwrap();
 		BundledFile::from_embedded_file(path, file)
 	}
