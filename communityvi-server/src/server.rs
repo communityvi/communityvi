@@ -35,6 +35,10 @@ pub async fn run_server(application_context: ApplicationContext) {
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
 	let mut open_api = OpenApi::default();
 
+	aide::gen::infer_responses(true);
+	aide::gen::extract_schemas(true);
+	aide::gen::all_error_responses(true);
+
 	let router = ApiRouter::new()
 		.api_route(
 			"/ws",
