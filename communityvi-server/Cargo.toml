@@ -9,7 +9,7 @@ repository = "https://github.com/communityvi/communityvi"
 members = [".", "hyper-test"]
 
 [dependencies]
-aide = {version = "0.9", features = ["axum"]}
+aide = {version = "0.9", features = ["axum", "axum-ws"]}
 axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 anyhow = "1"
 bytes = "1"
