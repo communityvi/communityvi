@@ -3,7 +3,7 @@ use crate::error::InternalError;
 use crate::response::Response;
 use crate::Host;
 use base64::display::Base64Display;
-use base64::{CharacterSet, Config};
+use base64::engine::DEFAULT_ENGINE;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::http::header::AUTHORIZATION;
 use hyper::http::uri;
@@ -82,10 +82,7 @@ impl RequestBuilder {
 
 		self.header(
 			AUTHORIZATION,
-			format!(
-				"Basic {}",
-				Base64Display::with_config(&user_pass, Config::new(CharacterSet::Standard, false))
-			),
+			format!("Basic {}", Base64Display::from(&user_pass, &DEFAULT_ENGINE)),
 		)
 	}
 
