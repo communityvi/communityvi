@@ -1,18 +1,23 @@
-use rweb::http::Response;
-use rweb::hyper::Body;
-
+#![allow(clippy::unused_async)]
 use crate::connection::receiver::MessageReceiver;
 use crate::connection::sender::MessageSender;
 use crate::context::ApplicationContext;
 use crate::lifecycle::run_client;
 use crate::room::Room;
+use crate::server::rest_api::{finish_openapi_specification, rest_api};
 use crate::utils::websocket_message_conversion::{
-	rweb_websocket_message_to_tungstenite_message, tungstenite_message_to_rweb_websocket_message,
+	axum_websocket_message_to_tungstenite_message, tungstenite_message_to_axum_websocket_message,
 };
+use aide::axum::routing::get_with;
+use aide::axum::{ApiRouter, IntoApiResponse};
+use aide::openapi::OpenApi;
+use axum::extract::{ws::WebSocket, Extension, State, WebSocketUpgrade};
+use axum::Router;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
-use rweb::warp::filters::BoxedFilter;
-use rweb::{Filter, Reply};
+use serde::{Serialize, Serializer};
+use serde_json::value::RawValue;
 use std::future::ready;
+use std::sync::Arc;
 
 mod file_bundle;
 mod rest_api;
@@ -23,65 +28,96 @@ pub async fn run_server(application_context: ApplicationContext) {
 		application_context.configuration.room_size_limit,
 	);
 	let address = application_context.configuration.address;
-	rweb::serve(create_filter(application_context, room)).run(address).await;
+	axum::Server::bind(&address)
+		.serve(create_router(application_context, room).into_make_service())
+		.await
+		.unwrap();
 }
 
-pub fn create_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
-	let reference_timer = application_context.reference_timer.clone();
-	websocket_filter(application_context, room)
-		.or(rest_api::rest_api(reference_timer))
-		.or(bundled_frontend_filter())
-		.boxed()
-}
+pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
+	let mut api_specification = OpenApi::default();
 
-fn websocket_filter(application_context: ApplicationContext, room: Room) -> BoxedFilter<(impl Reply,)> {
-	rweb::path("ws")
-		.and(rweb::ws())
-		.map(
-			move |ws: rweb::ws::Ws /*, room: Room, application_context: ApplicationContext*/| {
-				let room = room.clone();
-				let application_context = application_context.clone();
+	aide::gen::infer_responses(true);
+	aide::gen::extract_schemas(true);
+	aide::gen::all_error_responses(true);
 
-				ws.max_send_queue(1)
-					.max_message_size(10 * 1024)
-					.max_frame_size(10 * 1024)
-					.on_upgrade(move |websocket| {
-						let (sink, stream) = websocket.split();
-
-						let message_sender = MessageSender::from(
-							sink.with(|message| ready(tungstenite_message_to_rweb_websocket_message(message))),
-						);
-						let message_receiver = MessageReceiver::new(
-							stream
-								.map_ok(rweb_websocket_message_to_tungstenite_message)
-								.map_err(Into::into),
-							message_sender.clone(),
-						);
-
-						run_client(application_context, room, message_sender, message_receiver)
-					})
-			},
+	let router = ApiRouter::new()
+		.api_route(
+			"/ws",
+			get_with(websocket_handler, |operation| {
+				operation.summary("Start a websocket client session")
+			}),
 		)
-		.boxed()
+		.nest_api_service("/api", rest_api().with_state(application_context.clone()))
+		.finish_api_with(&mut api_specification, finish_openapi_specification)
+		.with_state(application_context)
+		.layer(Extension(room))
+		.layer(Extension(
+			OpenApiJson::try_from(api_specification).expect("Failed to serialize generated OpenAPI specification"),
+		));
+
+	#[cfg(feature = "bundle-frontend")]
+	{
+		#[derive(rust_embed::RustEmbed)]
+		#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
+		struct FrontendBundle;
+
+		let bundled_frontend_handler = file_bundle::BundledFileHandlerBuilder::default()
+			.with_rust_embed::<FrontendBundle>()
+			.build();
+		router.fallback_service(axum::routing::get_service(bundled_frontend_handler))
+	}
+
+	#[cfg(not(feature = "bundle-frontend"))]
+	{
+		router
+	}
 }
 
-#[cfg(feature = "bundle-frontend")]
-fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
-	use crate::server::file_bundle::BundledFileHandler;
-	use rust_embed::RustEmbed;
+#[derive(Clone)]
+struct OpenApiJson(Arc<RawValue>);
 
-	#[derive(RustEmbed)]
-	#[folder = "$CARGO_MANIFEST_DIR/../communityvi-frontend/build"]
-	struct FrontendBundle;
+impl TryFrom<OpenApi> for OpenApiJson {
+	type Error = serde_json::Error;
 
-	BundledFileHandler::builder()
-		.with_rust_embed::<FrontendBundle>()
-		.build()
-		.into_rweb_filter()
-		.boxed()
+	fn try_from(value: OpenApi) -> Result<Self, Self::Error> {
+		let json = serde_json::to_string(&value)?;
+		serde_json::from_str::<Box<RawValue>>(&json).map(|raw_json| Self(raw_json.into()))
+	}
 }
 
-#[cfg(not(feature = "bundle-frontend"))]
-fn bundled_frontend_filter() -> BoxedFilter<(Response<Body>,)> {
-	rweb::any().and_then(|| ready(Err(rweb::reject::not_found()))).boxed()
+impl Serialize for OpenApiJson {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		RawValue::serialize(&self.0, serializer)
+	}
+}
+
+async fn websocket_handler(
+	websocket: WebSocketUpgrade,
+	Extension(room): Extension<Room>,
+	State(application_context): State<ApplicationContext>,
+) -> impl IntoApiResponse {
+	websocket
+		.max_send_queue(1)
+		.max_message_size(10 * 1024)
+		.max_frame_size(10 * 1024)
+		.on_upgrade(move |websocket| run_websocket_connection(websocket, room, application_context))
+}
+
+async fn run_websocket_connection(websocket: WebSocket, room: Room, application_context: ApplicationContext) {
+	let (sink, stream) = websocket.split();
+
+	let message_sender =
+		MessageSender::from(sink.with(|message| ready(tungstenite_message_to_axum_websocket_message(message))));
+	let message_receiver = MessageReceiver::new(
+		stream
+			.map_ok(axum_websocket_message_to_tungstenite_message)
+			.map_err(Into::into),
+		message_sender.clone(),
+	);
+
+	run_client(application_context, room, message_sender, message_receiver).await;
 }

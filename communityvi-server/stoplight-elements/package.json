@@ -1,0 +1,10 @@
+{
+  "name": "communityvi-stoplight-elements-bundle",
+  "version": "0.0.1",
+  "description": "NPM package for bundling stoplight elements",
+  "main": "index.js",
+  "license": "Apache-2.0",
+  "dependencies": {
+	  "@stoplight/elements": "^7.7.7"
+  }
+}

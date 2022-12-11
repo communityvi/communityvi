@@ -5,16 +5,16 @@ use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let should_bundle_frontend = env::var("CARGO_FEATURE_BUNDLE_FRONTEND").is_ok();
-	let should_bundle_swagger_ui = env::var("CARGO_FEATURE_API_DOCS").is_ok();
+	let should_bundle_stoplight_elements = env::var("CARGO_FEATURE_API_DOCS").is_ok();
 	if should_bundle_frontend {
 		bundle_frontend()?;
 	}
 
-	if should_bundle_swagger_ui {
-		bundle_swagger_ui()?;
+	if should_bundle_stoplight_elements {
+		bundle_stoplight_elements()?;
 	}
 
-	if !should_bundle_frontend && !should_bundle_swagger_ui {
+	if !should_bundle_frontend && !should_bundle_stoplight_elements {
 		// don't always rerun build.rs
 		println!("cargo:rerun-if-changed=build.rs")
 	}
@@ -42,20 +42,20 @@ fn bundle_frontend() -> Result<(), Box<dyn std::error::Error>> {
 	Ok(())
 }
 
-fn bundle_swagger_ui() -> Result<(), Box<dyn std::error::Error>> {
-	let swagger_ui_path = Path::new("swagger-ui");
+fn bundle_stoplight_elements() -> Result<(), Box<dyn std::error::Error>> {
+	let stoplight_elements_path = Path::new("stoplight-elements");
 
 	if is_debug_profile() {
-		limit_rerun_to_frontend_changes(swagger_ui_path);
+		limit_rerun_to_frontend_changes(stoplight_elements_path);
 	}
 
 	let exit_status = NpmEnv::default()
-		.set_path(swagger_ui_path)
+		.set_path(stoplight_elements_path)
 		.init_env()
 		.install(None)
 		.exec()?;
 	if !exit_status.success() {
-		return Err("Npm install of swagger-ui failed".into());
+		return Err("Npm install of stoplight elements failed".into());
 	}
 
 	Ok(())
