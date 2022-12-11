@@ -153,7 +153,7 @@ where
 }
 
 #[async_trait]
-pub trait WebSocketClient {
+pub trait WebSocketClient: Send {
 	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()>;
 	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage>;
 }

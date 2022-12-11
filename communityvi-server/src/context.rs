@@ -1,19 +1,19 @@
 use crate::configuration::Configuration;
 use crate::reference_time::ReferenceTimer;
-use crate::utils::time_source::TimeSource;
+use async_time_mock_tokio::MockableClock;
 
 #[derive(Clone)]
 pub struct ApplicationContext {
 	pub configuration: Configuration,
-	pub time_source: TimeSource,
+	pub clock: MockableClock,
 	pub reference_timer: ReferenceTimer,
 }
 
 impl ApplicationContext {
-	pub fn new(configuration: Configuration, time_source: TimeSource) -> ApplicationContext {
+	pub fn new(configuration: Configuration, clock: MockableClock) -> ApplicationContext {
 		Self {
 			configuration,
-			time_source,
+			clock,
 			reference_timer: ReferenceTimer::default(),
 		}
 	}

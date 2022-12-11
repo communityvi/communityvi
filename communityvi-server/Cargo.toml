@@ -10,6 +10,7 @@ members = [".", "hyper-test"]
 
 [dependencies]
 anyhow = "1"
+async-time-mock-tokio = {path = "../../async-time-mock/async-time-mock-tokio",  default-features = false}
 chrono = { version = "0.4", features = ["serde"] }
 clap = {version = "4", features = ["derive"]}
 env_logger = "0.10"
@@ -45,6 +46,7 @@ unicode_skeleton = "0.1"
 rand = "0.8"
 async-trait = "0.1"
 hyper-test = {path = "hyper-test"}
+async-time-mock-tokio = {path = "../../async-time-mock/async-time-mock-tokio",  features = ["mock"]}
 
 [build-dependencies]
 npm_rs = "1.0"

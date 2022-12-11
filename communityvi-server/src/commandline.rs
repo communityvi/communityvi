@@ -2,7 +2,7 @@ use crate::configuration::Configuration;
 use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
 use crate::server::run_server;
-use crate::utils::time_source::TimeSource;
+use async_time_mock_tokio::MockableClock;
 use log::info;
 
 #[derive(clap::Parser)]
@@ -30,8 +30,8 @@ impl Default for BaseCommand {
 impl Commandline {
 	pub async fn run(self) -> Result<(), CommunityviError> {
 		let configuration = Configuration::from_file(&self.configuration_file_path)?;
-		let time_source = TimeSource::default();
-		let application_context = ApplicationContext::new(configuration, time_source);
+		let clock = MockableClock::Real;
+		let application_context = ApplicationContext::new(configuration, clock);
 
 		env_logger::Builder::new()
 			.parse_filters(&application_context.configuration.log_filters)

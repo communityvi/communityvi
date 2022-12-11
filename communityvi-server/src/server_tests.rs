@@ -11,7 +11,7 @@ use crate::room::client_id::ClientId;
 use crate::room::Room;
 use crate::server::create_filter;
 use crate::utils::test_client::WebsocketTestClient;
-use crate::utils::time_source::TimeSource;
+use async_time_mock_tokio::MockableClock;
 use js_int::uint;
 use rweb::http::header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE};
 use rweb::http::StatusCode;
@@ -208,8 +208,8 @@ pub(self) fn start_test_server() -> TestClient {
 		heartbeat_interval: std::time::Duration::from_secs(2),
 		missed_heartbeat_limit: 3,
 	};
-	let time_source = TimeSource::test();
-	let application_context = ApplicationContext::new(configuration, time_source);
+	let clock = MockableClock::Real;
+	let application_context = ApplicationContext::new(configuration, clock);
 
 	let service = service(create_filter(application_context, room));
 	let make_service = make_service_fn(move |_| {

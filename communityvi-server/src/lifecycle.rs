@@ -13,7 +13,7 @@ use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
 use crate::room::Room;
-use crate::utils::time_source::TimeSource;
+use async_time_mock_tokio::MockableClock;
 use chrono::Duration;
 use futures_channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
@@ -41,7 +41,7 @@ pub async fn run_client(
 			_ = send_broadcasts(client.clone()) => LeftReason::Closed,
 			left_reason = heartbeat(
 				client,
-				&application_context.time_source,
+				&application_context.clock,
 				pong_receiver,
 				application_context.configuration.heartbeat_interval,
 				application_context.configuration.missed_heartbeat_limit
@@ -156,22 +156,22 @@ pub async fn send_broadcasts(client: Client) {
 
 pub async fn heartbeat(
 	client: Client,
-	time_source: &TimeSource,
+	clock: &MockableClock,
 	mut pong_receiver: mpsc::Receiver<Vec<u8>>,
 	heartbeat_interval: std::time::Duration,
 	missed_heartbeat_limit: u8,
 ) -> LeftReason {
-	let mut interval = time_source.interval_at(heartbeat_interval, heartbeat_interval);
+	let mut interval = clock.interval_at(clock.now() + heartbeat_interval, heartbeat_interval);
 	let mut missed_heartbeats = 0;
 
 	for count in 0..usize::MAX {
-		interval.tick().await;
+		let (guard, _) = interval.tick().await;
 
-		if !client.send_ping(count.to_ne_bytes().as_ref().into()).await {
-			return LeftReason::Closed;
-		}
+		let ping_pong_future = async {
+			if !client.send_ping(count.to_ne_bytes().as_ref().into()).await {
+				return Ok(false);
+			}
 
-		let receive_pong = async {
 			while let Some(payload) = pong_receiver.next().await {
 				let payload = match <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) {
 					Ok(payload) => payload,
@@ -180,18 +180,23 @@ pub async fn heartbeat(
 
 				let received_count = usize::from_ne_bytes(payload);
 				if received_count == count {
-					return Ok(());
+					return Ok(true);
 				}
 			}
 			Err(())
 		};
-		if time_source.timeout(heartbeat_interval, receive_pong).await.is_err() {
-			missed_heartbeats += 1;
-			if missed_heartbeats >= missed_heartbeat_limit {
-				break;
+		// TODO: Comment why the guard is dropped!
+		drop(guard);
+
+		match clock.timeout(heartbeat_interval, ping_pong_future).await {
+			Ok(Ok(true)) => missed_heartbeats = 0,
+			Ok(Ok(false)) => return LeftReason::Closed,
+			Err(_) | Ok(Err(())) => {
+				missed_heartbeats += 1;
+				if missed_heartbeats >= missed_heartbeat_limit {
+					break;
+				}
 			}
-		} else {
-			missed_heartbeats = 0;
 		}
 	}
 
@@ -966,87 +971,68 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn should_send_heartbeats_with_test_time_source() {
+	async fn should_send_heartbeats() {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
-		let time_source = TimeSource::test();
+		let (clock, timer_registry) = MockableClock::mock();
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
-		let time_source_for_heartbeat = time_source.clone();
 
-		tokio::spawn(async move {
-			let left_reason = heartbeat(client, &time_source_for_heartbeat, pong_receiver, heartbeat_interval, 0).await;
-			assert_eq!(left_reason, LeftReason::Closed); // NOTE: This line will most likely never run
+		let heartbeat_handle = tokio::spawn({
+			let clock = clock.clone();
+			async move { heartbeat(client, &clock, pong_receiver, heartbeat_interval, 0).await }
 		});
 
-		time_source.wait_for_time_request().await;
-		const ITERATIONS: u32 = MISSED_HEARTBEAT_LIMIT + 1;
-		for _ in 0..ITERATIONS {
-			time_source.advance_time(heartbeat_interval);
+		let ping_pong = tokio::spawn(async move {
 			let payload = test_client.receive_ping().await;
-			pong_sender.send(payload).await.unwrap();
-		}
-	}
-
-	#[tokio::test]
-	async fn should_send_heartbeats_with_real_time_source() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
-		let time_source = TimeSource::default();
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
-		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
-
-		let heartbeat_interval = std::time::Duration::from_millis(1);
-		let time_source_for_heartbeat = time_source.clone();
-
-		tokio::spawn(async move {
-			let left_reason = heartbeat(client, &time_source_for_heartbeat, pong_receiver, heartbeat_interval, 0).await;
-			assert_eq!(left_reason, LeftReason::Closed); // NOTE: This line will most likely never run
+			pong_sender.send(payload).await.expect("Failed to send pong");
 		});
 
-		let payload = test_client.receive_ping().await;
-		pong_sender.send(payload).await.unwrap();
+		timer_registry.advance_time(heartbeat_interval).await;
+		ping_pong.await.expect("ping pong task crashed");
+
+		timer_registry.advance_time(heartbeat_interval).await;
+
+		let left_reason = heartbeat_handle.await.expect("heartbeat task crashed");
+		assert_eq!(left_reason, LeftReason::Closed);
 	}
 
+	// TODO: More tests, now that we have async time mock
+
 	#[tokio::test]
-	async fn should_stop_after_missed_heartbeat_limit_with_test_time_source() {
+	async fn should_stop_after_missed_heartbeat_limit() {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
-		let time_source = TimeSource::test();
+		let (clock, timer_registry) = MockableClock::mock();
 		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
 		let missed_heartbeat_limit = 1;
 
-		// task for advancing test time
-		let time_source_for_test = time_source.clone();
-		tokio::spawn(async move {
-			let time_source = time_source_for_test;
-
-			time_source.wait_for_time_request().await;
-			time_source.advance_time(MISSED_HEARTBEAT_LIMIT * heartbeat_interval);
-
-			for _ in 0..MISSED_HEARTBEAT_LIMIT {
-				time_source.wait_for_time_request().await;
-				time_source.advance_time(heartbeat_interval);
+		let heartbeat_handle = tokio::spawn({
+			let clock = clock.clone();
+			async move {
+				heartbeat(
+					client,
+					&clock,
+					pong_receiver,
+					heartbeat_interval,
+					missed_heartbeat_limit,
+				)
+				.await
 			}
 		});
 
-		let left_reason = heartbeat(
-			client,
-			&time_source,
-			pong_receiver,
-			heartbeat_interval,
-			missed_heartbeat_limit,
-		)
-		.await;
+		timer_registry.advance_time(heartbeat_interval * 1000).await;
+
+		let left_reason = heartbeat_handle.await.expect("heartbeat task crashed");
 		assert_eq!(left_reason, LeftReason::Timeout);
 	}
 
-	#[tokio::test]
+	/*#[tokio::test]
 	async fn should_stop_after_missed_heartbeats_with_real_time_source() {
 		let reference_timer = ReferenceTimer::default();
 		let room = Room::new(reference_timer, 1);
@@ -1066,7 +1052,7 @@ mod test {
 		)
 		.await;
 		assert_eq!(left_reason, LeftReason::Timeout);
-	}
+	}*/
 
 	async fn register_test_client(
 		name: &'static str,
