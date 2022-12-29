@@ -1,7 +1,7 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
-use crate::room::client_id::ClientId;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::room::session_id::SessionId;
 use js_int::UInt;
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ macro_rules! broadcast_from_struct {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientJoinedBroadcast {
-	pub id: ClientId,
+	pub id: SessionId,
 	pub name: String,
 }
 
@@ -35,7 +35,7 @@ broadcast_from_struct!(ClientJoined, ClientJoinedBroadcast);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientLeftBroadcast {
-	pub id: ClientId,
+	pub id: SessionId,
 	pub name: String,
 	pub reason: LeftReason,
 }
@@ -51,7 +51,7 @@ broadcast_from_struct!(ClientLeft, ClientLeftBroadcast);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatBroadcast {
-	pub sender_id: ClientId,
+	pub sender_id: SessionId,
 	pub sender_name: String,
 	pub message: String,
 	pub counter: UInt,
@@ -62,7 +62,7 @@ broadcast_from_struct!(Chat, ChatBroadcast);
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MediumStateChangedBroadcast {
 	pub changed_by_name: String,
-	pub changed_by_id: ClientId,
+	pub changed_by_id: SessionId,
 	pub medium: VersionedMediumBroadcast,
 }
 
@@ -142,7 +142,7 @@ mod test {
 	#[test]
 	fn chat_broadcast_should_serialize_and_deserialize() {
 		let chat_broadcast = BroadcastMessage::Chat(ChatBroadcast {
-			sender_id: ClientId::from(42),
+			sender_id: SessionId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
 			counter: uint!(1337),
@@ -161,7 +161,7 @@ mod test {
 	#[test]
 	fn client_joined_broadcast_should_serialize_and_deserialize() {
 		let joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
-			id: ClientId::from(42),
+			id: SessionId::from(42),
 			name: "Hedwig".to_string(),
 		});
 		let json =
@@ -176,7 +176,7 @@ mod test {
 	#[test]
 	fn client_left_broadcast_should_serialize_and_deserialize() {
 		let client_left_broadcast = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
-			id: ClientId::from(42),
+			id: SessionId::from(42),
 			name: "Hedwig".to_string(),
 			reason: LeftReason::Closed,
 		});
@@ -196,7 +196,7 @@ mod test {
 	fn medium_state_changed_broadcast_for_paused_should_serialize_and_deserialize() {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Squirrel".to_string(),
-			changed_by_id: ClientId::from(42),
+			changed_by_id: SessionId::from(42),
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "The Acorn".to_string(),
@@ -243,7 +243,7 @@ mod test {
 	fn medium_state_changed_broadcast_for_playing_should_serialize_and_deserialize() {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
-			changed_by_id: ClientId::from(0),
+			changed_by_id: SessionId::from(0),
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "Metropolis".to_string(),

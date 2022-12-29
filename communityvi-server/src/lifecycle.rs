@@ -32,7 +32,7 @@ pub async fn run_client(
 	message_receiver: MessageReceiver,
 ) {
 	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
-		let client_id = client.id();
+		let session_id = client.id();
 		let client_name = client.name().to_string();
 		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
 
@@ -47,11 +47,11 @@ pub async fn run_client(
 				application_context.configuration.missed_heartbeat_limit
 			) => left_reason,
 		};
-		room.remove_client(client_id);
+		room.remove_client(session_id);
 
-		info!("Client '{}' with id {} has left.", client_name, client_id);
+		info!("Client '{}' with id {} has left.", client_name, session_id);
 		room.broadcast(ClientLeftBroadcast {
-			id: client_id,
+			id: session_id,
 			name: client_name,
 			reason: left_reason,
 		});
@@ -365,9 +365,9 @@ mod test {
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse, VersionedMediumResponse};
 	use crate::reference_time::ReferenceTimer;
-	use crate::room::client_id::ClientId;
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::room::medium::VersionedMedium;
+	use crate::room::session_id::SessionId;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
 	use js_int::{int, uint};
@@ -844,7 +844,7 @@ mod test {
 
 		assert_eq!(
 			SuccessMessage::Hello {
-				id: ClientId::from(0),
+				id: SessionId::from(0),
 				clients: vec![],
 				current_medium: VersionedMediumResponse {
 					medium: MediumResponse::FixedLength {
@@ -881,7 +881,7 @@ mod test {
 
 		assert_eq!(
 			SuccessMessage::Hello {
-				id: ClientId::from(1),
+				id: SessionId::from(1),
 				clients: vec![ClientResponse {
 					id: stephanie.id(),
 					name: stephanie.name().to_string(),
@@ -907,7 +907,7 @@ mod test {
 
 		assert_eq!(
 			SuccessMessage::Hello {
-				id: ClientId::from(0),
+				id: SessionId::from(0),
 				clients: vec![],
 				current_medium: VersionedMedium::default().into(),
 			},
@@ -935,7 +935,7 @@ mod test {
 
 		assert_eq!(
 			SuccessMessage::Hello {
-				id: ClientId::from(0),
+				id: SessionId::from(0),
 				clients: vec![],
 				current_medium: VersionedMediumResponse {
 					medium: MediumResponse::FixedLength {

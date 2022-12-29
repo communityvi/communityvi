@@ -54,7 +54,7 @@ mod test {
 	use super::*;
 	use crate::message::outgoing::broadcast_message::ClientJoinedBroadcast;
 	use crate::message::outgoing::error_message::ErrorMessageType;
-	use crate::room::client_id::ClientId;
+	use crate::room::session_id::SessionId;
 	use js_int::uint;
 
 	#[test]
@@ -118,7 +118,7 @@ mod test {
 	fn broadcast_message_should_serialize_and_deserialize() {
 		let broadcast_message = OutgoingMessage::Broadcast {
 			message: BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
-				id: ClientId::from(99),
+				id: SessionId::from(99),
 				name: "Luftballons".to_string(),
 			}),
 		};

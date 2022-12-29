@@ -5,22 +5,22 @@ use std::hash::Hash;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(transparent)]
-pub struct ClientId(UInt);
+pub struct SessionId(UInt);
 
-impl From<UInt> for ClientId {
+impl From<UInt> for SessionId {
 	fn from(id: UInt) -> Self {
-		ClientId(id)
+		SessionId(id)
 	}
 }
 
 #[cfg(test)]
-impl From<u32> for ClientId {
+impl From<u32> for SessionId {
 	fn from(id: u32) -> Self {
-		ClientId(id.into())
+		SessionId(id.into())
 	}
 }
 
-impl Display for ClientId {
+impl Display for SessionId {
 	fn fmt(&self, formatter: &mut Formatter) -> std::fmt::Result {
 		write!(formatter, "ClientId({})", self.0)
 	}
