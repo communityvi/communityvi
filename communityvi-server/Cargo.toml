@@ -11,19 +11,19 @@ members = [".", "hyper-test"]
 
 [dependencies]
 aide = {version = "0.11", features = ["axum", "axum-ws"]}
-axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 anyhow = "1"
+axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 clap = {version = "4", features = ["derive"]}
 env_logger = "0.10"
-futures-util = "0.3"
 futures-channel = "0.3"
+futures-util = "0.3"
 governor = { version = "0.5", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
+http-body = "0.4.5"
 humantime-serde = "1"
 hyper-test = {path = "hyper-test"}
-http-body = "0.4.5"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"]}
 lazy_static = "1"
 log = "0.4"
