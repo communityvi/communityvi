@@ -1,3 +1,4 @@
+use crate::user::UserCreationError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -10,4 +11,16 @@ pub enum RoomError {
 	ClientNameTooLong,
 	#[error("Can't join, room is already full.")]
 	RoomFull,
+}
+
+impl From<UserCreationError> for RoomError {
+	fn from(creation_error: UserCreationError) -> Self {
+		use UserCreationError::*;
+
+		match creation_error {
+			NameEmpty => Self::EmptyClientName,
+			NameTooLong => Self::ClientNameTooLong,
+			NameAlreadyInUse => Self::ClientNameAlreadyInUse,
+		}
+	}
 }
