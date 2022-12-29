@@ -6,13 +6,15 @@
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
 use crate::server::OpenApiJson;
-use aide::axum::routing::get_with;
+use aide::axum::routing::{get_with, post_with};
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::transform::TransformOpenApi;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
@@ -26,6 +28,10 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 				.summary("Return current server reference time in milliseconds")
 				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
 			))
+		.api_route("/client", post_with(register_client, |operation| operation
+			.summary("Register a client")
+			.description("Clients need to be registered before they can take part in any room.")
+		))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
 }
@@ -56,4 +62,13 @@ async fn openapi_specification(Extension(specification): Extension<OpenApiJson>)
 async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTimer>) -> impl IntoApiResponse {
 	let milliseconds = u64::from(reference_timer.reference_time_milliseconds());
 	Json(milliseconds)
+}
+
+async fn register_client(Json(request): Json<ClientRegistrationRequest>) -> impl IntoApiResponse {
+	Json(request)
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+struct ClientRegistrationRequest {
+	pub name: String,
 }
