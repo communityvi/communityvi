@@ -23,7 +23,7 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 			"/reference-time-milliseconds",
 			get_with(reference_time_milliseconds,
 			|operation| operation
-				.summary("Returns the current server reference time in milliseconds.")
+				.summary("Return current server reference time in milliseconds")
 				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
 			))
 		.route("/openapi.json", get(openapi_specification))
