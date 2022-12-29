@@ -7,4 +7,6 @@ pub enum CommunityviError {
 	ConfigurationError(#[from] ConfigurationError),
 	#[error("Failed to parse commandline: {0}")]
 	CommandlineError(#[from] clap::Error),
+	#[error("Failed to decode JWT secret: {0}")]
+	JwtSecretDecodingError(#[from] jsonwebtoken::errors::Error),
 }

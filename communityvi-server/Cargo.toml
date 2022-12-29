@@ -12,7 +12,8 @@ members = [".", "hyper-test"]
 [dependencies]
 aide = {version = "0.11", features = ["axum", "axum-ws"]}
 anyhow = "1"
-axum = {version = "0.6", features = ["ws", "http2", "macros"]}
+axum = {version = "0.6", features = ["ws", "http2", "macros", "headers"]}
+base64 = "0.21"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 clap = {version = "4", features = ["derive"]}
@@ -52,7 +53,6 @@ unicode_skeleton = "0.1"
 
 [dev-dependencies]
 async-trait = "0.1"
-base64 = "0.20"
 hyper-test = {path = "hyper-test"}
 
 [build-dependencies]
