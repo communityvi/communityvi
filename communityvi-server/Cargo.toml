@@ -24,6 +24,7 @@ hex = "0.4"
 http-body = "0.4.5"
 humantime-serde = "1"
 hyper-test = {path = "hyper-test"}
+indexmap = "1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"]}
 lazy_static = "1"
 log = "0.4"

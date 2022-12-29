@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
+mod error;
 mod response;
 
 pub fn rest_api() -> ApiRouter<ApplicationContext> {

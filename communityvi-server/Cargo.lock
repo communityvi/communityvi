@@ -335,6 +335,7 @@ dependencies = [
  "humantime-serde",
  "hyper-test",
  "ignore",
+ "indexmap",
  "js_int",
  "lazy_static",
  "log",
