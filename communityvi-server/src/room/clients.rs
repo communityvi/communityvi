@@ -1,11 +1,9 @@
 use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
 use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
-use js_int::{uint, UInt};
 use std::collections::{BTreeMap, BTreeSet};
 use unicode_skeleton::UnicodeSkeleton;
 
@@ -14,27 +12,6 @@ pub struct Clients {
 	names: BTreeSet<String>,
 	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
-	counters: parking_lot::Mutex<Counters>,
-}
-
-#[derive(Default)]
-struct Counters {
-	chat_message_counter: UInt,
-	broadcast_counter: usize,
-}
-
-impl Counters {
-	pub fn fetch_and_increment_chat_counter(&mut self) -> UInt {
-		let count = self.chat_message_counter;
-		self.chat_message_counter += uint!(1);
-		count
-	}
-
-	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
-		let count = self.broadcast_counter;
-		self.broadcast_counter += 1;
-		count
-	}
 }
 
 impl Clients {
@@ -44,7 +21,6 @@ impl Clients {
 			names: Default::default(),
 			clients_by_id: Default::default(),
 			maximum_size: limit,
-			counters: Default::default(),
 		}
 	}
 
@@ -91,32 +67,8 @@ impl Clients {
 		self.clients_by_id.len()
 	}
 
-	pub fn send_chat_message(&self, sender: &Client, message: String) {
-		let (chat_counter, broadcast_counter) = {
-			let mut counters = self.counters.lock();
-			let chat_counter = counters.fetch_and_increment_chat_counter();
-			let broadcast_counter = counters.fetch_and_increment_broadcast_counter();
-			(chat_counter, broadcast_counter)
-		};
-		let chat_message = ChatBroadcast {
-			sender_id: sender.id(),
-			sender_name: sender.name().to_string(),
-			message,
-			counter: chat_counter,
-		};
-		self.broadcast_with_count(chat_message.into(), broadcast_counter);
-	}
-
-	pub fn broadcast(&self, message: BroadcastMessage) {
-		let count = self.counters.lock().fetch_and_increment_broadcast_counter();
-		self.broadcast_with_count(message, count);
-	}
-
-	#[allow(clippy::needless_pass_by_value)] // it is not necessarily more performant to pass by reference here
-	fn broadcast_with_count(&self, message: BroadcastMessage, count: usize) {
-		for client in self.clients_by_id.values() {
-			client.enqueue_broadcast(message.clone(), count);
-		}
+	pub fn iter_clients(&self) -> impl Iterator<Item = &Client> {
+		self.clients_by_id.values()
 	}
 }
 
