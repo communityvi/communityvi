@@ -1,5 +1,5 @@
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
@@ -7,7 +7,7 @@ use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use chrono::Duration;
-use js_int::UInt;
+use js_int::{uint, UInt};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
@@ -27,6 +27,27 @@ struct Inner {
 	clients: RwLock<Clients>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
+	message_counters: Mutex<MessageCounters>,
+}
+
+#[derive(Default)]
+struct MessageCounters {
+	chat_message_counter: UInt,
+	broadcast_counter: usize,
+}
+
+impl MessageCounters {
+	pub fn fetch_and_increment_chat_counter(&mut self) -> UInt {
+		let count = self.chat_message_counter;
+		self.chat_message_counter += uint!(1);
+		count
+	}
+
+	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
+		let count = self.broadcast_counter;
+		self.broadcast_counter += 1;
+		count
+	}
 }
 
 impl Room {
@@ -35,6 +56,7 @@ impl Room {
 			clients: RwLock::new(Clients::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
+			message_counters: Default::default(),
 		};
 		Self { inner: Arc::new(inner) }
 	}
@@ -56,11 +78,27 @@ impl Room {
 	}
 
 	pub fn send_chat_message(&self, sender: &Client, message: String) {
-		self.inner.clients.read().send_chat_message(sender, message);
+		let chat_counter = self.inner.message_counters.lock().fetch_and_increment_chat_counter();
+		let chat_message = ChatBroadcast {
+			sender_id: sender.id(),
+			sender_name: sender.name().to_string(),
+			message,
+			counter: chat_counter,
+		};
+		self.broadcast(chat_message);
 	}
 
 	pub fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
-		self.inner.clients.read().broadcast(response.into());
+		let message = response.into();
+		let count = self
+			.inner
+			.message_counters
+			.lock()
+			.fetch_and_increment_broadcast_counter();
+		let clients = self.inner.clients.read();
+		for client in clients.iter_clients() {
+			client.enqueue_broadcast(message.clone(), count);
+		}
 	}
 
 	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
