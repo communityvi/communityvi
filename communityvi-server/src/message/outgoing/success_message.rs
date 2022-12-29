@@ -2,16 +2,16 @@ use js_int::{Int, UInt};
 use serde::{Deserialize, Serialize};
 
 use crate::room::client::Client;
-use crate::room::client_id::ClientId;
 use crate::room::medium::playback_state::PlaybackState;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::room::session_id::SessionId;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum SuccessMessage {
 	Hello {
-		id: ClientId,
+		id: SessionId,
 		clients: Vec<ClientResponse>,
 		current_medium: VersionedMediumResponse,
 	},
@@ -20,7 +20,7 @@ pub enum SuccessMessage {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientResponse {
-	pub id: ClientId,
+	pub id: SessionId,
 	pub name: String,
 }
 
@@ -124,7 +124,7 @@ mod test {
 		let hello_response = SuccessMessage::Hello {
 			id: 42.into(),
 			clients: vec![ClientResponse {
-				id: ClientId::from(8080),
+				id: SessionId::from(8080),
 				name: "IMSAI".to_string(),
 			}],
 			current_medium: VersionedMediumResponse {

@@ -4,7 +4,7 @@ use crate::connection::Connection;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
-use crate::room::client_id::ClientId;
+use crate::room::session_id::SessionId;
 use crate::user::User;
 use js_int::UInt;
 use log::info;
@@ -16,20 +16,20 @@ pub struct Client {
 }
 
 struct Inner {
-	id: ClientId,
+	id: SessionId,
 	user: User,
 	connection: Connection,
 }
 
 impl Client {
-	pub fn new(id: ClientId, user: User, broadcast_buffer: BroadcastBuffer, sender: MessageSender) -> Self {
+	pub fn new(id: SessionId, user: User, broadcast_buffer: BroadcastBuffer, sender: MessageSender) -> Self {
 		let connection = Connection::new(sender, broadcast_buffer);
 		Self {
 			inner: Arc::new(Inner { id, user, connection }),
 		}
 	}
 
-	pub fn id(&self) -> ClientId {
+	pub fn id(&self) -> SessionId {
 		self.inner.id
 	}
 

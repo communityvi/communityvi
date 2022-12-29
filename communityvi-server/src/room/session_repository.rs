@@ -1,23 +1,23 @@
 use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::room::client::Client;
-use crate::room::client_id::ClientId;
-use crate::room::client_id_sequence::ClientIdSequence;
 use crate::room::error::RoomError;
+use crate::room::session_id::SessionId;
+use crate::room::session_id_sequence::SessionIdSequence;
 use crate::user::User;
 use std::collections::HashMap;
 
 pub struct SessionRepository {
 	maximum_size: usize,
-	client_id_sequence: ClientIdSequence,
-	clients_by_id: HashMap<ClientId, Client>,
+	id_sequence: SessionIdSequence,
+	clients_by_id: HashMap<SessionId, Client>,
 }
 
 impl SessionRepository {
 	pub fn with_limit(limit: usize) -> SessionRepository {
 		Self {
 			maximum_size: limit,
-			client_id_sequence: Default::default(),
+			id_sequence: Default::default(),
 			clients_by_id: Default::default(),
 		}
 	}
@@ -33,20 +33,20 @@ impl SessionRepository {
 			return Err(RoomError::RoomFull);
 		}
 
-		let client_id = self.client_id_sequence.next();
+		let id = self.id_sequence.next();
 		let broadcast_buffer = BroadcastBuffer::new(self.maximum_size);
-		let client = Client::new(client_id, user, broadcast_buffer, message_sender);
+		let client = Client::new(id, user, broadcast_buffer, message_sender);
 
 		let existing_clients = self.clients_by_id.values().cloned().collect();
-		if self.clients_by_id.insert(client_id, client.clone()).is_some() {
+		if self.clients_by_id.insert(id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!");
 		}
 
 		Ok((client, existing_clients))
 	}
 
-	pub fn remove(&mut self, client_id: ClientId) -> Option<Client> {
-		self.clients_by_id.remove(&client_id)
+	pub fn remove(&mut self, session_id: SessionId) -> Option<Client> {
+		self.clients_by_id.remove(&session_id)
 	}
 
 	pub fn is_empty(&self) -> bool {

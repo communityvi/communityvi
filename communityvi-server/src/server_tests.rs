@@ -6,7 +6,7 @@ use crate::message::outgoing::broadcast_message::{
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::SuccessMessage;
-use crate::room::client_id::ClientId;
+use crate::room::session_id::SessionId;
 use crate::room::Room;
 use crate::server::create_router;
 use crate::utils::test_client::WebsocketTestClient;
@@ -26,8 +26,8 @@ mod rest_api;
 async fn should_respond_to_websocket_messages() {
 	let http_client = start_test_server();
 	let mut websocket_client = websocket_test_client(&http_client).await;
-	let client_id = register_client("Ferris", &mut websocket_client).await;
-	assert_eq!(ClientId::from(0), client_id);
+	let session_id = register_client("Ferris", &mut websocket_client).await;
+	assert_eq!(SessionId::from(0), session_id);
 }
 
 #[tokio::test]
@@ -49,7 +49,7 @@ async fn should_not_allow_invalid_messages_during_registration() {
 #[tokio::test]
 async fn should_not_allow_invalid_messages_after_successful_registration() {
 	let http_client = start_test_server();
-	let (_client_id, mut websocket_client) = registered_websocket_test_client("Ferris", &http_client).await;
+	let (_session_id, mut websocket_client) = registered_websocket_test_client("Ferris", &http_client).await;
 	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
 	websocket_client.send_raw(invalid_message).await;
 	let response = websocket_client.receive_error_message(None).await;
@@ -68,20 +68,20 @@ async fn should_broadcast_messages() {
 	let request = ChatRequest {
 		message: message.to_string(),
 	};
-	let (alice_client_id, mut alice_test_client) = registered_websocket_test_client("Alice", &http_client).await;
-	assert_eq!(ClientId::from(0), alice_client_id);
-	let (bob_client_id, mut bob_test_client) = registered_websocket_test_client("Bob", &http_client).await;
-	assert_eq!(ClientId::from(1), bob_client_id);
+	let (alice_session_id, mut alice_test_client) = registered_websocket_test_client("Alice", &http_client).await;
+	assert_eq!(SessionId::from(0), alice_session_id);
+	let (bob_session_id, mut bob_test_client) = registered_websocket_test_client("Bob", &http_client).await;
+	assert_eq!(SessionId::from(1), bob_session_id);
 
 	let expected_bob_joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
-		id: bob_client_id,
+		id: bob_session_id,
 		name: "Bob".to_string(),
 	});
 	let bob_joined_broadcast = alice_test_client.receive_broadcast_message().await;
 	assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
 
 	let expected_chat_broadcast = BroadcastMessage::Chat(ChatBroadcast {
-		sender_id: alice_client_id,
+		sender_id: alice_session_id,
 		sender_name: "Alice".to_string(),
 		message: message.to_string(),
 		counter: uint!(0),
@@ -106,14 +106,14 @@ async fn should_broadcast_messages() {
 #[tokio::test]
 async fn should_broadcast_when_client_leaves_the_room() {
 	let http_client = start_test_server();
-	let (_alice_client_id, mut alice_client) = registered_websocket_test_client("Alice", &http_client).await;
-	let (bob_client_id, bob_client) = registered_websocket_test_client("Bob", &http_client).await;
+	let (_alice_session_id, mut alice_client) = registered_websocket_test_client("Alice", &http_client).await;
+	let (bob_session_id, bob_client) = registered_websocket_test_client("Bob", &http_client).await;
 
 	let _bobs_join_message = alice_client.receive_broadcast_message().await;
 	std::mem::drop(bob_client);
 
 	let expected_leave_message = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
-		id: bob_client_id,
+		id: bob_session_id,
 		name: "Bob".to_string(),
 		reason: LeftReason::Closed,
 	});
@@ -148,13 +148,13 @@ async fn test_server_should_serve_bundled_frontend() {
 async fn registered_websocket_test_client(
 	name: &'static str,
 	http_client: &TestClient,
-) -> (ClientId, WebsocketTestClient) {
+) -> (SessionId, WebsocketTestClient) {
 	let mut websocket_client = websocket_test_client(http_client).await;
-	let client_id = register_client(name, &mut websocket_client).await;
-	(client_id, websocket_client)
+	let session_id = register_client(name, &mut websocket_client).await;
+	(session_id, websocket_client)
 }
 
-async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> ClientId {
+async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> SessionId {
 	let register_request = RegisterRequest { name: name.to_string() };
 
 	let request_id = test_client.send_request(register_request).await;
