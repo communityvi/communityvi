@@ -3,9 +3,9 @@ use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcas
 use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
 use crate::room::client_id::ClientId;
-use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::room::session_repository::SessionRepository;
 use crate::user::UserRepository;
 use chrono::Duration;
 use js_int::{uint, UInt};
@@ -15,9 +15,9 @@ use std::sync::Arc;
 pub mod client;
 pub mod client_id;
 mod client_id_sequence;
-pub mod clients;
 pub mod error;
 pub mod medium;
+pub mod session_repository;
 
 #[derive(Clone)]
 pub struct Room {
@@ -26,7 +26,7 @@ pub struct Room {
 
 struct Inner {
 	user_repository: Mutex<UserRepository>,
-	clients: RwLock<Clients>,
+	session_repository: RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
 	message_counters: Mutex<MessageCounters>,
@@ -56,7 +56,7 @@ impl Room {
 	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
 		let inner = Inner {
 			user_repository: Mutex::default(),
-			clients: RwLock::new(Clients::with_limit(room_size_limit)),
+			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
 			message_counters: Default::default(),
@@ -72,17 +72,20 @@ impl Room {
 		message_sender: MessageSender,
 	) -> Result<(Client, Vec<Client>), RoomError> {
 		let user = self.inner.user_repository.lock().create_user(name)?;
-		self.inner.clients.write().add_and_return_existing(user, message_sender)
+		self.inner
+			.session_repository
+			.write()
+			.add_and_return_existing(user, message_sender)
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {
-		let mut clients = self.inner.clients.write();
+		let mut session_repository = self.inner.session_repository.write();
 
-		if let Some(client) = clients.remove(client_id) {
+		if let Some(client) = session_repository.remove(client_id) {
 			self.inner.user_repository.lock().remove(client.user());
 		}
 
-		if clients.is_empty() {
+		if session_repository.is_empty() {
 			self.eject_medium();
 		}
 	}
@@ -105,8 +108,8 @@ impl Room {
 			.message_counters
 			.lock()
 			.fetch_and_increment_broadcast_counter();
-		let clients = self.inner.clients.read();
-		for client in clients.iter_clients() {
+		let session_repository = self.inner.session_repository.read();
+		for client in session_repository.iter_clients() {
 			client.enqueue_broadcast(message.clone(), count);
 		}
 	}
