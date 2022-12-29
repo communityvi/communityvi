@@ -65,7 +65,7 @@ impl Room {
 	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
 	pub fn add_client_and_return_existing(
 		&self,
-		name: String,
+		name: &str,
 		message_sender: MessageSender,
 	) -> Result<(Client, Vec<Client>), RoomError> {
 		self.inner.clients.write().add_and_return_existing(name, message_sender)
@@ -154,13 +154,13 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client_and_return_existing(format!("{count}"), message_sender.clone()) {
+			if let Err(error) = room.add_client_and_return_existing(&format!("{count}"), message_sender.clone()) {
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client_and_return_existing("elephant".to_string(), message_sender);
+		let result = room.add_client_and_return_existing("elephant", message_sender);
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
@@ -171,7 +171,7 @@ mod test {
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		let (makise_kurisu, _) = room
-			.add_client_and_return_existing(name.to_string(), message_sender)
+			.add_client_and_return_existing(name, message_sender)
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
 		room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
@@ -215,14 +215,12 @@ mod test {
 	fn add_client_should_return_list_of_existing_clients() {
 		let room = Room::new(ReferenceTimer::default(), 10);
 		let jake_sender = FakeMessageSender::default();
-		let (jake, existing_clients) = room
-			.add_client_and_return_existing("Jake".to_string(), jake_sender.into())
-			.unwrap();
+		let (jake, existing_clients) = room.add_client_and_return_existing("Jake", jake_sender.into()).unwrap();
 		assert!(existing_clients.is_empty());
 
 		let elwood_sender = FakeMessageSender::default();
 		let (_, existing_clients) = room
-			.add_client_and_return_existing("Elwood".to_string(), elwood_sender.into())
+			.add_client_and_return_existing("Elwood", elwood_sender.into())
 			.unwrap();
 		assert_eq!(existing_clients.len(), 1);
 		let existing_jake = &existing_clients[0];

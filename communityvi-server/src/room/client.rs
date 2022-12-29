@@ -5,6 +5,7 @@ use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::client_id::ClientId;
+use crate::user::User;
 use js_int::UInt;
 use log::info;
 use std::sync::Arc;
@@ -16,15 +17,15 @@ pub struct Client {
 
 struct Inner {
 	id: ClientId,
-	name: String,
+	user: User,
 	connection: Connection,
 }
 
 impl Client {
-	pub fn new(id: ClientId, name: String, broadcast_buffer: BroadcastBuffer, sender: MessageSender) -> Self {
+	pub fn new(id: ClientId, user: User, broadcast_buffer: BroadcastBuffer, sender: MessageSender) -> Self {
 		let connection = Connection::new(sender, broadcast_buffer);
 		Self {
-			inner: Arc::new(Inner { id, name, connection }),
+			inner: Arc::new(Inner { id, user, connection }),
 		}
 	}
 
@@ -33,7 +34,11 @@ impl Client {
 	}
 
 	pub fn name(&self) -> &str {
-		self.inner.name.as_str()
+		self.inner.user.name()
+	}
+
+	pub fn user(&self) -> &User {
+		&self.inner.user
 	}
 
 	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> bool {
