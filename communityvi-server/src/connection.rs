@@ -1,6 +1,51 @@
+use crate::connection::broadcast_buffer::BroadcastBuffer;
+use crate::connection::sender::MessageSender;
+use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::error_message::ErrorMessage;
+use crate::message::outgoing::success_message::SuccessMessage;
+use js_int::UInt;
+
 pub mod broadcast_buffer;
 pub mod receiver;
 pub mod sender;
+
+pub struct Connection {
+	sender: MessageSender,
+	broadcast_buffer: BroadcastBuffer,
+}
+
+impl Connection {
+	pub fn new(sender: MessageSender, broadcast_buffer: BroadcastBuffer) -> Self {
+		Self {
+			sender,
+			broadcast_buffer,
+		}
+	}
+
+	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> bool {
+		self.sender.send_success_message(message, request_id).await.is_ok()
+	}
+
+	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<UInt>) -> bool {
+		self.sender.send_error_message(message, request_id).await.is_ok()
+	}
+
+	pub async fn send_broadcast_message(&self, message: BroadcastMessage) -> bool {
+		self.sender.send_broadcast_message(message).await.is_ok()
+	}
+
+	pub fn enqueue_broadcast(&self, message: BroadcastMessage, count: usize) {
+		self.broadcast_buffer.enqueue(message, count);
+	}
+
+	pub async fn wait_for_broadcast(&self) -> BroadcastMessage {
+		self.broadcast_buffer.wait_for_broadcast().await
+	}
+
+	pub async fn send_ping(&self, payload: Vec<u8>) -> bool {
+		self.sender.send_ping(payload).await.is_ok()
+	}
+}
 
 #[cfg(test)]
 pub mod test {
