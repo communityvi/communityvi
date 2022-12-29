@@ -31,9 +31,8 @@ impl FixedLengthMedium {
 	}
 
 	pub(super) fn pause(&mut self, at_position: Duration) {
-		let new_position = at_position
-			.max(Duration::seconds(0)) // Don't pause before 0
-			.min(self.length); // Don't pause after the end
+		// Don't pause before 0 or after the end.
+		let new_position = at_position.clamp(Duration::zero(), self.length);
 
 		self.playback = PlaybackState::Paused {
 			at_position: new_position,

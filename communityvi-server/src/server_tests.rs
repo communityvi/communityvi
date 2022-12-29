@@ -164,7 +164,7 @@ async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> C
 	let id = if let SuccessMessage::Hello { id, .. } = response {
 		id
 	} else {
-		panic!("Expected Hello-Response, got '{:?}'", response);
+		panic!("Expected Hello-Response, got '{response:?}'");
 	};
 
 	let joined_response = test_client.receive_broadcast_message().await;

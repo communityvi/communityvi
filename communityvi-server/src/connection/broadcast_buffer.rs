@@ -314,13 +314,13 @@ mod test {
 	#[test]
 	fn should_not_store_more_than_limit_chat_messages() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
-		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT as u32 + 3) {
+		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT + 3) {
 			broadcast_buffer.enqueue_chat_message(ClientId::from(number), number.into());
 		}
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
-		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT as u32 + 3) {
+		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT + 3) {
 			let (id, count) = broadcast_buffer.dequeue_chat_message();
 			assert_eq!(id, ClientId::from(number));
 			assert_eq!(count, UInt::from(number));

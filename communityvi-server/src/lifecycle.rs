@@ -346,7 +346,7 @@ fn handle_pause_request(
 	}: PauseRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
 	let versioned_medium = match room.pause_medium(
-		Duration::milliseconds(position_in_milliseconds.max(UInt::MIN).min(UInt::MAX).into()),
+		Duration::milliseconds(position_in_milliseconds.clamp(UInt::MIN, UInt::MAX).into()),
 		previous_version,
 	) {
 		None => {
