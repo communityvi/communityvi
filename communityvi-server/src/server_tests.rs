@@ -195,13 +195,7 @@ async fn websocket_test_client(http_client: &TestClient) -> WebsocketTestClient 
 }
 
 pub(self) fn start_test_server() -> TestClient {
-	let configuration = Configuration {
-		address: "127.0.0.1:8000".parse().unwrap(),
-		log_filters: String::new(),
-		room_size_limit: 10,
-		heartbeat_interval: std::time::Duration::from_secs(2),
-		missed_heartbeat_limit: 3,
-	};
+	let configuration = Configuration::test();
 	let time_source = TimeSource::test();
 	let application_context = ApplicationContext::new(configuration, time_source);
 	let room = Room::new(application_context.reference_timer.clone(), 10);

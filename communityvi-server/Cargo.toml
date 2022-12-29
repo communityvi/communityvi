@@ -26,6 +26,7 @@ humantime-serde = "1"
 hyper-test = {path = "hyper-test"}
 indexmap = "1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"]}
+jsonwebtoken = "8.2"
 lazy_static = "1"
 log = "0.4"
 mime = "0.3"
@@ -34,6 +35,7 @@ nonzero_ext = "0.3"
 parking_lot = "0.12"
 pin-project = "1"
 quanta = "0.11"
+rand = "0.8"
 rust-embed = { version = "6", features = ["interpolate-folder-path"] }
 schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
@@ -49,8 +51,8 @@ typed-builder = "0.14"
 unicode_skeleton = "0.1"
 
 [dev-dependencies]
-rand = "0.8"
 async-trait = "0.1"
+base64 = "0.20"
 hyper-test = {path = "hyper-test"}
 
 [build-dependencies]
