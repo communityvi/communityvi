@@ -6,6 +6,7 @@ use crate::room::client_id::ClientId;
 use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::user::UserRepository;
 use chrono::Duration;
 use js_int::{uint, UInt};
 use parking_lot::{Mutex, RwLock};
@@ -24,6 +25,7 @@ pub struct Room {
 }
 
 struct Inner {
+	user_repository: Mutex<UserRepository>,
 	clients: RwLock<Clients>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
@@ -53,6 +55,7 @@ impl MessageCounters {
 impl Room {
 	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
 		let inner = Inner {
+			user_repository: Mutex::default(),
 			clients: RwLock::new(Clients::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
@@ -68,11 +71,18 @@ impl Room {
 		name: &str,
 		message_sender: MessageSender,
 	) -> Result<(Client, Vec<Client>), RoomError> {
-		self.inner.clients.write().add_and_return_existing(name, message_sender)
+		let user = self.inner.user_repository.lock().create_user(name)?;
+		self.inner.clients.write().add_and_return_existing(user, message_sender)
 	}
 
 	pub fn remove_client(&self, client_id: ClientId) {
-		if self.inner.clients.write().remove(client_id) == 0 {
+		let mut clients = self.inner.clients.write();
+
+		if let Some(client) = clients.remove(client_id) {
+			self.inner.user_repository.lock().remove(client.user());
+		}
+
+		if clients.is_empty() {
 			self.eject_medium();
 		}
 	}
