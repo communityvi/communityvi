@@ -5,7 +5,10 @@
 
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
+use crate::server::rest_api::models::{UserRegistrationRequest, UserRegistrationResponse};
+use crate::server::rest_api::response::Created;
 use crate::server::OpenApiJson;
+use crate::user::{UserCreationError, UserRepository};
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::transform::TransformOpenApi;
@@ -13,12 +16,13 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
 mod error;
+mod models;
 mod response;
 
 pub fn rest_api() -> ApiRouter<ApplicationContext> {
@@ -30,9 +34,9 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 				.summary("Return current server reference time in milliseconds")
 				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
 			))
-		.api_route("/client", post_with(register_client, |operation| operation
-			.summary("Register a client")
-			.description("Clients need to be registered before they can take part in any room.")
+		.api_route("/user", post_with(register_user, |operation| operation
+			.summary("Register a user")
+			.description("Users need to be registered before they can take part in any room.")
 		))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
@@ -66,11 +70,10 @@ async fn reference_time_milliseconds(State(reference_timer): State<ReferenceTime
 	Json(milliseconds)
 }
 
-async fn register_client(Json(request): Json<ClientRegistrationRequest>) -> impl IntoApiResponse {
-	Json(request)
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-struct ClientRegistrationRequest {
-	pub name: String,
+async fn register_user(
+	State(user_repository): State<Arc<Mutex<UserRepository>>>,
+	Json(request): Json<UserRegistrationRequest>,
+) -> Result<impl IntoApiResponse, UserCreationError> {
+	let user = user_repository.lock().create_user(&request.name)?;
+	Ok(Created(Json(UserRegistrationResponse::from(user))))
 }
