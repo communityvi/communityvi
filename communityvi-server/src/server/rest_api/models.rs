@@ -19,3 +19,8 @@ impl From<User> for UserRegistrationResponse {
 		}
 	}
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct LoginRequest {
+	pub username: String,
+}

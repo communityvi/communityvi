@@ -30,6 +30,11 @@ impl UserRepository {
 		Ok(user)
 	}
 
+	pub fn get(&self, name: &str) -> Option<&User> {
+		let name = normalized_name(name);
+		self.users.get(name.as_str())
+	}
+
 	pub fn remove(&mut self, user: &User) {
 		self.users.remove(user);
 	}

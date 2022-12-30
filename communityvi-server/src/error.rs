@@ -2,6 +2,7 @@ use crate::configuration::ConfigurationError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(clippy::enum_variant_names)] // same postfix is OK
 pub enum CommunityviError {
 	#[error("Failed to load configuration: {0}")]
 	ConfigurationError(#[from] ConfigurationError),

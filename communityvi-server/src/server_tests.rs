@@ -197,7 +197,8 @@ async fn websocket_test_client(http_client: &TestClient) -> WebsocketTestClient 
 pub(self) fn start_test_server() -> TestClient {
 	let configuration = Configuration::test();
 	let time_source = TimeSource::test();
-	let application_context = ApplicationContext::new(configuration, time_source);
+	let application_context =
+		ApplicationContext::new(configuration, time_source).expect("ApplicationContext failed to initialize.");
 	let room = Room::new(application_context.reference_timer.clone(), 10);
 	hyper_test::Client::new_with_host(
 		create_router(application_context, room).into_make_service(),
