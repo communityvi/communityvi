@@ -5,11 +5,12 @@
 
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
+use crate::server::rest_api::auth::Claims;
 use crate::server::rest_api::error::login::LoginError;
-use crate::server::rest_api::models::{LoginRequest, UserRegistrationRequest, UserRegistrationResponse};
+use crate::server::rest_api::models::{LoginRequest, UserRegistrationRequest, UserRegistrationResponse, UserResponse};
 use crate::server::rest_api::response::Created;
 use crate::server::OpenApiJson;
-use crate::user::{UserCreationError, UserRepository};
+use crate::user::{User, UserCreationError, UserRepository};
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::transform::TransformOpenApi;
@@ -23,11 +24,12 @@ use std::sync::Arc;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
+mod auth;
 mod error;
 mod models;
 mod response;
 
-pub fn rest_api() -> ApiRouter<ApplicationContext> {
+pub fn rest_api(application_context: ApplicationContext) -> ApiRouter {
 	ApiRouter::new()
 		.api_route(
 			"/reference-time-milliseconds",
@@ -40,12 +42,17 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 			.summary("Register a user")
 			.description("Users need to be registered before they can take part in any room.")
 		))
+		.api_route("/user/self", get_with(current_user, |operation| operation
+			.summary("Lookup current user")
+			.description("Get all data belonging to the currently logged in user.")
+		).layer(axum::middleware::from_fn_with_state(application_context.clone(), auth::middleware)))
 		.api_route("/login", post_with(login, |operation| operation
 			.summary("Perform a login")
 			.description("Creates a JWT on success that can be used to authenticate as the user.")
 		))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
+		.with_state(application_context)
 }
 
 pub fn finish_openapi_specification(api: TransformOpenApi) -> TransformOpenApi {
@@ -95,7 +102,12 @@ async fn login(
 
 	// FIXME: Rework once infrastructure is in place.
 	let header = Header::new(Algorithm::HS512);
-	let key = jsonwebtoken::encode(&header, &(user.name().to_string()), &jwt_encoding_key)?;
+	let claims = Claims::new(user.name().to_string());
+	let key = jsonwebtoken::encode(&header, &claims, &jwt_encoding_key)?;
 
 	Ok(Json(key))
+}
+
+async fn current_user(Extension(user): Extension<User>) -> impl IntoApiResponse {
+	Json(UserResponse::from(user))
 }

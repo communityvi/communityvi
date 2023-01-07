@@ -24,3 +24,16 @@ impl From<User> for UserRegistrationResponse {
 pub struct LoginRequest {
 	pub username: String,
 }
+
+#[derive(Serialize, JsonSchema)]
+pub struct UserResponse {
+	pub name: String,
+}
+
+impl From<User> for UserResponse {
+	fn from(user: User) -> Self {
+		UserResponse {
+			name: user.name().to_string(),
+		}
+	}
+}

@@ -48,7 +48,7 @@ pub fn create_router(application_context: ApplicationContext, room: Room) -> Rou
 				operation.summary("Start a websocket client session")
 			}),
 		)
-		.nest_api_service("/api", rest_api().with_state(application_context.clone()))
+		.nest_api_service("/api", rest_api(application_context.clone()))
 		.finish_api_with(&mut api_specification, finish_openapi_specification)
 		.with_state(application_context)
 		.layer(Extension(room))
