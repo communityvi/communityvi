@@ -4,6 +4,7 @@ use axum::Json;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+pub mod authentication_failed;
 pub mod login;
 mod user_creation;
 

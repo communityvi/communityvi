@@ -1,8 +1,10 @@
+use crate::server::rest_api::error::authentication_failed::AuthenticationFailedError;
 use crate::user::UserRepository;
+use aide::transform::TransformOperation;
 use axum::extract::State;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::TypedHeader;
@@ -33,21 +35,25 @@ pub async fn middleware<Body>(
 	TypedHeader(auth_header): TypedHeader<Authorization<Bearer>>,
 	mut request: Request<Body>,
 	next: Next<Body>,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, AuthenticationFailedError> {
 	let mut validation = Validation::new(Algorithm::HS512);
 	validation.validate_exp = false;
 	validation.required_spec_claims.clear();
 
 	let token = jsonwebtoken::decode::<Claims>(auth_header.token(), &jwt_decoding_key, &validation).map_err(|e| {
 		log::debug!("Could not decode token: '{}', error was: {}", auth_header.token(), e);
-		StatusCode::UNAUTHORIZED
+		AuthenticationFailedError
 	})?;
 
 	let Some(user) = user_repository.lock().get(token.claims.username()).cloned() else {
 		log::debug!("User for username '{}' not found!", token.claims.username());
-		return Err(StatusCode::UNAUTHORIZED);
+		return Err(AuthenticationFailedError);
 	};
 	request.extensions_mut().insert(user);
 
 	Ok(next.run(request).await)
+}
+
+pub fn needs_authentication(operation: TransformOperation) -> TransformOperation {
+	operation.response::<401, AuthenticationFailedError>()
 }

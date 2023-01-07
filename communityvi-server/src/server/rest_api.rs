@@ -5,7 +5,7 @@
 
 use crate::context::ApplicationContext;
 use crate::reference_time::ReferenceTimer;
-use crate::server::rest_api::auth::Claims;
+use crate::server::rest_api::auth::{needs_authentication, Claims};
 use crate::server::rest_api::error::login::LoginError;
 use crate::server::rest_api::models::{LoginRequest, UserRegistrationRequest, UserRegistrationResponse, UserResponse};
 use crate::server::rest_api::response::Created;
@@ -43,6 +43,7 @@ pub fn rest_api(application_context: ApplicationContext) -> ApiRouter {
 			.description("Users need to be registered before they can take part in any room.")
 		))
 		.api_route("/user/self", get_with(current_user, |operation| operation
+			.with(needs_authentication)
 			.summary("Lookup current user")
 			.description("Get all data belonging to the currently logged in user.")
 		).layer(axum::middleware::from_fn_with_state(application_context.clone(), auth::middleware)))
