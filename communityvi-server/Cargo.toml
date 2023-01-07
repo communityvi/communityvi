@@ -13,7 +13,7 @@ aide = {version = "0.9", features = ["axum", "axum-ws"]}
 axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 anyhow = "1"
 bytes = "1"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 clap = {version = "4", features = ["derive"]}
 env_logger = "0.10"
 futures-util = "0.3"
