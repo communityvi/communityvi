@@ -9,6 +9,7 @@ use hyper::http::header::AUTHORIZATION;
 use hyper::http::uri;
 use hyper::{http, HeaderMap};
 use hyper::{Body, Uri};
+use serde::Serialize;
 use std::fmt::Display;
 use std::future::Future;
 use std::mem::swap;
@@ -25,6 +26,7 @@ struct RequestComponents {
 	headers: HeaderMap,
 	method: http::Method,
 	uri: http::Uri,
+	body: Option<Vec<u8>>,
 }
 
 impl RequestBuilder {
@@ -117,6 +119,22 @@ impl RequestBuilder {
 		self
 	}
 
+	/// Use serialized JSON as request body. Defaults to empty body if not present.
+	pub fn json<T: Serialize + ?Sized>(mut self, json: &T) -> Self {
+		self = self.header(http::header::CONTENT_TYPE, "application/json");
+		self.components = self.components.and_then(move |mut components| {
+			if components.body.is_some() {
+				let message = "Body provided multiple times.".to_string();
+				return Err(InternalError::RequestBuilder(message).into());
+			};
+
+			let json = serde_json::to_vec(json)?;
+			components.body = Some(json);
+			Ok(components)
+		});
+		self
+	}
+
 	pub fn send(&self) -> impl Future<Output = Result<Response, crate::Error>> + Send + Sync + 'static {
 		let Self {
 			client,
@@ -128,6 +146,7 @@ impl RequestBuilder {
 			     mut headers,
 			     method,
 			     uri,
+			     body,
 			 }| {
 				let uri = if let Some(fallback) = fallback_host {
 					uri_with_fallback(uri, fallback)?
@@ -140,7 +159,7 @@ impl RequestBuilder {
 					swap(&mut headers, request_headers);
 				}
 
-				Ok(request_builder.body(Body::empty())?)
+				Ok(request_builder.body(body.map(Body::from).unwrap_or_default())?)
 			},
 		);
 
