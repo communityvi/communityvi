@@ -78,6 +78,7 @@ impl BroadcastBuffer {
 			+ 3 // Join + medium state + Leave if a client joins, changes the state and leaves again
 	}
 
+	#[cfg(test)]
 	pub fn is_empty(&self) -> bool {
 		self.inner.lock().is_empty()
 	}
@@ -171,7 +172,7 @@ impl Inner {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast};
+	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast, Participant};
 	use crate::room::session_id::SessionId;
 	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
@@ -182,6 +183,7 @@ mod test {
 	struct BroadcastBufferWithTestHelpers {
 		pub broadcast_buffer: BroadcastBuffer,
 		pub broadcast_number: usize,
+		participants: BTreeSet<Participant>,
 	}
 
 	impl Default for BroadcastBufferWithTestHelpers {
@@ -189,6 +191,7 @@ mod test {
 			Self {
 				broadcast_buffer: BroadcastBuffer::new(50),
 				broadcast_number: 0,
+				participants: Default::default(),
 			}
 		}
 	}
@@ -209,18 +212,24 @@ mod test {
 		}
 
 		fn enqueue_client_joined(&mut self, id: UInt) {
+			let name = format!("{id}");
+			self.participants.insert(Participant::new(id.into(), name.clone()));
 			let message = ClientJoinedBroadcast {
 				id: id.into(),
-				name: format!("{id}"),
+				name,
+				participants: self.participants.clone(),
 			};
 			self.enqueue_next(message.into());
 		}
 
 		fn enqueue_client_left(&mut self, id: UInt) {
+			let name = format!("{id}");
+			self.participants.remove(&Participant::new(id.into(), name.clone()));
 			let message = ClientLeftBroadcast {
 				id: id.try_into().unwrap(),
-				name: format!("{id}"),
+				name,
 				reason: LeftReason::Closed,
+				participants: self.participants.clone(),
 			};
 			self.enqueue_next(message.into());
 		}
@@ -368,6 +377,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 42);
@@ -382,6 +392,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 44);
@@ -396,6 +407,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 41);

@@ -29,13 +29,14 @@ import {
 	PlayingPlaybackState,
 	MediumChangedByOurself,
 	MediumStateChanged,
+	PeersRefreshedMessage,
 } from '$lib/client/model';
 import MessageBroker, {Subscriber, Unsubscriber} from '$lib/client/message_broker';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import {RESTClient} from '$lib/client/RESTClient';
 
 export default class RegisteredClient {
-	readonly id: number;
+	id?: number;
 	readonly name: string;
 	private referenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private versionedMedium: VersionedMedium;
@@ -55,20 +56,17 @@ export default class RegisteredClient {
 	}
 
 	constructor(
-		id: number,
 		name: string,
 		referenceTimeSynchronizer: ReferenceTimeSynchronizer,
 		versionedMedium: VersionedMedium,
-		peers: Array<Peer>,
 		restClient: RESTClient,
 		connection: Connection,
 		disconnectCallback: DisconnectCallback,
 	) {
-		this.id = id;
 		this.name = name;
 		this.referenceTimeSynchronizer = referenceTimeSynchronizer;
 		this.versionedMedium = versionedMedium;
-		this.peers = peers;
+		this.peers = new Array<Peer>();
 
 		this.restClient = restClient;
 
@@ -110,7 +108,9 @@ export default class RegisteredClient {
 	}
 
 	asPeer(): Peer {
-		return new Peer(this.id, this.name);
+		// FIXME
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+		return new Peer(this.id!, this.name);
 	}
 
 	subscribeToPeerChanges(subscriber: Subscriber<PeerLifecycleMessage>): Unsubscriber {
@@ -199,8 +199,13 @@ export default class RegisteredClient {
 	}
 
 	private handleClientJoinedBroadcast(clientJoinedBroadcast: ClientJoinedBroadcast) {
-		if (this.id === clientJoinedBroadcast.id) {
-			// we already know that we've joined ourselves
+		// FIXME: We joined, this is a bogus change...
+		if (this.id === undefined && clientJoinedBroadcast.name === this.name) {
+			this.id = clientJoinedBroadcast.id;
+			this.peers.splice(0, this.peers.length, ...clientJoinedBroadcast.participants
+				.map(Peer.fromParticipant)
+				.filter(participant => !participant.equals(this.asPeer())));
+			this.peerLifecycleMessageBroker.notify(new PeersRefreshedMessage(this.peers));
 			return;
 		}
 

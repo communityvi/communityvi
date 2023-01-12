@@ -1,8 +1,32 @@
+import {VersionedMediumResponse} from '$lib/client/response';
+
 export class RESTClient {
 	private readonly apiBaseURL: URL;
 
 	constructor(apiBaseURL: URL) {
 		this.apiBaseURL = apiBaseURL;
+	}
+
+	async registerNewUser(name: string): Promise<{ name: string }> {
+		return (await this.post('user', {name})).json();
+	}
+
+	async login(username: string): Promise<string> {
+		return (await this.post('login', {username})).json();
+	}
+
+	private async post(path: string, payload: object): Promise<Response> {
+		return await fetch(`${this.apiBaseURL}/${path}`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify(payload)
+		});
+	}
+
+	async defaultMedium(token: string): Promise<VersionedMediumResponse> {
+		return (await fetch(`${this.apiBaseURL}/room/default/medium`, {
+			headers: {'Authorization': `Bearer ${token}`}
+		})).json();
 	}
 
 	async getReferenceTimeMilliseconds(): Promise<ReferenceTimeResponse> {

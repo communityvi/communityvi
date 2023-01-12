@@ -1,5 +1,6 @@
 import type {PlaybackStateResponse, ServerResponse} from '$lib/client/response';
 import type {MediumType} from '$lib/client/request';
+import {Peer} from "$lib/client/model";
 
 export interface ClientLeftBroadcast extends BroadcastMessage {
 	readonly id: number;
@@ -13,6 +14,12 @@ export enum LeftReason {
 }
 
 export interface ClientJoinedBroadcast extends BroadcastMessage {
+	readonly id: number;
+	readonly name: string;
+	readonly participants: Participant[];
+}
+
+export interface Participant {
 	readonly id: number;
 	readonly name: string;
 }

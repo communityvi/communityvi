@@ -1,7 +1,7 @@
 use crate::server::rest_api::error::authentication_failed::AuthenticationFailedError;
 use crate::user::UserRepository;
 use aide::transform::TransformOperation;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Request;
@@ -29,10 +29,17 @@ impl Claims {
 	}
 }
 
+/// Alternative for specifying JWTs when headers aren't possible, i.e. `WebSockets`.
+#[derive(Deserialize)]
+pub struct QueryToken {
+	token: String,
+}
+
 pub async fn middleware<Body>(
 	State(user_repository): State<Arc<Mutex<UserRepository>>>,
 	State(jwt_decoding_key): State<DecodingKey>,
-	TypedHeader(auth_header): TypedHeader<Authorization<Bearer>>,
+	maybe_auth_header: Option<TypedHeader<Authorization<Bearer>>>,
+	maybe_auth_query: Option<Query<QueryToken>>,
 	mut request: Request<Body>,
 	next: Next<Body>,
 ) -> Result<Response, AuthenticationFailedError> {
@@ -40,8 +47,15 @@ pub async fn middleware<Body>(
 	validation.validate_exp = false;
 	validation.required_spec_claims.clear();
 
-	let token = jsonwebtoken::decode::<Claims>(auth_header.token(), &jwt_decoding_key, &validation).map_err(|e| {
-		log::debug!("Could not decode token: '{}', error was: {}", auth_header.token(), e);
+	// Either accept a JWT via Bearer header or as query parameter.
+	let token = match (maybe_auth_header, maybe_auth_query) {
+		(Some(auth_header), None) => auth_header.token().to_string(),
+		(None, Some(Query(auth_query))) => auth_query.token,
+		_ => return Err(AuthenticationFailedError),
+	};
+
+	let token = jsonwebtoken::decode::<Claims>(&token, &jwt_decoding_key, &validation).map_err(|e| {
+		log::debug!("Could not decode token: '{}', error was: {}", token, e);
 		AuthenticationFailedError
 	})?;
 

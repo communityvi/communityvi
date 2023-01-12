@@ -1,15 +1,16 @@
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
+use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, Participant};
 use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use crate::room::session_id::SessionId;
 use crate::room::session_repository::SessionRepository;
-use crate::user::UserRepository;
+use crate::user::User;
 use chrono::Duration;
 use js_int::{uint, UInt};
 use parking_lot::{Mutex, RwLock};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub mod client;
@@ -25,7 +26,6 @@ pub struct Room {
 }
 
 struct Inner {
-	user_repository: Mutex<UserRepository>,
 	session_repository: RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
@@ -55,7 +55,6 @@ impl MessageCounters {
 impl Room {
 	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
 		let inner = Inner {
-			user_repository: Mutex::default(),
 			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
@@ -66,28 +65,28 @@ impl Room {
 
 	/// Add a new client to the room, passing in a sender for sending messages to it.
 	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
-	pub fn add_client_and_return_existing(
-		&self,
-		name: &str,
-		message_sender: MessageSender,
-	) -> Result<(Client, Vec<Client>), RoomError> {
-		let user = self.inner.user_repository.lock().create_user(name)?;
-		self.inner
-			.session_repository
-			.write()
-			.add_and_return_existing(user, message_sender)
+	pub fn start_session_for_user(&self, user: User, message_sender: MessageSender) -> Result<NewSession, RoomError> {
+		let mut repository = self.inner.session_repository.write();
+		let session = repository.add(user, message_sender)?;
+		let participants = Self::collect_participants(&repository);
+
+		Ok(NewSession { session, participants })
 	}
 
-	pub fn remove_client(&self, session_id: SessionId) {
-		let mut session_repository = self.inner.session_repository.write();
+	pub fn remove_session(&self, session_id: SessionId) -> RemoveSession {
+		let mut repository = self.inner.session_repository.write();
 
-		if let Some(client) = session_repository.remove(session_id) {
-			self.inner.user_repository.lock().remove(client.user());
-		}
-
-		if session_repository.is_empty() {
+		repository.remove(session_id);
+		if repository.is_empty() {
 			self.eject_medium();
 		}
+
+		let participants = Self::collect_participants(&repository);
+		RemoveSession { participants }
+	}
+
+	fn collect_participants(repository: &SessionRepository) -> BTreeSet<Participant> {
+		repository.iter_clients().map(From::from).collect()
 	}
 
 	pub fn send_chat_message(&self, sender: &Client, message: String) {
@@ -152,6 +151,15 @@ impl Room {
 	}
 }
 
+pub struct NewSession {
+	pub session: Client,
+	pub participants: BTreeSet<Participant>,
+}
+
+pub struct RemoveSession {
+	pub participants: BTreeSet<Participant>,
+}
+
 #[cfg(test)]
 #[allow(clippy::non_ascii_literal)]
 mod test {
@@ -167,13 +175,13 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client_and_return_existing(&format!("{count}"), message_sender.clone()) {
+			if let Err(error) = room.start_session_for_user(User::new(&format!("{count}")), message_sender.clone()) {
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client_and_return_existing("elephant", message_sender);
+		let result = room.start_session_for_user(User::new("elephant"), message_sender);
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
@@ -183,13 +191,15 @@ mod test {
 		let name = "牧瀬 紅莉栖";
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let (makise_kurisu, _) = room
-			.add_client_and_return_existing(name, message_sender)
+		let NewSession {
+			session: makise_kurisu, ..
+		} = room
+			.start_session_for_user(User::new(name), message_sender)
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
 		room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
 
-		room.remove_client(makise_kurisu.id());
+		room.remove_session(makise_kurisu.id());
 		assert_eq!(
 			room.medium(),
 			VersionedMedium {
@@ -222,22 +232,5 @@ mod test {
 			"Must not be able to insert"
 		);
 		assert_eq!(room.medium().version, uint!(0));
-	}
-
-	#[test]
-	fn add_client_should_return_list_of_existing_clients() {
-		let room = Room::new(ReferenceTimer::default(), 10);
-		let jake_sender = FakeMessageSender::default();
-		let (jake, existing_clients) = room.add_client_and_return_existing("Jake", jake_sender.into()).unwrap();
-		assert!(existing_clients.is_empty());
-
-		let elwood_sender = FakeMessageSender::default();
-		let (_, existing_clients) = room
-			.add_client_and_return_existing("Elwood", elwood_sender.into())
-			.unwrap();
-		assert_eq!(existing_clients.len(), 1);
-		let existing_jake = &existing_clients[0];
-		assert_eq!(jake.id(), existing_jake.id());
-		assert_eq!(jake.name(), existing_jake.name());
 	}
 }

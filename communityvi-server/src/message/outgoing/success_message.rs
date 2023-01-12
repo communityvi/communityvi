@@ -1,22 +1,11 @@
 use js_int::{Int, UInt};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::room::client::Client;
 use crate::room::medium::playback_state::PlaybackState;
 use crate::room::medium::{Medium, VersionedMedium};
 use crate::room::session_id::SessionId;
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum SuccessMessage {
-	Hello {
-		id: SessionId,
-		clients: Vec<ClientResponse>,
-		current_medium: VersionedMediumResponse,
-	},
-	Success,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientResponse {
@@ -52,12 +41,18 @@ pub enum MediumResponse {
 	Empty,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum PlaybackStateResponse {
-	Playing { start_time_in_milliseconds: Int },
-	Paused { position_in_milliseconds: UInt },
+	Playing {
+		#[schemars(with = "i64")]
+		start_time_in_milliseconds: Int,
+	},
+	Paused {
+		#[schemars(with = "u64")]
+		position_in_milliseconds: UInt,
+	},
 }
 
 impl From<PlaybackState> for PlaybackStateResponse {
@@ -92,90 +87,5 @@ impl From<Medium> for MediumResponse {
 			},
 			Medium::Empty => MediumResponse::Empty,
 		}
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-	use chrono::Duration;
-	use js_int::uint;
-
-	#[test]
-	fn hello_response_without_medium_should_serialize_and_deserialize() {
-		let hello_response = SuccessMessage::Hello {
-			id: 42.into(),
-			clients: vec![],
-			current_medium: VersionedMedium::default().into(),
-		};
-		let json = serde_json::to_string(&hello_response).expect("Failed to serialize Hello response to JSON");
-		assert_eq!(
-			r#"{"type":"hello","id":42,"clients":[],"current_medium":{"version":0,"type":"empty"}}"#,
-			json
-		);
-
-		let deserialized_hello_response: SuccessMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
-		assert_eq!(hello_response, deserialized_hello_response);
-	}
-
-	#[test]
-	fn hello_response_with_medium_should_serialize_and_deserialize() {
-		let hello_response = SuccessMessage::Hello {
-			id: 42.into(),
-			clients: vec![ClientResponse {
-				id: SessionId::from(8080),
-				name: "IMSAI".to_string(),
-			}],
-			current_medium: VersionedMediumResponse {
-				medium: MediumResponse::FixedLength {
-					name: "WarGames".to_string(),
-					length_in_milliseconds: u64::try_from(Duration::minutes(114).num_milliseconds()).unwrap(),
-					playback_state: PlaybackStateResponse::Paused {
-						position_in_milliseconds: uint!(0),
-					},
-				},
-				version: uint!(0),
-			},
-		};
-		let json = serde_json::to_string_pretty(&hello_response).expect("Failed to serialize Hello response to JSON");
-		assert_eq!(
-			r#"{
-  "type": "hello",
-  "id": 42,
-  "clients": [
-    {
-      "id": 8080,
-      "name": "IMSAI"
-    }
-  ],
-  "current_medium": {
-    "version": 0,
-    "type": "fixed_length",
-    "name": "WarGames",
-    "length_in_milliseconds": 6840000,
-    "playback_state": {
-      "type": "paused",
-      "position_in_milliseconds": 0
-    }
-  }
-}"#,
-			json
-		);
-
-		let deserialized_hello_response: SuccessMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize Hello response from JSON");
-		assert_eq!(hello_response, deserialized_hello_response);
-	}
-
-	#[test]
-	fn success_response_should_serialize_and_deserialize() {
-		let success_response = SuccessMessage::Success;
-		let json = serde_json::to_string(&success_response).expect("Failed to serialize Success response to JSON");
-		assert_eq!(r#"{"type":"success"}"#, json);
-
-		let deserialized_success_response: SuccessMessage =
-			serde_json::from_str(&json).expect("Failed to deserialize Success response from JSON");
-		assert_eq!(success_response, deserialized_success_response);
 	}
 }

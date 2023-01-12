@@ -1,6 +1,5 @@
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use futures_util::{Sink, SinkExt};
@@ -26,8 +25,8 @@ where
 }
 
 impl MessageSender {
-	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> Result<(), ()> {
-		let outgoing_message = OutgoingMessage::Success { request_id, message };
+	pub async fn send_success_message(&self, request_id: UInt) -> Result<(), ()> {
+		let outgoing_message = OutgoingMessage::Success { request_id };
 		self.send_message(outgoing_message).await
 	}
 

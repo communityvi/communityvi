@@ -1,6 +1,5 @@
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::{MessageError, WebSocketMessage};
 use js_int::UInt;
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,6 @@ pub mod success_message;
 pub enum OutgoingMessage {
 	Success {
 		request_id: UInt,
-		message: SuccessMessage,
 	},
 	Error {
 		request_id: Option<UInt>,
@@ -52,22 +50,17 @@ impl TryFrom<&WebSocketMessage> for OutgoingMessage {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::message::outgoing::broadcast_message::ClientJoinedBroadcast;
+	use crate::message::outgoing::broadcast_message::{ClientJoinedBroadcast, Participant};
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::room::session_id::SessionId;
 	use js_int::uint;
+	use std::collections::BTreeSet;
 
 	#[test]
 	fn success_message_should_serialize_and_deserialize() {
-		let success_message = OutgoingMessage::Success {
-			request_id: uint!(42),
-			message: SuccessMessage::Success,
-		};
+		let success_message = OutgoingMessage::Success { request_id: uint!(42) };
 		let json = serde_json::to_string(&success_message).expect("Failed to serialize Success message to JSON");
-		assert_eq!(
-			r#"{"type":"success","request_id":42,"message":{"type":"success"}}"#,
-			json
-		);
+		assert_eq!(r#"{"type":"success","request_id":42}"#, json);
 
 		let deserialized_success_message: OutgoingMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize Success message from JSON");
@@ -116,15 +109,18 @@ mod test {
 
 	#[test]
 	fn broadcast_message_should_serialize_and_deserialize() {
+		let nena = Participant::new(SessionId::from(98), "Nena".to_string());
+		let luftballons = Participant::new(SessionId::from(99), "Luftballons".to_string());
 		let broadcast_message = OutgoingMessage::Broadcast {
 			message: BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 				id: SessionId::from(99),
 				name: "Luftballons".to_string(),
+				participants: BTreeSet::from_iter([nena, luftballons]),
 			}),
 		};
 		let json = serde_json::to_string(&broadcast_message).expect("Failed to serialize broadcast message to JSON");
 		assert_eq!(
-			r#"{"type":"broadcast","message":{"type":"client_joined","id":99,"name":"Luftballons"}}"#,
+			r#"{"type":"broadcast","message":{"type":"client_joined","id":99,"name":"Luftballons","participants":[{"id":99,"name":"Luftballons"},{"id":98,"name":"Nena"}]}}"#,
 			json
 		);
 

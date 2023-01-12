@@ -3,7 +3,6 @@ use crate::connection::sender::MessageSender;
 use crate::connection::Connection;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::session_id::SessionId;
 use crate::user::User;
 use js_int::UInt;
@@ -41,8 +40,8 @@ impl Client {
 		&self.inner.user
 	}
 
-	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> bool {
-		let success = self.inner.connection.send_success_message(message, request_id).await;
+	pub async fn send_success_message(&self, request_id: UInt) -> bool {
+		let success = self.inner.connection.send_success_message(request_id).await;
 		if !success {
 			info!(
 				"Failed to send success message to client with id {} because it went away.",

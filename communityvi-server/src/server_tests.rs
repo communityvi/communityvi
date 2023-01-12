@@ -1,11 +1,10 @@
 use crate::configuration::Configuration;
 use crate::context::ApplicationContext;
-use crate::message::client_request::{ChatRequest, RegisterRequest};
+use crate::message::client_request::ChatRequest;
 use crate::message::outgoing::broadcast_message::{
-	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, LeftReason,
+	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, LeftReason, Participant,
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
-use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::session_id::SessionId;
 use crate::room::Room;
 use crate::server::create_router;
@@ -13,38 +12,17 @@ use crate::utils::test_client::WebsocketTestClient;
 use crate::utils::time_source::TimeSource;
 use axum::http::header::{CONNECTION, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE};
 use axum::http::StatusCode;
+use hyper_test::hyper;
 use hyper_test::hyper::upgrade;
 use js_int::uint;
+use serde_json::json;
+use std::collections::BTreeSet;
 use tokio_tungstenite::tungstenite::protocol::Role;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 
 type TestClient = hyper_test::Client;
 
 mod rest_api;
-
-#[tokio::test]
-async fn should_respond_to_websocket_messages() {
-	let http_client = start_test_server();
-	let mut websocket_client = websocket_test_client(&http_client).await;
-	let session_id = register_client("Ferris", &mut websocket_client).await;
-	assert_eq!(SessionId::from(0), session_id);
-}
-
-#[tokio::test]
-async fn should_not_allow_invalid_messages_during_registration() {
-	let http_client = start_test_server();
-	let mut websocket_client = websocket_test_client(&http_client).await;
-	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
-	websocket_client.send_raw(invalid_message).await;
-
-	let response = websocket_client.receive_error_message(None).await;
-
-	let expected_response = ErrorMessage::builder()
-		.error(ErrorMessageType::InvalidFormat)
-		.message("Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string())
-		.build();
-	assert_eq!(expected_response, response);
-}
 
 #[tokio::test]
 async fn should_not_allow_invalid_messages_after_successful_registration() {
@@ -73,9 +51,13 @@ async fn should_broadcast_messages() {
 	let (bob_session_id, mut bob_test_client) = registered_websocket_test_client("Bob", &http_client).await;
 	assert_eq!(SessionId::from(1), bob_session_id);
 
+	let bob = Participant::new(bob_session_id, "Bob".to_string());
+	let alice = Participant::new(alice_session_id, "Alice".to_string());
+
 	let expected_bob_joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 		id: bob_session_id,
 		name: "Bob".to_string(),
+		participants: BTreeSet::from_iter([alice, bob]),
 	});
 	let bob_joined_broadcast = alice_test_client.receive_broadcast_message().await;
 	assert_eq!(expected_bob_joined_broadcast, bob_joined_broadcast);
@@ -88,10 +70,7 @@ async fn should_broadcast_messages() {
 	});
 
 	let request_id = alice_test_client.send_request(request).await;
-	assert_eq!(
-		SuccessMessage::Success,
-		alice_test_client.receive_success_message(request_id).await
-	);
+	alice_test_client.receive_success_message(request_id).await;
 
 	assert_eq!(
 		expected_chat_broadcast,
@@ -106,7 +85,8 @@ async fn should_broadcast_messages() {
 #[tokio::test]
 async fn should_broadcast_when_client_leaves_the_room() {
 	let http_client = start_test_server();
-	let (_alice_session_id, mut alice_client) = registered_websocket_test_client("Alice", &http_client).await;
+	let (alice_session_id, mut alice_client) = registered_websocket_test_client("Alice", &http_client).await;
+	let alice = Participant::new(alice_session_id, "Alice".to_string());
 	let (bob_session_id, bob_client) = registered_websocket_test_client("Bob", &http_client).await;
 
 	let _bobs_join_message = alice_client.receive_broadcast_message().await;
@@ -116,6 +96,7 @@ async fn should_broadcast_when_client_leaves_the_room() {
 		id: bob_session_id,
 		name: "Bob".to_string(),
 		reason: LeftReason::Closed,
+		participants: BTreeSet::from_iter([alice]),
 	});
 	let leave_message = alice_client.receive_broadcast_message().await;
 	assert_eq!(expected_leave_message, leave_message);
@@ -124,7 +105,7 @@ async fn should_broadcast_when_client_leaves_the_room() {
 #[tokio::test]
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let http_client = start_test_server();
-	let mut websocket_client = websocket_test_client(&http_client).await;
+	let (_, mut websocket_client) = registered_websocket_test_client("test", &http_client).await;
 	websocket_client.send_raw(tungstenite::Message::Ping(vec![])).await;
 
 	let pong = websocket_client.receive_raw().await;
@@ -149,49 +130,53 @@ async fn registered_websocket_test_client(
 	name: &'static str,
 	http_client: &TestClient,
 ) -> (SessionId, WebsocketTestClient) {
-	let mut websocket_client = websocket_test_client(http_client).await;
-	let session_id = register_client(name, &mut websocket_client).await;
-	(session_id, websocket_client)
-}
+	// Register
+	let register_response = http_client
+		.post("http://localhost/api/user")
+		.json(&json!({ "name": name }))
+		.send()
+		.await
+		.expect("Registration request failed.");
+	assert!(register_response.status().is_success(), "Registration failed");
 
-async fn register_client(name: &str, test_client: &mut WebsocketTestClient) -> SessionId {
-	let register_request = RegisterRequest { name: name.to_string() };
+	// Login
+	let login_body = http_client
+		.post("http://localhost/api/login")
+		.json(&json!({ "username": name }))
+		.send()
+		.await
+		.expect("Login request failed.")
+		.into_body();
+	let body_bytes = hyper::body::to_bytes(login_body)
+		.await
+		.expect("Could not extract body from login request.");
+	let token = serde_json::from_slice::<String>(&body_bytes).expect("Could not deserialize token.");
 
-	let request_id = test_client.send_request(register_request).await;
-
-	let response = test_client.receive_success_message(request_id).await;
-
-	let SuccessMessage::Hello { id, .. } = response else {
-		panic!("Expected Hello-Response, got '{response:?}'");
-	};
-
-	let joined_response = test_client.receive_broadcast_message().await;
-	assert!(matches!(
-		joined_response,
-		BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
-	));
-
-	id
-}
-
-async fn websocket_test_client(http_client: &TestClient) -> WebsocketTestClient {
+	// Start session
 	let response = http_client
-		.get("ws://localhost/ws")
+		.get("ws://localhost/api/room/default/join")
+		.bearer_auth(token)
 		.header(CONNECTION, "upgrade")
 		.header(UPGRADE, "websocket")
 		.header(SEC_WEBSOCKET_KEY, "dGhlIHNhbXBsZSBub25jZQ==")
 		.header(SEC_WEBSOCKET_VERSION, "13")
 		.send()
 		.await
-		.expect("Websocket request failed.");
+		.expect("Session start request failed.");
 	assert_eq!(response.status(), StatusCode::SWITCHING_PROTOCOLS);
-
 	let upgraded = upgrade::on(response.into_response())
 		.await
 		.expect("Failed to upgrade client websocket.");
-	WebSocketStream::from_raw_socket(upgraded, Role::Client, None)
+	let mut websocket_client: WebsocketTestClient = WebSocketStream::from_raw_socket(upgraded, Role::Client, None)
 		.await
-		.into()
+		.into();
+
+	let joined_response = websocket_client.receive_broadcast_message().await;
+	let BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: session_id, name: _, participants: _ }) = joined_response else {
+		panic!("Received message was not ClientJoined broadcast.");
+	};
+
+	(session_id, websocket_client)
 }
 
 pub(self) fn start_test_server() -> TestClient {

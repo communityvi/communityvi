@@ -23,12 +23,8 @@ impl SessionRepository {
 	}
 
 	/// Add a new client, passing in a sender for sending messages to it.
-	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
-	pub fn add_and_return_existing(
-		&mut self,
-		user: User,
-		message_sender: MessageSender,
-	) -> Result<(Client, Vec<Client>), RoomError> {
+	/// Returns the newly added client.
+	pub fn add(&mut self, user: User, message_sender: MessageSender) -> Result<Client, RoomError> {
 		if self.clients_by_id.len() >= self.maximum_size {
 			return Err(RoomError::RoomFull);
 		}
@@ -37,12 +33,11 @@ impl SessionRepository {
 		let broadcast_buffer = BroadcastBuffer::new(self.maximum_size);
 		let client = Client::new(id, user, broadcast_buffer, message_sender);
 
-		let existing_clients = self.clients_by_id.values().cloned().collect();
 		if self.clients_by_id.insert(id, client.clone()).is_some() {
 			unreachable!("There must never be two clients with the same id!");
 		}
 
-		Ok((client, existing_clients))
+		Ok(client)
 	}
 
 	pub fn remove(&mut self, session_id: SessionId) -> Option<Client> {
@@ -66,40 +61,6 @@ mod test {
 	use crate::utils::fake_message_sender::FakeMessageSender;
 
 	#[test]
-	fn add_should_return_empty_list_when_adding_to_an_empty_list() {
-		let mut user_repository = UserRepository::default();
-		let mut session_repository = SessionRepository::with_limit(10);
-		let jake = user_repository.create_user("Jake").expect("Could not create user");
-		let jake_sender = FakeMessageSender::default();
-		let (_, existing_clients) = session_repository
-			.add_and_return_existing(jake, jake_sender.into())
-			.unwrap();
-		assert!(existing_clients.is_empty());
-	}
-
-	#[test]
-	fn add_should_return_list_of_existing_clients() {
-		let mut user_repository = UserRepository::default();
-		let mut session_repository = SessionRepository::with_limit(10);
-		let jake = user_repository.create_user("Jake").expect("Could not create user");
-		let elwood = user_repository.create_user("Elwood").expect("Could not create user");
-		let jake_sender = FakeMessageSender::default();
-		let (jake, existing_clients) = session_repository
-			.add_and_return_existing(jake, jake_sender.into())
-			.unwrap();
-		assert!(existing_clients.is_empty());
-
-		let elwood_sender = FakeMessageSender::default();
-		let (_, existing_clients) = session_repository
-			.add_and_return_existing(elwood, elwood_sender.into())
-			.unwrap();
-		assert_eq!(existing_clients.len(), 1);
-		let existing_jake = &existing_clients[0];
-		assert_eq!(jake.id(), existing_jake.id());
-		assert_eq!(jake.name(), existing_jake.name());
-	}
-
-	#[test]
 	fn should_track_if_there_are_any_clients_left() {
 		let mut user_repository = UserRepository::default();
 		let mut session_repository = SessionRepository::with_limit(2);
@@ -107,12 +68,12 @@ mod test {
 		let spidey = user_repository.create_user("Spidey").expect("Could not create Spidey!");
 
 		let ferris_connection = MessageSender::from(FakeMessageSender::default());
-		let (ferris_client, _) = session_repository
-			.add_and_return_existing(ferris, ferris_connection)
+		let ferris_client = session_repository
+			.add(ferris, ferris_connection)
 			.expect("Could not add Ferris!");
 		let spidey_connection = MessageSender::from(FakeMessageSender::default());
-		let (spidey_client, _) = session_repository
-			.add_and_return_existing(spidey, spidey_connection)
+		let spidey_client = session_repository
+			.add(spidey, spidey_connection)
 			.expect("Could not add Spidey!");
 
 		session_repository.remove(ferris_client.id());
@@ -125,7 +86,7 @@ mod test {
 		let crab = user_repository.create_user("Crab").expect("Could not create Crab!");
 		let crab_connection = MessageSender::from(FakeMessageSender::default());
 		session_repository
-			.add_and_return_existing(crab, crab_connection)
+			.add(crab, crab_connection)
 			.expect("Could not add client!");
 	}
 
@@ -139,7 +100,7 @@ mod test {
 				.expect("Could not create user!");
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = session_repository.add_and_return_existing(user, message_sender.clone()) {
+			if let Err(error) = session_repository.add(user, message_sender.clone()) {
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
@@ -155,14 +116,14 @@ mod test {
 				.expect("Could not create user!");
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = session_repository.add_and_return_existing(user, message_sender.clone()) {
+			if let Err(error) = session_repository.add(user, message_sender.clone()) {
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
 		let elephant = user_repository.create_user("elephant").expect("Could not create user!");
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = session_repository.add_and_return_existing(elephant, message_sender);
+		let result = session_repository.add(elephant, message_sender);
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 }

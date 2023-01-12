@@ -3,23 +3,34 @@
 //       therefore needs to be global to the module.
 #![allow(clippy::needless_pass_by_value)]
 
+use crate::connection::receiver::MessageReceiver;
+use crate::connection::sender::MessageSender;
 use crate::context::ApplicationContext;
+use crate::lifecycle::run_client;
+use crate::message::outgoing::broadcast_message::VersionedMediumBroadcast;
 use crate::reference_time::ReferenceTimer;
+use crate::room::Room;
 use crate::server::rest_api::auth::{needs_authentication, Claims};
 use crate::server::rest_api::error::login::LoginError;
 use crate::server::rest_api::models::{LoginRequest, UserRegistrationRequest, UserRegistrationResponse, UserResponse};
 use crate::server::rest_api::response::Created;
 use crate::server::OpenApiJson;
 use crate::user::{User, UserCreationError, UserRepository};
+use crate::utils::websocket_message_conversion::{
+	axum_websocket_message_to_tungstenite_message, tungstenite_message_to_axum_websocket_message,
+};
 use aide::axum::routing::{get_with, post_with};
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::transform::TransformOpenApi;
-use axum::extract::State;
+use axum::extract::ws::WebSocket;
+use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
+use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use parking_lot::Mutex;
+use std::future::ready;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
@@ -32,13 +43,10 @@ mod response;
 
 pub fn rest_api(application_context: ApplicationContext) -> ApiRouter {
 	ApiRouter::new()
-		.api_route(
-			"/reference-time-milliseconds",
-			get_with(reference_time_milliseconds,
-			|operation| operation
-				.summary("Return current server reference time in milliseconds")
-				.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
-			))
+		.api_route("/reference-time-milliseconds", get_with(reference_time_milliseconds, |operation| operation
+			.summary("Return current server reference time in milliseconds")
+			.description("The reference time is the common time that all participants are synchronized on and that all operations refer to.")
+		))
 		.api_route("/user", post_with(register_user, |operation| operation
 			.summary("Register a user")
 			.description("Users need to be registered before they can take part in any room.")
@@ -52,6 +60,16 @@ pub fn rest_api(application_context: ApplicationContext) -> ApiRouter {
 			.summary("Perform a login")
 			.description("Creates a JWT on success that can be used to authenticate as the user.")
 		))
+		.api_route("/room/default/join", get_with(join_room, |operation| operation
+			.with(needs_authentication)
+			.summary("Join the default room")
+			.description("Starts a websocket client session as the logged-in user.")
+		).layer(axum::middleware::from_fn_with_state(application_context.clone(), auth::middleware)))
+		.api_route("/room/default/medium", get_with(read_medium, |operation| operation
+			.with(needs_authentication)
+			.summary("Get the default room's medium")
+			.description("Reads the default room's medium and it's current PlaybackState.")
+		).layer(axum::middleware::from_fn_with_state(application_context.clone(), auth::middleware)))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
 		.layer(CorsLayer::very_permissive())
@@ -113,4 +131,41 @@ async fn login(
 
 async fn current_user(Extension(user): Extension<User>) -> impl IntoApiResponse {
 	Json(UserResponse::from(user))
+}
+
+async fn join_room(
+	websocket: WebSocketUpgrade,
+	Extension(room): Extension<Room>,
+	Extension(user): Extension<User>,
+	State(application_context): State<ApplicationContext>,
+) -> impl IntoApiResponse {
+	websocket
+		.max_send_queue(1)
+		.max_message_size(10 * 1024)
+		.max_frame_size(10 * 1024)
+		.on_upgrade(move |websocket| run_websocket_connection(application_context, room, user, websocket))
+}
+
+async fn run_websocket_connection(
+	application_context: ApplicationContext,
+	room: Room,
+	user: User,
+	websocket: WebSocket,
+) {
+	let (sink, stream) = websocket.split();
+
+	let sink = sink.with(|message| ready(tungstenite_message_to_axum_websocket_message(message)));
+	let message_sender = MessageSender::from(sink);
+	let message_receiver = MessageReceiver::new(
+		stream
+			.map_ok(axum_websocket_message_to_tungstenite_message)
+			.map_err(Into::into),
+		message_sender.clone(),
+	);
+
+	run_client(application_context, room, user, message_sender, message_receiver).await;
+}
+
+async fn read_medium(Extension(room): Extension<Room>) -> impl IntoApiResponse {
+	Json(VersionedMediumBroadcast::new(room.medium(), false))
 }

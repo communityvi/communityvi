@@ -19,6 +19,7 @@ export interface Connection {
 export class WebSocketConnection implements Connection {
 	private readonly webSocket: WebSocket;
 	private readonly timeoutInMilliseconds: number;
+	private readonly undeliveredMessages: MessageEvent[];
 	private intendedClose = false;
 
 	private delegate?: ConnectionDelegate;
@@ -26,20 +27,17 @@ export class WebSocketConnection implements Connection {
 	private pendingResponses: PendingResponses = {};
 	private nextRequestId = 0;
 
-	constructor(webSocket: WebSocket, timeoutInMilliseconds: number) {
-		webSocket.onerror = error => {
-			this.delegate?.connectionDidEncounterError(error);
-		};
-		webSocket.onmessage = messageEvent => {
-			const message: ServerResponse = JSON.parse(messageEvent.data);
-			this.handleMessage(message, messageEvent);
-		};
-		webSocket.onclose = closeEvent => {
+	constructor(webSocket: WebSocket, timeoutInMilliseconds: number, earlyMessages: MessageEvent[]) {
+		this.undeliveredMessages = earlyMessages;
+
+		this.webSocket = webSocket;
+		this.webSocket.onerror = error => this.delegate?.connectionDidEncounterError(error);
+		this.webSocket.onmessage = messageEvent => this.undeliveredMessages.push(messageEvent);
+		this.webSocket.onclose = closeEvent => {
 			const reason = this.determineCloseReasonFromCloseEvent(closeEvent);
 			this.delegate?.connectionDidClose(reason);
 		};
 
-		this.webSocket = webSocket;
 		this.timeoutInMilliseconds = timeoutInMilliseconds;
 	}
 
@@ -57,6 +55,16 @@ export class WebSocketConnection implements Connection {
 
 	setDelegate(delegate: ConnectionDelegate): void {
 		this.delegate = delegate;
+		this.webSocket.onmessage = messageEvent => {
+			const message: ServerResponse = JSON.parse(messageEvent.data);
+			this.handleMessage(message, messageEvent);
+		};
+
+		// Deliver the undelivered messages to the delegate, then clear the buffer.
+		for (const event of this.undeliveredMessages) {
+			this.webSocket.onmessage(event);
+		}
+		this.undeliveredMessages.splice(0, this.undeliveredMessages.length);
 	}
 
 	private handleMessage(serverResponse: ServerResponse, event: MessageEvent): void {

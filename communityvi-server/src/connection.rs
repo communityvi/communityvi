@@ -2,7 +2,6 @@ use crate::connection::broadcast_buffer::BroadcastBuffer;
 use crate::connection::sender::MessageSender;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
 use js_int::UInt;
 
 pub mod broadcast_buffer;
@@ -22,8 +21,8 @@ impl Connection {
 		}
 	}
 
-	pub async fn send_success_message(&self, message: SuccessMessage, request_id: UInt) -> bool {
-		self.sender.send_success_message(message, request_id).await.is_ok()
+	pub async fn send_success_message(&self, request_id: UInt) -> bool {
+		self.sender.send_success_message(request_id).await.is_ok()
 	}
 
 	pub async fn send_error_message(&self, message: ErrorMessage, request_id: Option<UInt>) -> bool {

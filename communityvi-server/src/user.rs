@@ -69,6 +69,11 @@ impl User {
 	pub fn name(&self) -> &str {
 		&self.name
 	}
+
+	#[cfg(test)]
+	pub fn new(name: &str) -> Self {
+		Self { name: name.to_string() }
+	}
 }
 
 impl Borrow<str> for User {

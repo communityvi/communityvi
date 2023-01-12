@@ -4,17 +4,17 @@ use crate::lifecycle::send_broadcasts;
 use crate::message::client_request::{ClientRequest, ClientRequestWithId};
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
-use crate::message::outgoing::success_message::SuccessMessage;
 use crate::message::outgoing::OutgoingMessage;
 use crate::message::WebSocketMessage;
 use crate::room::client::Client;
-use crate::room::Room;
+use crate::room::{NewSession, Room};
+use crate::user::User;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures_channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 use js_int::UInt;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
@@ -22,7 +22,7 @@ use tokio_tungstenite::WebSocketStream;
 
 pub struct WebsocketTestClient {
 	websocket_client: Box<dyn WebSocketClient>,
-	success_messages: BTreeMap<UInt, SuccessMessage>,
+	success_messages: BTreeSet<UInt>,
 	error_messages: BTreeMap<Option<UInt>, ErrorMessage>,
 	broadcast_messages: VecDeque<BroadcastMessage>,
 }
@@ -43,8 +43,8 @@ impl WebsocketTestClient {
 	// async because it uses tokio::spawn. This make it clear that this should not be run outside of a runtime.
 	pub fn in_room(name: &'static str, room: &Room) -> (Client, Self) {
 		let (sender, _, test_client) = Self::new();
-		let (client, _) = room
-			.add_client_and_return_existing(name, sender)
+		let NewSession { session: client, .. } = room
+			.start_session_for_user(User::new(name), sender)
 			.expect("Failed to add client to room");
 		tokio::spawn(send_broadcasts(client.clone()));
 		(client, test_client)
@@ -79,11 +79,11 @@ impl WebsocketTestClient {
 		self.send_raw(websocket_message).await;
 	}
 
-	pub async fn receive_success_message(&mut self, expected_request_id: UInt) -> SuccessMessage {
+	pub async fn receive_success_message(&mut self, expected_request_id: UInt) {
 		loop {
 			self.receive_outgoing_message().await;
-			if let Some(success) = self.success_messages.remove(&expected_request_id) {
-				return success;
+			if self.success_messages.remove(&expected_request_id) {
+				return;
 			}
 		}
 	}
@@ -120,8 +120,8 @@ impl WebsocketTestClient {
 			.expect("Timeout while waiting for message.");
 		use OutgoingMessage::*;
 		match OutgoingMessage::try_from(&websocket_message).expect("Failed to deserialize OutgoingMessage") {
-			Success { request_id, message } => {
-				self.success_messages.insert(request_id, message);
+			Success { request_id } => {
+				self.success_messages.insert(request_id);
 			}
 			Error { request_id, message } => assert!(
 				self.error_messages.insert(request_id, message).is_none(),

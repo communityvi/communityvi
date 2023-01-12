@@ -10,6 +10,7 @@
 #![allow(clippy::wildcard_imports)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::let_underscore_untyped)]
+
 use crate::commandline::Commandline;
 use crate::error::CommunityviError;
 use clap::Parser;
