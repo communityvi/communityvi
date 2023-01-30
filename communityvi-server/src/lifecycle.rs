@@ -76,9 +76,7 @@ async fn register_client(
 		Request(request) => request,
 	};
 
-	let name = if let ClientRequest::Register(RegisterRequest { name }) = request.request {
-		name
-	} else {
+	let ClientRequest::Register(RegisterRequest { name }) = request.request else {
 		error!("Client registration failed. Invalid request: {:?}", request);
 
 		let _ = message_sender
@@ -173,10 +171,7 @@ pub async fn heartbeat(
 
 		let receive_pong = async {
 			while let Some(payload) = pong_receiver.next().await {
-				let payload = match <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) {
-					Ok(payload) => payload,
-					Err(_) => return Err(()),
-				};
+				let Ok(payload) = <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) else { return Err(()) };
 
 				let received_count = usize::from_ne_bytes(payload);
 				if received_count == count {
@@ -282,9 +277,7 @@ fn handle_insert_medium_request(
 	}: InsertMediumRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
 	let medium = Medium::try_from(medium_request)?;
-	let versioned_medium = match room.insert_medium(medium, previous_version) {
-		Some(versioned_medium) => versioned_medium,
-		None => {
+	let Some(versioned_medium) = room.insert_medium(medium, previous_version) else {
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
@@ -292,8 +285,7 @@ fn handle_insert_medium_request(
 					current_version = room.medium().version
 				),
 			})
-		}
-	};
+		};
 
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
@@ -313,11 +305,10 @@ fn handle_play_request(
 		start_time_in_milliseconds,
 	}: PlayRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
-	let versioned_medium = match room.play_medium(
+	let Some(versioned_medium) = room.play_medium(
 		Duration::milliseconds(start_time_in_milliseconds.into()),
 		previous_version,
-	) {
-		None => {
+	) else {
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
@@ -325,9 +316,7 @@ fn handle_play_request(
 					current_version = room.medium().version
 				),
 			})
-		}
-		Some(versioned_medium) => versioned_medium,
-	};
+		};
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
@@ -345,11 +334,10 @@ fn handle_pause_request(
 		position_in_milliseconds,
 	}: PauseRequest,
 ) -> Result<SuccessMessage, ErrorMessage> {
-	let versioned_medium = match room.pause_medium(
+	let Some(versioned_medium) = room.pause_medium(
 		Duration::milliseconds(position_in_milliseconds.clamp(UInt::MIN, UInt::MAX).into()),
 		previous_version,
-	) {
-		None => {
+	) else {
 			return Err(ErrorMessage {
 				error: ErrorMessageType::IncorrectMediumVersion,
 				message: format!(
@@ -357,9 +345,7 @@ fn handle_pause_request(
 					current_version = room.medium().version
 				),
 			})
-		}
-		Some(versioned_medium) => versioned_medium,
-	};
+		};
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
@@ -1086,9 +1072,7 @@ mod test {
 
 		let response = test_client.receive_success_message(request_id).await;
 
-		let id = if let SuccessMessage::Hello { id, .. } = response {
-			id
-		} else {
+		let SuccessMessage::Hello { id, .. } = response else {
 			panic!("Expected Hello-Response, got '{response:?}'");
 		};
 		assert_eq!(client.id(), id);

@@ -59,7 +59,7 @@ impl MessageSender {
 			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
 	}
 
-	#[allow(clippy::let_underscore_drop)] // Ignore Clippy here because we don't care about the result.
+	#[allow(let_underscore_drop)] // Ignore Clippy here because we don't care about the result.
 	pub async fn close(&self) {
 		let mut sink = self.sink.lock().await;
 		let _ = sink.send(WebSocketMessage::Close(None)).await;
