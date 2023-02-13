@@ -13,6 +13,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Extension, Json, Router};
+use tower_http::cors::CorsLayer;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
@@ -28,6 +29,7 @@ pub fn rest_api() -> ApiRouter<ApplicationContext> {
 			))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
+		.layer(CorsLayer::very_permissive())
 }
 
 pub fn finish_openapi_specification(api: TransformOpenApi) -> TransformOpenApi {
