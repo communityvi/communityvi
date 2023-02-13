@@ -366,6 +366,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite 0.19.0",
  "toml",
+ "tower-http",
  "tower-service",
  "typed-builder",
  "unicode_skeleton",

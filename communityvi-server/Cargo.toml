@@ -47,6 +47,7 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_l
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-tungstenite = "0.19"
 toml = "0.7"
+tower-http = { version = "0.3", features = ["cors"] }
 tower-service = "0.3"
 typed-builder = "0.14"
 unicode_skeleton = "0.1"

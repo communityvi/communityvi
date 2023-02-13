@@ -21,6 +21,7 @@ use axum::{Extension, Json, Router};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use parking_lot::Mutex;
 use std::sync::Arc;
+use tower_http::cors::CorsLayer;
 
 #[cfg(feature = "api-docs")]
 mod api_docs;
@@ -53,6 +54,7 @@ pub fn rest_api(application_context: ApplicationContext) -> ApiRouter {
 		))
 		.route("/openapi.json", get(openapi_specification))
 		.merge(stoplight_elements())
+		.layer(CorsLayer::very_permissive())
 		.with_state(application_context)
 }
 
