@@ -18,16 +18,11 @@ impl VersionedMedium {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Medium {
+	#[default]
 	Empty,
 	FixedLength(FixedLengthMedium),
-}
-
-impl Default for Medium {
-	fn default() -> Self {
-		Medium::Empty
-	}
 }
 
 impl VersionedMedium {
