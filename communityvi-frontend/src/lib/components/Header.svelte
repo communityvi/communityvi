@@ -25,6 +25,7 @@
 					toggleBurgerMenu();
 				}
 			}}
+			tabindex="0"
 			aria-label="menu"
 			aria-expanded={isBurgerMenuExpanded}
 		>
