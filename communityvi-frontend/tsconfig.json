@@ -9,10 +9,10 @@
 		"importsNotUsedAsValues": "remove",
 		"preserveValueImports": false,
 		"paths": {
-			"$lib/*": ["src/lib/*"],
-			"$lib": ["src/lib"],
-			"$client/*": ["src/client/*"],
-			"$client": ["src/client"]
+			"$lib/*": ["./src/lib/*"],
+			"$lib": ["./src/lib"],
+			"$client/*": ["./src/client/*"],
+			"$client": ["./src/client"]
 		},
 		"types": ["jest"]
 	}

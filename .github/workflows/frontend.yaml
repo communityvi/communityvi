@@ -18,7 +18,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Install packages
         run: npm install
       - name: ESLint & Prettier & Svelte check
@@ -32,7 +32,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Install packages
         run: npm install
       - name: Build static files
@@ -46,7 +46,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Install packages
         run: npm install
       - name: Test

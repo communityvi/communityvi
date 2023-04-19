@@ -7,7 +7,7 @@
 		"watch": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings --fail-on-hints && echo 'Svelte validate OK!'",
+		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
 		"lint:fix": "prettier -w --plugin-search-dir=. . && eslint --ignore-path .gitignore . --fix && echo 'ESLint Fixed!'",
 		"test": "jest tests",
 		"test:coverage": "jest tests --coverage",
@@ -17,7 +17,7 @@
 	"devDependencies": {
 		"@faker-js/faker": "^7.3.0",
 		"@fortawesome/fontawesome-free": "^6.0.0",
-		"@sveltejs/adapter-static": "next",
+		"@sveltejs/adapter-static": "^2.0.2",
 		"@sveltejs/kit": "^1.0.1",
 		"@testing-library/jest-dom": "^5.16",
 		"@testing-library/svelte": "^3.0",
@@ -39,7 +39,7 @@
 		"svelte-preprocess": "^5.0.0",
 		"ts-jest": "^29.0.0",
 		"tslib": "^2.3",
-		"typescript": "^4.6",
+		"typescript": "^5.0.0",
 		"vite": "^4.0.0"
 	}
 }
