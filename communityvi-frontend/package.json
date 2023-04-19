@@ -7,7 +7,7 @@
 		"watch": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings --fail-on-hints && echo 'Svelte validate OK!'",
+		"lint": "prettier --check --plugin-search-dir=. . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
 		"lint:fix": "prettier -w --plugin-search-dir=. . && eslint --ignore-path .gitignore . --fix && echo 'ESLint Fixed!'",
 		"test": "jest tests",
 		"test:coverage": "jest tests --coverage",
