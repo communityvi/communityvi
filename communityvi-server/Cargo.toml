@@ -10,7 +10,7 @@ rust-version = "1.67"
 members = [".", "hyper-test"]
 
 [dependencies]
-aide = {version = "0.10", features = ["axum", "axum-ws"]}
+aide = {version = "0.11", features = ["axum", "axum-ws"]}
 axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 anyhow = "1"
 bytes = "1"
