@@ -10,7 +10,7 @@ rust-version = "1.67"
 members = [".", "hyper-test"]
 
 [dependencies]
-aide = {version = "0.10", features = ["axum", "axum-ws"]}
+aide = {version = "0.11", features = ["axum", "axum-ws"]}
 axum = {version = "0.6", features = ["ws", "http2", "macros"]}
 anyhow = "1"
 bytes = "1"
@@ -40,7 +40,7 @@ sha2 = "0.10"
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
-tokio-tungstenite = "0.18"
+tokio-tungstenite = "0.19"
 toml = "0.7"
 tower-service = "0.3"
 typed-builder = "0.14"
