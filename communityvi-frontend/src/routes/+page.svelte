@@ -19,7 +19,7 @@
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
 		// as when the frontend is bundled with the backend.
-		const url = new URL(`ws://${pageHost()}/ws`);
+		const url = new URL(`ws://${pageHost()}/api/room/default/join`);
 		url.port = '8000';
 
 		return url;

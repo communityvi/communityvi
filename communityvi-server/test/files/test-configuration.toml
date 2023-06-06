@@ -3,3 +3,4 @@ log_filters = "info"
 room_size_limit = 42
 heartbeat_interval = "2s"
 missed_heartbeat_limit = 3
+jwt_secret = "SGFsbG8sIFdlbHQh"

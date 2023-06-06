@@ -13,6 +13,7 @@ pub(crate) enum InternalError {
 	Json(String),
 	TextDecoding(Utf8Error),
 	Request(String),
+	RequestBuilder(String),
 	ResponseContent(String),
 }
 
@@ -27,6 +28,7 @@ impl Display for InternalError {
 			Json(message) => write!(formatter, "JSON error: {message}"),
 			TextDecoding(error) => write!(formatter, "Text decoding error: {error}"),
 			Request(message) => write!(formatter, "Request error: {message}"),
+			RequestBuilder(message) => write!(formatter, "Request builder error: {message}"),
 			ResponseContent(message) => write!(formatter, "Failed to read response content: {message}"),
 		}
 	}

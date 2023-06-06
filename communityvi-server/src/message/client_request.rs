@@ -19,7 +19,6 @@ pub struct ClientRequestWithId {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum ClientRequest {
-	Register(RegisterRequest),
 	Chat(ChatRequest),
 	InsertMedium(InsertMediumRequest),
 	Play(PlayRequest),
@@ -30,7 +29,6 @@ impl ClientRequest {
 	pub fn kind(&self) -> &'static str {
 		use ClientRequest::*;
 		match self {
-			Register(_) => "Register",
 			Chat(_) => "Chat",
 			InsertMedium(_) => "InsertMedium",
 			Play(_) => "Play",
@@ -67,13 +65,6 @@ macro_rules! client_request_from_struct {
 		impl RequestConvertible for $struct_type {}
 	};
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct RegisterRequest {
-	pub name: String,
-}
-
-client_request_from_struct!(Register, RegisterRequest);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatRequest {
@@ -212,20 +203,6 @@ mod test {
 		let deserialized_chat_request: ClientRequestWithId =
 			serde_json::from_str(&json).expect("Failed to deserialize Chat request from JSON");
 		assert_eq!(chat_request, deserialized_chat_request);
-	}
-
-	#[test]
-	fn register_request_should_serialize_and_deserialize() {
-		let register_request = ClientRequest::Register(RegisterRequest {
-			name: "Ferris".to_string(),
-		})
-		.with_id(uint!(42));
-		let json = serde_json::to_string(&register_request).expect("Failed to serialize Register request to JSON");
-		assert_eq!(r#"{"request_id":42,"type":"register","name":"Ferris"}"#, json);
-
-		let deserialized_register_request: ClientRequestWithId =
-			serde_json::from_str(&json).expect("Failed to deserialize Register request from JSON");
-		assert_eq!(register_request, deserialized_register_request);
 	}
 
 	#[test]

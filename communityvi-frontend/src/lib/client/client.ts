@@ -1,7 +1,5 @@
-import type {HelloMessage} from '$lib/client/response';
-import {RegisterRequest} from '$lib/client/request';
 import type {Transport} from '$lib/client/transport';
-import {Peer, VersionedMedium} from '$lib/client/model';
+import {VersionedMedium} from '$lib/client/model';
 import ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_client';
 import {RESTClient} from '$lib/client/RESTClient';
@@ -16,25 +14,23 @@ export default class Client {
 	}
 
 	async register(name: string, disconnectCallback: DisconnectCallback): Promise<RegisteredClient> {
-		const connection = await this.transport.connect();
-
-		const response = (await connection.performRequest(new RegisterRequest(name))).response as HelloMessage;
-		const peers = response.clients.map(Peer.fromClientResponse);
+		await this.restClient.registerNewUser(name);
+		const token = await this.restClient.login(name);
+		const connection = await this.transport.connect(token);
+		const currentMedium = await this.restClient.defaultMedium(token);
 
 		const referenceTimeSynchronizer = await ReferenceTimeSynchronizer.createInitializedWithRESTClient(
 			this.restClient,
 		);
 		const versionedMedium = VersionedMedium.fromVersionedMediumResponseAndReferenceTimeOffset(
-			response.current_medium,
+			currentMedium,
 			referenceTimeSynchronizer.offset,
 		);
 
 		return new RegisteredClient(
-			response.id,
 			name,
 			referenceTimeSynchronizer,
 			versionedMedium,
-			peers,
 			this.restClient,
 			connection,
 			disconnectCallback,

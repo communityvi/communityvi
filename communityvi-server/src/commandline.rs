@@ -30,12 +30,13 @@ impl Default for BaseCommand {
 impl Commandline {
 	pub async fn run(self) -> Result<(), CommunityviError> {
 		let configuration = Configuration::from_file(&self.configuration_file_path)?;
-		let time_source = TimeSource::default();
-		let application_context = ApplicationContext::new(configuration, time_source);
 
 		env_logger::Builder::new()
-			.parse_filters(&application_context.configuration.log_filters)
+			.parse_filters(&configuration.log_filters)
 			.init();
+
+		let time_source = TimeSource::default();
+		let application_context = ApplicationContext::new(configuration, time_source)?;
 
 		let base_command = self.command.unwrap_or_default();
 		match base_command {
