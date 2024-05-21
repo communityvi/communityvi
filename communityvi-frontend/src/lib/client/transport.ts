@@ -1,7 +1,7 @@
 import {Connection, WebSocketConnection} from '$lib/client/connection';
 
 export interface Transport {
-	connect(): Promise<Connection>;
+	connect(token: string): Promise<Connection>;
 }
 
 export class WebSocketTransport implements Transport {
@@ -13,12 +13,20 @@ export class WebSocketTransport implements Transport {
 		this.timeoutInMilliseconds = timeoutInMilliseconds;
 	}
 
-	async connect(): Promise<Connection> {
+	async connect(token: string): Promise<Connection> {
+		// Collects all messages being received before any connection delegate is registered.
+		const earlyMessages: MessageEvent[] = [];
 		const webSocket = await new Promise<WebSocket>((resolve, reject) => {
-			const webSocket = new WebSocket(this.endpoint.toString());
+			const loginURL = new URL(this.endpoint.toString());
+			loginURL.searchParams.set('token', token);
+
+			const webSocket = new WebSocket(loginURL);
 			webSocket.onopen = () => {
 				resolve(webSocket);
 				webSocket.onerror = null;
+			};
+			webSocket.onmessage = (message) => {
+				earlyMessages.push(message);
 			};
 			webSocket.onerror = error => {
 				reject(new ConnectionFailedError(this.endpoint, error));
@@ -26,7 +34,7 @@ export class WebSocketTransport implements Transport {
 			};
 		});
 
-		return new WebSocketConnection(webSocket, this.timeoutInMilliseconds);
+		return new WebSocketConnection(webSocket, this.timeoutInMilliseconds, earlyMessages);
 	}
 }
 

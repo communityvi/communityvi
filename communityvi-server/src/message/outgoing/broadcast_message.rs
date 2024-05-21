@@ -1,9 +1,13 @@
 use crate::message::outgoing::success_message::PlaybackStateResponse;
 use crate::message::{MessageError, WebSocketMessage};
-use crate::room::client_id::ClientId;
+use crate::room::client::Client;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::room::session_id::SessionId;
 use js_int::UInt;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type")]
@@ -27,17 +31,53 @@ macro_rules! broadcast_from_struct {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientJoinedBroadcast {
-	pub id: ClientId,
+	pub id: SessionId,
 	pub name: String,
+	pub participants: BTreeSet<Participant>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub struct Participant {
+	pub id: SessionId,
+	pub name: String,
+}
+
+impl Participant {
+	pub fn new(id: SessionId, name: String) -> Self {
+		Participant { id, name }
+	}
+}
+
+impl PartialOrd for Participant {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for Participant {
+	fn cmp(&self, other: &Self) -> Ordering {
+		use Ordering::*;
+		match self.name.cmp(&other.name) {
+			Equal => self.id.cmp(&other.id),
+			other => other,
+		}
+	}
+}
+
+impl From<&Client> for Participant {
+	fn from(client: &Client) -> Self {
+		Self::new(client.id(), client.user().name().to_owned())
+	}
 }
 
 broadcast_from_struct!(ClientJoined, ClientJoinedBroadcast);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientLeftBroadcast {
-	pub id: ClientId,
+	pub id: SessionId,
 	pub name: String,
 	pub reason: LeftReason,
+	pub participants: BTreeSet<Participant>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -51,7 +91,7 @@ broadcast_from_struct!(ClientLeft, ClientLeftBroadcast);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatBroadcast {
-	pub sender_id: ClientId,
+	pub sender_id: SessionId,
 	pub sender_name: String,
 	pub message: String,
 	pub counter: UInt,
@@ -62,12 +102,13 @@ broadcast_from_struct!(Chat, ChatBroadcast);
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct MediumStateChangedBroadcast {
 	pub changed_by_name: String,
-	pub changed_by_id: ClientId,
+	pub changed_by_id: SessionId,
 	pub medium: VersionedMediumBroadcast,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 pub struct VersionedMediumBroadcast {
+	#[schemars(with = "u64")]
 	pub version: UInt,
 	#[serde(flatten)]
 	pub medium: MediumBroadcast,
@@ -82,12 +123,13 @@ impl VersionedMediumBroadcast {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 pub enum MediumBroadcast {
 	FixedLength {
 		name: String,
+		#[schemars(with = "u64")]
 		length_in_milliseconds: UInt,
 		playback_skipped: bool,
 		playback_state: PlaybackStateResponse,
@@ -142,7 +184,7 @@ mod test {
 	#[test]
 	fn chat_broadcast_should_serialize_and_deserialize() {
 		let chat_broadcast = BroadcastMessage::Chat(ChatBroadcast {
-			sender_id: ClientId::from(42),
+			sender_id: SessionId::from(42),
 			sender_name: "Hedwig".to_string(),
 			message: "hello".to_string(),
 			counter: uint!(1337),
@@ -160,13 +202,19 @@ mod test {
 
 	#[test]
 	fn client_joined_broadcast_should_serialize_and_deserialize() {
+		let scabbers = Participant::new(SessionId::from(43), "Scabbers".to_string());
+		let hedwig = Participant::new(SessionId::from(42), "Hedwig".to_string());
 		let joined_broadcast = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
-			id: ClientId::from(42),
+			id: SessionId::from(42),
 			name: "Hedwig".to_string(),
+			participants: BTreeSet::from_iter([scabbers, hedwig]),
 		});
 		let json =
 			serde_json::to_string(&joined_broadcast).expect("Failed to serialize ClientJoined broadcast to JSON");
-		assert_eq!(r#"{"type":"client_joined","id":42,"name":"Hedwig"}"#, json);
+		assert_eq!(
+			r#"{"type":"client_joined","id":42,"name":"Hedwig","participants":[{"id":42,"name":"Hedwig"},{"id":43,"name":"Scabbers"}]}"#,
+			json
+		);
 
 		let deserialized_joined_broadcast: BroadcastMessage =
 			serde_json::from_str(&json).expect("Failed to deserialize ClientJoined broadcast from JSON");
@@ -175,15 +223,18 @@ mod test {
 
 	#[test]
 	fn client_left_broadcast_should_serialize_and_deserialize() {
+		let scabbers = Participant::new(SessionId::from(43), "Scabbers".to_string());
+		let crookshanks = Participant::new(SessionId::from(44), "Crookshanks".to_string());
 		let client_left_broadcast = BroadcastMessage::ClientLeft(ClientLeftBroadcast {
-			id: ClientId::from(42),
+			id: SessionId::from(42),
 			name: "Hedwig".to_string(),
 			reason: LeftReason::Closed,
+			participants: BTreeSet::from_iter([scabbers, crookshanks]),
 		});
 		let json =
 			serde_json::to_string(&client_left_broadcast).expect("Failed to serialize ClientLeft broadcast to JSON");
 		assert_eq!(
-			r#"{"type":"client_left","id":42,"name":"Hedwig","reason":"closed"}"#,
+			r#"{"type":"client_left","id":42,"name":"Hedwig","reason":"closed","participants":[{"id":44,"name":"Crookshanks"},{"id":43,"name":"Scabbers"}]}"#,
 			json
 		);
 
@@ -196,7 +247,7 @@ mod test {
 	fn medium_state_changed_broadcast_for_paused_should_serialize_and_deserialize() {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Squirrel".to_string(),
-			changed_by_id: ClientId::from(42),
+			changed_by_id: SessionId::from(42),
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "The Acorn".to_string(),
@@ -243,7 +294,7 @@ mod test {
 	fn medium_state_changed_broadcast_for_playing_should_serialize_and_deserialize() {
 		let medium_state_changed_broadcast = BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 			changed_by_name: "Alice".to_string(),
-			changed_by_id: ClientId::from(0),
+			changed_by_id: SessionId::from(0),
 			medium: VersionedMediumBroadcast {
 				medium: MediumBroadcast::FixedLength {
 					name: "Metropolis".to_string(),

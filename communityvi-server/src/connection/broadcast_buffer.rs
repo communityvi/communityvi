@@ -78,6 +78,7 @@ impl BroadcastBuffer {
 			+ 3 // Join + medium state + Leave if a client joins, changes the state and leaves again
 	}
 
+	#[cfg(test)]
 	pub fn is_empty(&self) -> bool {
 		self.inner.lock().is_empty()
 	}
@@ -171,8 +172,8 @@ impl Inner {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast};
-	use crate::room::client_id::ClientId;
+	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast, Participant};
+	use crate::room::session_id::SessionId;
 	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
 
@@ -182,6 +183,7 @@ mod test {
 	struct BroadcastBufferWithTestHelpers {
 		pub broadcast_buffer: BroadcastBuffer,
 		pub broadcast_number: usize,
+		participants: BTreeSet<Participant>,
 	}
 
 	impl Default for BroadcastBufferWithTestHelpers {
@@ -189,6 +191,7 @@ mod test {
 			Self {
 				broadcast_buffer: BroadcastBuffer::new(50),
 				broadcast_number: 0,
+				participants: Default::default(),
 			}
 		}
 	}
@@ -209,23 +212,29 @@ mod test {
 		}
 
 		fn enqueue_client_joined(&mut self, id: UInt) {
+			let name = format!("{id}");
+			self.participants.insert(Participant::new(id.into(), name.clone()));
 			let message = ClientJoinedBroadcast {
 				id: id.into(),
-				name: format!("{id}"),
+				name,
+				participants: self.participants.clone(),
 			};
 			self.enqueue_next(message.into());
 		}
 
 		fn enqueue_client_left(&mut self, id: UInt) {
+			let name = format!("{id}");
+			self.participants.remove(&Participant::new(id.into(), name.clone()));
 			let message = ClientLeftBroadcast {
 				id: id.try_into().unwrap(),
-				name: format!("{id}"),
+				name,
 				reason: LeftReason::Closed,
+				participants: self.participants.clone(),
 			};
 			self.enqueue_next(message.into());
 		}
 
-		fn enqueue_medium_state(&mut self, id: ClientId, version: UInt) {
+		fn enqueue_medium_state(&mut self, id: SessionId, version: UInt) {
 			let medium_state = MediumStateChangedBroadcast {
 				changed_by_name: format!("{id}"),
 				changed_by_id: id,
@@ -237,7 +246,7 @@ mod test {
 			self.enqueue_next(medium_state.into());
 		}
 
-		fn enqueue_chat_message(&mut self, id: ClientId, number: UInt) {
+		fn enqueue_chat_message(&mut self, id: SessionId, number: UInt) {
 			let chat_message = ChatBroadcast {
 				sender_id: id,
 				sender_name: format!("{id}"),
@@ -247,21 +256,21 @@ mod test {
 			self.enqueue_next(chat_message.into());
 		}
 
-		fn dequeue_client_joined(&mut self) -> ClientId {
+		fn dequeue_client_joined(&mut self) -> SessionId {
 			match self.broadcast_buffer.dequeue().expect("No message queued") {
 				BroadcastMessage::ClientJoined(joined) => joined.id,
 				_ => panic!("Head of buffer was not ClientJoined"),
 			}
 		}
 
-		fn dequeue_client_left(&mut self) -> ClientId {
+		fn dequeue_client_left(&mut self) -> SessionId {
 			match self.broadcast_buffer.dequeue().expect("No message queued") {
 				BroadcastMessage::ClientLeft(left) => left.id,
 				_ => panic!("Head of buffer was not ClientLeft"),
 			}
 		}
 
-		fn dequeue_medium_state(&mut self) -> (ClientId, UInt) {
+		fn dequeue_medium_state(&mut self) -> (SessionId, UInt) {
 			match self.broadcast_buffer.dequeue().expect("No message queued") {
 				BroadcastMessage::MediumStateChanged(MediumStateChangedBroadcast {
 					changed_by_id,
@@ -272,7 +281,7 @@ mod test {
 			}
 		}
 
-		fn dequeue_chat_message(&mut self) -> (ClientId, UInt) {
+		fn dequeue_chat_message(&mut self) -> (SessionId, UInt) {
 			match self.broadcast_buffer.dequeue().expect("No message queued") {
 				BroadcastMessage::Chat(ChatBroadcast { sender_id, counter, .. }) => (sender_id, counter),
 				_ => panic!("Head of buffer was not Chat"),
@@ -292,22 +301,22 @@ mod test {
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
-		assert_eq!(broadcast_buffer.dequeue_client_joined(), ClientId::from(2));
-		assert_eq!(broadcast_buffer.dequeue_client_left(), ClientId::from(99));
+		assert_eq!(broadcast_buffer.dequeue_client_joined(), SessionId::from(2));
+		assert_eq!(broadcast_buffer.dequeue_client_left(), SessionId::from(99));
 		assert!(broadcast_buffer.is_empty());
 	}
 
 	#[test]
 	fn collect_garbage_should_only_produce_latest_medium_state() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
-		broadcast_buffer.enqueue_medium_state(ClientId::from(42), uint!(13));
-		broadcast_buffer.enqueue_medium_state(ClientId::from(12), uint!(14));
-		broadcast_buffer.enqueue_medium_state(ClientId::from(1), uint!(1));
+		broadcast_buffer.enqueue_medium_state(SessionId::from(42), uint!(13));
+		broadcast_buffer.enqueue_medium_state(SessionId::from(12), uint!(14));
+		broadcast_buffer.enqueue_medium_state(SessionId::from(1), uint!(1));
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
 		let (id, version) = broadcast_buffer.dequeue_medium_state();
-		assert_eq!(id, ClientId::from(12));
+		assert_eq!(id, SessionId::from(12));
 		assert_eq!(version, uint!(14));
 	}
 
@@ -315,14 +324,14 @@ mod test {
 	fn should_not_store_more_than_limit_chat_messages() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		for number in 0..(CHAT_MESSAGE_BUFFER_LIMIT + 3) {
-			broadcast_buffer.enqueue_chat_message(ClientId::from(number), number.into());
+			broadcast_buffer.enqueue_chat_message(SessionId::from(number), number.into());
 		}
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
 		for number in 3..(CHAT_MESSAGE_BUFFER_LIMIT + 3) {
 			let (id, count) = broadcast_buffer.dequeue_chat_message();
-			assert_eq!(id, ClientId::from(number));
+			assert_eq!(id, SessionId::from(number));
 			assert_eq!(count, UInt::from(number));
 		}
 	}
@@ -331,32 +340,32 @@ mod test {
 	fn chat_messages_should_keep_clients_alive() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		broadcast_buffer.enqueue_client_joined(uint!(42));
-		broadcast_buffer.enqueue_chat_message(ClientId::from(42), uint!(1337));
+		broadcast_buffer.enqueue_chat_message(SessionId::from(42), uint!(1337));
 		broadcast_buffer.enqueue_client_left(uint!(42));
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
-		assert_eq!(broadcast_buffer.dequeue_client_joined(), ClientId::from(42));
+		assert_eq!(broadcast_buffer.dequeue_client_joined(), SessionId::from(42));
 		let (id, count) = broadcast_buffer.dequeue_chat_message();
-		assert_eq!(id, ClientId::from(42));
+		assert_eq!(id, SessionId::from(42));
 		assert_eq!(count, uint!(1337));
-		assert_eq!(broadcast_buffer.dequeue_client_left(), ClientId::from(42));
+		assert_eq!(broadcast_buffer.dequeue_client_left(), SessionId::from(42));
 	}
 
 	#[test]
 	fn medium_state_messages_should_keep_clients_alive() {
 		let mut broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 		broadcast_buffer.enqueue_client_joined(uint!(42));
-		broadcast_buffer.enqueue_medium_state(ClientId::from(42), uint!(2));
+		broadcast_buffer.enqueue_medium_state(SessionId::from(42), uint!(2));
 		broadcast_buffer.enqueue_client_left(uint!(42));
 
 		broadcast_buffer.inner.lock().collect_garbage();
 
-		assert_eq!(broadcast_buffer.dequeue_client_joined(), ClientId::from(42));
+		assert_eq!(broadcast_buffer.dequeue_client_joined(), SessionId::from(42));
 		let (id, version) = broadcast_buffer.dequeue_medium_state();
-		assert_eq!(id, ClientId::from(42));
+		assert_eq!(id, SessionId::from(42));
 		assert_eq!(version, uint!(2));
-		assert_eq!(broadcast_buffer.dequeue_client_left(), ClientId::from(42));
+		assert_eq!(broadcast_buffer.dequeue_client_left(), SessionId::from(42));
 	}
 
 	#[test]
@@ -368,6 +377,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 42);
@@ -382,6 +392,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 44);
@@ -396,6 +407,7 @@ mod test {
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
 			id: 0.into(),
 			name: String::default(),
+			participants: Default::default(),
 		});
 		broadcast_buffer.enqueue(message.clone(), 42);
 		broadcast_buffer.enqueue(message, 41);
@@ -408,7 +420,7 @@ mod test {
 
 		let worst_count_to_keep_alive = broadcast_buffer.worst_count_of_messages_to_keep_alive() as u32;
 		for number in 0..(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2)) {
-			broadcast_buffer.enqueue_medium_state(ClientId::from(number), number.into());
+			broadcast_buffer.enqueue_medium_state(SessionId::from(number), number.into());
 		}
 
 		assert_eq!(
@@ -416,7 +428,7 @@ mod test {
 			(worst_count_to_keep_alive + (worst_count_to_keep_alive / 2))
 		);
 
-		broadcast_buffer.enqueue_medium_state(ClientId::from(1337), uint!(1337));
+		broadcast_buffer.enqueue_medium_state(SessionId::from(1337), uint!(1337));
 		assert_eq!(broadcast_buffer.inner.lock().length(), 1); // garbage collection should have been triggered
 	}
 }

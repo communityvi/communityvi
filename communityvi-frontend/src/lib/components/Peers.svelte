@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {registeredClient, notifications} from '$lib/stores';
-	import {PeerJoinedMessage, PeerLeftMessage} from '$lib/client/model';
+	import {PeerJoinedMessage, PeerLeftMessage, PeersRefreshedMessage} from '$lib/client/model';
 	import type {PeerLifecycleMessage} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 
@@ -19,7 +19,9 @@
 			return;
 		}
 
-		if (peerChange instanceof PeerJoinedMessage) {
+		if (peerChange instanceof PeersRefreshedMessage) {
+			peers = [$registeredClient.asPeer(), ...peerChange.peers];
+		} else if (peerChange instanceof PeerJoinedMessage) {
 			peers = [...peers, peerChange.peer];
 			notifications.inform(`'${peerChange.peer.name}' joined.`);
 		} else if (peerChange instanceof PeerLeftMessage) {

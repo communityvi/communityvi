@@ -3,7 +3,7 @@ import type {
 	ClientJoinedBroadcast,
 	ClientLeftBroadcast,
 	FixedLengthMediumBroadcast,
-	MediumStateChangedBroadcast,
+	MediumStateChangedBroadcast, Participant,
 	VersionedMediumBroadcast,
 } from '$lib/client/broadcast';
 import {MediumType} from '$lib/client/request';
@@ -18,7 +18,15 @@ import type {
 import {PlaybackStateType} from '$lib/client/response';
 import {LeftReason} from '$lib/client/broadcast';
 
-export class PeerJoinedMessage implements PeerLifecycleMessage {
+export class PeersRefreshedMessage {
+	readonly peers: Peer[];
+
+	constructor(peers: Peer[]) {
+		this.peers = peers;
+	}
+}
+
+export class PeerJoinedMessage {
 	readonly peer: Peer;
 
 	static fromClientJoinedBroadcast(broadcast: ClientJoinedBroadcast): PeerJoinedMessage {
@@ -31,7 +39,7 @@ export class PeerJoinedMessage implements PeerLifecycleMessage {
 	}
 }
 
-export class PeerLeftMessage implements PeerLifecycleMessage {
+export class PeerLeftMessage {
 	readonly peer: Peer;
 	readonly reason: LeaveReason;
 
@@ -63,9 +71,7 @@ export enum LeaveReason {
 	Timeout,
 }
 
-export interface PeerLifecycleMessage {
-	readonly peer: Peer;
-}
+export type PeerLifecycleMessage = PeersRefreshedMessage | PeerJoinedMessage | PeerLeftMessage;
 
 export class ChatMessage {
 	readonly message: string;
@@ -86,20 +92,28 @@ export class Peer {
 	readonly id: number;
 	readonly name: string;
 
-	static fromClientResponse(response: ClientResponse): Peer {
-		return new Peer(response.id, response.name);
+	static fromClientResponse({id, name}: ClientResponse): Peer {
+		return new Peer(id, name);
 	}
 
-	static fromClientBroadcast(broadcast: ClientLeftBroadcast | ClientJoinedBroadcast): Peer {
-		return new Peer(broadcast.id, broadcast.name);
+	static fromClientBroadcast({id, name}: ClientLeftBroadcast | ClientJoinedBroadcast): Peer {
+		return new Peer(id, name);
 	}
 
-	static fromChatBroadcast(broadcast: ChatBroadcast): Peer {
-		return new Peer(broadcast.sender_id, broadcast.sender_name);
+	static fromChatBroadcast({sender_id, sender_name}: ChatBroadcast): Peer {
+		return new Peer(sender_id, sender_name);
 	}
 
-	static fromMediumStateChangedBroadcast(broadcast: MediumStateChangedBroadcast): Peer {
-		return new Peer(broadcast.changed_by_id, broadcast.changed_by_name);
+	static fromMediumStateChangedBroadcast({changed_by_id, changed_by_name}: MediumStateChangedBroadcast): Peer {
+		return new Peer(changed_by_id, changed_by_name);
+	}
+
+	static fromParticipant({id, name}: Participant): Peer {
+		return new Peer(id, name);
+	}
+
+	equals(other: Peer): boolean {
+		return other.id === this.id && other.name == this.name;
 	}
 
 	constructor(id: number, name: string) {
