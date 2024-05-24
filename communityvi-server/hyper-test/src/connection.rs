@@ -138,7 +138,6 @@ pub(self) mod test {
 			.expect_err("Should have failed to read from a closed connection.");
 	}
 
-	#[track_caller]
 	pub async fn ensure_connection_works(mut client: Connection, mut server: Connection) {
 		client.write_u8(42).await.expect("Failed to send byte");
 		assert_eq!(
