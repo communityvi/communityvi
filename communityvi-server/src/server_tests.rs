@@ -142,7 +142,7 @@ async fn test_server_should_serve_bundled_frontend() {
 	let content = response.content().await.expect("Failed to collect bytes from response");
 
 	assert_eq!(response.status(), StatusCode::OK);
-	assert!(content.starts_with(b"<!DOCTYPE html>"));
+	assert!(content.starts_with(b"<!doctype html>"));
 }
 
 async fn registered_websocket_test_client(
