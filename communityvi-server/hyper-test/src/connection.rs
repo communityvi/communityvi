@@ -90,7 +90,7 @@ impl hyper::client::connect::Connection for Connection {
 }
 
 #[cfg(test)]
-pub(self) mod test {
+mod test {
 	use super::*;
 	use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

@@ -115,7 +115,7 @@ impl TryFrom<MediumRequest> for Medium {
 				} else {
 					Ok(FixedLengthMedium::new(
 						name,
-						Duration::milliseconds(i64::try_from(length_in_milliseconds).unwrap()),
+						Duration::milliseconds(i64::from(length_in_milliseconds)),
 					)
 					.into())
 				}

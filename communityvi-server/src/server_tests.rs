@@ -64,7 +64,7 @@ async fn should_not_allow_invalid_messages_after_successful_registration() {
 #[tokio::test]
 async fn should_broadcast_messages() {
 	let http_client = start_test_server();
-	let message = r#"Hello everyone \o/"#;
+	let message = r"Hello everyone \o/";
 	let request = ChatRequest {
 		message: message.to_string(),
 	};
@@ -194,7 +194,7 @@ async fn websocket_test_client(http_client: &TestClient) -> WebsocketTestClient 
 		.into()
 }
 
-pub(self) fn start_test_server() -> TestClient {
+fn start_test_server() -> TestClient {
 	let configuration = Configuration {
 		address: "127.0.0.1:8000".parse().unwrap(),
 		log_filters: String::new(),

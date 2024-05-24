@@ -37,8 +37,8 @@ pub async fn run_client(
 		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
 
 		let left_reason = tokio::select! {
-			_ = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
-			_ = send_broadcasts(client.clone()) => LeftReason::Closed,
+			() = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
+			() = send_broadcasts(client.clone()) => LeftReason::Closed,
 			left_reason = heartbeat(
 				client,
 				&application_context.time_source,

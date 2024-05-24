@@ -12,6 +12,7 @@ use unicode_skeleton::UnicodeSkeleton;
 pub struct Clients {
 	client_id_sequence: ClientIdSequence,
 	names: BTreeSet<String>,
+	#[allow(clippy::struct_field_names)]
 	clients_by_id: BTreeMap<ClientId, Client>,
 	maximum_size: usize,
 	counters: parking_lot::Mutex<Counters>,

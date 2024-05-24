@@ -1,3 +1,4 @@
+#![allow(clippy::should_panic_without_expect)]
 use crate::message::outgoing::broadcast_message::{
 	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumStateChangedBroadcast,
 	VersionedMediumBroadcast,
@@ -218,7 +219,7 @@ mod test {
 
 		fn enqueue_client_left(&mut self, id: UInt) {
 			let message = ClientLeftBroadcast {
-				id: id.try_into().unwrap(),
+				id: id.into(),
 				name: format!("{id}"),
 				reason: LeftReason::Closed,
 			};
