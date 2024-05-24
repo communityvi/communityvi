@@ -10,25 +10,25 @@ rust-version = "1.67"
 members = [".", "hyper-test"]
 
 [dependencies]
-aide = {version = "0.11", features = ["axum", "axum-ws"]}
-axum = {version = "0.6", features = ["ws", "http2", "macros"]}
+aide = { version = "0.11", features = ["axum", "axum-ws"] }
+axum = { version = "0.6", features = ["ws", "http2", "macros"] }
 anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
-clap = {version = "4", features = ["derive"]}
+clap = { version = "4", features = ["derive"] }
 env_logger = "0.11"
 futures-util = "0.3"
 futures-channel = "0.3"
 governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
 humantime-serde = "1"
-hyper-test = {path = "hyper-test"}
+hyper-test = { path = "hyper-test" }
 http-body = "0.4.5"
-js_int = { version = "0.2", features = ["serde", "float_deserialize"]}
+js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
 lazy_static = "1"
 log = "0.4"
 mime = "0.3"
-mime_guess = {version = "2", default-features = false}
+mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
 parking_lot = "0.12"
 pin-project = "1"
@@ -49,7 +49,7 @@ unicode_skeleton = "0.1"
 [dev-dependencies]
 rand = "0.8"
 async-trait = "0.1"
-hyper-test = {path = "hyper-test"}
+hyper-test = { path = "hyper-test" }
 
 [build-dependencies]
 npm_rs = "1.0"
