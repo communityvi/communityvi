@@ -2,8 +2,8 @@ name: Backend
 on:
   push:
     paths:
-    - 'communityvi-server/**'
-    - '.github/workflows/backend.yaml'
+      - 'communityvi-server/**'
+      - '.github/workflows/backend.yaml'
 defaults:
   run:
     # The backend project is not in the repository root
@@ -20,7 +20,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -70,7 +70,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
         with:
