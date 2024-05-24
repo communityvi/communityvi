@@ -16,7 +16,7 @@ anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 clap = {version = "4", features = ["derive"]}
-env_logger = "0.10"
+env_logger = "0.11"
 futures-util = "0.3"
 futures-channel = "0.3"
 governor = { version = "0.5", default-features = false, features = ["std", "jitter"] }
