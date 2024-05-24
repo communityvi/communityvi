@@ -23,7 +23,7 @@
 		"@testing-library/svelte": "^3.0",
 		"@typescript-eslint/eslint-plugin": "^7.0.0",
 		"@typescript-eslint/parser": "^7.0.0",
-		"bulma": "^0.9",
+		"bulma": "^1.0.0",
 		"eslint": "^8.20",
 		"eslint-config-prettier": "^9.0.0",
 		"eslint-plugin-svelte3": "^4.0",
