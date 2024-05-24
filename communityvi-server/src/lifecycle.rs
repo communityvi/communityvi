@@ -171,7 +171,9 @@ pub async fn heartbeat(
 
 		let receive_pong = async {
 			while let Some(payload) = pong_receiver.next().await {
-				let Ok(payload) = <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) else { return Err(()) };
+				let Ok(payload) = <[u8; std::mem::size_of::<usize>()]>::try_from(payload.as_ref()) else {
+					return Err(());
+				};
 
 				let received_count = usize::from_ne_bytes(payload);
 				if received_count == count {
@@ -278,14 +280,14 @@ fn handle_insert_medium_request(
 ) -> Result<SuccessMessage, ErrorMessage> {
 	let medium = Medium::try_from(medium_request)?;
 	let Some(versioned_medium) = room.insert_medium(medium, previous_version) else {
-			return Err(ErrorMessage {
-				error: ErrorMessageType::IncorrectMediumVersion,
-				message: format!(
-					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
-					current_version = room.medium().version
-				),
-			})
-		};
+		return Err(ErrorMessage {
+			error: ErrorMessageType::IncorrectMediumVersion,
+			message: format!(
+				"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+				current_version = room.medium().version
+			),
+		});
+	};
 
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
@@ -309,14 +311,14 @@ fn handle_play_request(
 		Duration::milliseconds(start_time_in_milliseconds.into()),
 		previous_version,
 	) else {
-			return Err(ErrorMessage {
-				error: ErrorMessageType::IncorrectMediumVersion,
-				message: format!(
-					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
-					current_version = room.medium().version
-				),
-			})
-		};
+		return Err(ErrorMessage {
+			error: ErrorMessageType::IncorrectMediumVersion,
+			message: format!(
+				"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+				current_version = room.medium().version
+			),
+		});
+	};
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
@@ -338,14 +340,14 @@ fn handle_pause_request(
 		Duration::milliseconds(position_in_milliseconds.clamp(UInt::MIN, UInt::MAX).into()),
 		previous_version,
 	) else {
-			return Err(ErrorMessage {
-				error: ErrorMessageType::IncorrectMediumVersion,
-				message: format!(
-					"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
-					current_version = room.medium().version
-				),
-			})
-		};
+		return Err(ErrorMessage {
+			error: ErrorMessageType::IncorrectMediumVersion,
+			message: format!(
+				"Medium version is incorrect. Request had {previous_version} but current version is {current_version}.",
+				current_version = room.medium().version
+			),
+		});
+	};
 	room.broadcast(MediumStateChangedBroadcast {
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),

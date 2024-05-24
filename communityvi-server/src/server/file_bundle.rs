@@ -27,7 +27,9 @@ impl BundledFileHandler {
 	}
 
 	pub fn request(&self, path: &str, request_headers: &HeaderMap) -> Response<Body> {
-		let Some(file) = self.look_up_file_falling_back_to_index_html(path) else { return not_found() };
+		let Some(file) = self.look_up_file_falling_back_to_index_html(path) else {
+			return not_found();
+		};
 
 		if file.is_cached(request_headers) {
 			return not_modified();
