@@ -40,7 +40,7 @@ sha2 = "0.10"
 thiserror = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
-tokio-tungstenite = "0.19"
+tokio-tungstenite = "0.21"
 toml = "0.8"
 tower-service = "0.3"
 typed-builder = "0.14"
