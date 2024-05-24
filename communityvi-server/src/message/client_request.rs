@@ -113,11 +113,7 @@ impl TryFrom<MediumRequest> for Medium {
 						.message("Length of a medium must not be larger than one year.".to_string())
 						.build())
 				} else {
-					Ok(FixedLengthMedium::new(
-						name,
-						Duration::milliseconds(i64::from(length_in_milliseconds)),
-					)
-					.into())
+					Ok(FixedLengthMedium::new(name, Duration::milliseconds(i64::from(length_in_milliseconds))).into())
 				}
 			}
 			MediumRequest::Empty => Ok(Medium::Empty),
