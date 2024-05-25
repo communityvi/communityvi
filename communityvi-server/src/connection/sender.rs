@@ -59,6 +59,14 @@ impl MessageSender {
 			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
 	}
 
+	pub async fn send_pong(&self, payload: Vec<u8>) -> Result<(), ()> {
+		let mut sink = self.sink.lock().await;
+		let pong = WebSocketMessage::Pong(payload);
+		sink.send(pong)
+			.await
+			.map_err(|error| error!("Error while sending `pong`: {error:?}"))
+	}
+
 	#[allow(let_underscore_drop)] // Ignore Clippy here because we don't care about the result.
 	pub async fn close(&self) {
 		let mut sink = self.sink.lock().await;

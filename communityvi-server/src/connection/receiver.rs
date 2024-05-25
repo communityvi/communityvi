@@ -28,16 +28,26 @@ impl MessageReceiver {
 		use ReceivedMessage::Finished;
 
 		for _ in 0..MAXIMUM_RETRIES {
-			let websocket_message = match self.stream.next().await {
-				Some(Ok(websocket_message)) => websocket_message,
-				Some(Err(error)) => {
-					log::error!("Failed to receive websocket message: {}", error);
-					return Finished;
-				}
-				None => return Finished,
+			use tokio_tungstenite::tungstenite::Message::*;
+			let websocket_message = loop {
+				match self.stream.next().await {
+					Some(Ok(Ping(payload))) => {
+						// respond to ping in-place. Previously, tungstenite did this for us, but now we need to
+						// to it manually and keep on looping until we receive a non-ping message
+						// TODO: Put this responding into a more appropriate place
+						if let Err(()) = self.sender.send_pong(payload).await {
+							return Finished;
+						}
+					}
+					Some(Ok(websocket_message)) => break websocket_message,
+					Some(Err(error)) => {
+						log::error!("Failed to receive websocket message: {}", error);
+						return Finished;
+					}
+					None => return Finished,
+				};
 			};
 
-			use tokio_tungstenite::tungstenite::Message::*;
 			let websocket_message = match websocket_message {
 				Pong(payload) => return ReceivedMessage::Pong { payload },
 				Close(_) => {
