@@ -101,7 +101,6 @@ async fn websocket_handler(
 	State(application_context): State<ApplicationContext>,
 ) -> impl IntoApiResponse {
 	websocket
-		.max_send_queue(1)
 		.max_message_size(10 * 1024)
 		.max_frame_size(10 * 1024)
 		.on_upgrade(move |websocket| run_websocket_connection(websocket, room, application_context))
