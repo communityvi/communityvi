@@ -19,7 +19,7 @@ futures-channel = "0.3"
 governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
 humantime-serde = "1"
-hyper = "0.14"
+hyper = "1.0"
 http-body = "0.4.5"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
 lazy_static = "1"
