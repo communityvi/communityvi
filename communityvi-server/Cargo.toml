@@ -7,8 +7,9 @@ repository = "https://github.com/communityvi/communityvi"
 rust-version = "1.78"
 
 [dependencies]
-aide = { version = "0.11", features = ["axum", "axum-ws"] }
-axum = { version = "0.6", features = ["ws", "http2", "macros"] }
+aide = { version = "0.13", features = ["axum", "axum-ws"] }
+axum = { version = "0.7", features = ["ws", "http2", "macros"] }
+axum-server = "0.6"
 anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
@@ -19,8 +20,9 @@ futures-channel = "0.3"
 governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
 humantime-serde = "1"
-hyper = "0.14"
-http-body = "0.4.5"
+hyper = "1"
+http-body = "1"
+http-body-util = "0.1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
 lazy_static = "1"
 log = "0.4"
@@ -44,9 +46,8 @@ typed-builder = "0.18"
 unicode_skeleton = "0.1"
 
 [dev-dependencies]
-axum-server = "0.5"
 rand = "0.8"
-reqwest = { version = "0.11", default-features = false, features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 async-trait = "0.1"
 
 [build-dependencies]
