@@ -39,7 +39,7 @@ impl ClientRequest {
 	}
 }
 
-pub trait RequestConvertible: Into<ClientRequest> {
+trait RequestConvertible: Into<ClientRequest> {
 	fn with_id(self, request_id: UInt) -> ClientRequestWithId {
 		ClientRequestWithId {
 			request_id,
