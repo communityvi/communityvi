@@ -209,6 +209,7 @@ mod test {
 	use super::*;
 	use axum::body::Bytes;
 	use axum::http::HeaderValue;
+	use http_body_util::BodyExt;
 
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/test/bundled_files"]
@@ -425,6 +426,11 @@ mod test {
 	}
 
 	async fn response_content(response: Response<Body>) -> Bytes {
-		hyper::body::to_bytes(response.into_body()).await.unwrap()
+		response
+			.into_body()
+			.collect()
+			.await
+			.expect("Failed to collect response body")
+			.to_bytes()
 	}
 }

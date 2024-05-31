@@ -2,6 +2,7 @@
 use crate::connection::receiver::MessageReceiver;
 use crate::connection::sender::MessageSender;
 use crate::context::ApplicationContext;
+use crate::error::CommunityviError;
 use crate::lifecycle::run_client;
 use crate::room::Room;
 use crate::server::rest_api::{finish_openapi_specification, rest_api};
@@ -22,16 +23,17 @@ use std::sync::Arc;
 mod file_bundle;
 mod rest_api;
 
-pub async fn run_server(application_context: ApplicationContext) {
+pub async fn run_server(application_context: ApplicationContext) -> Result<(), CommunityviError> {
 	let room = Room::new(
 		application_context.reference_timer.clone(),
 		application_context.configuration.room_size_limit,
 	);
 	let address = application_context.configuration.address;
-	axum::Server::bind(&address)
+
+	axum_server::Server::bind(address)
 		.serve(create_router(application_context, room).into_make_service())
-		.await
-		.unwrap();
+		.await?;
+	Ok(())
 }
 
 pub fn create_router(application_context: ApplicationContext, room: Room) -> Router {
