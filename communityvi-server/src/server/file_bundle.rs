@@ -209,7 +209,6 @@ mod test {
 	use super::*;
 	use axum::body::Bytes;
 	use axum::http::HeaderValue;
-	use hyper_test::hyper;
 
 	#[derive(RustEmbed)]
 	#[folder = "$CARGO_MANIFEST_DIR/test/bundled_files"]

@@ -364,6 +364,7 @@ dependencies = [
  "hex",
  "http-body",
  "humantime-serde",
+ "hyper",
  "hyper-test",
  "ignore",
  "js_int",
