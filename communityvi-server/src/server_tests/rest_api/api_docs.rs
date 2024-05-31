@@ -3,18 +3,18 @@ use axum::http::StatusCode;
 
 #[tokio::test]
 async fn should_serve_bundled_stoplight_elements() {
-	let client = start_test_server();
+	let client = start_test_server().await;
 
 	// sample some of the files
 	for filename in ["index.html", "web-components.min.js", "LICENSE"] {
-		let mut response = client
+		let response = client
 			.get(&format!("/api/docs/{filename}"))
 			.send()
 			.await
 			.expect("Request failed");
 
 		assert_eq!(response.status(), StatusCode::OK, "Missing file '{filename}'");
-		let content = response.content().await.expect("Failed to get response bytes.");
+		let content = response.bytes().await.expect("Failed to get response bytes.");
 		assert!(!content.is_empty(), "File '{filename}' is empty.");
 	}
 }
