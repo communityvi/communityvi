@@ -6,9 +6,6 @@ edition = "2021"
 repository = "https://github.com/communityvi/communityvi"
 rust-version = "1.78"
 
-[workspace]
-members = [".", "hyper-test"]
-
 [dependencies]
 aide = { version = "0.11", features = ["axum", "axum-ws"] }
 axum = { version = "0.6", features = ["ws", "http2", "macros"] }
@@ -22,7 +19,7 @@ futures-channel = "0.3"
 governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
 humantime-serde = "1"
-hyper-test = { path = "hyper-test" }
+hyper = "0.14"
 http-body = "0.4.5"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
 lazy_static = "1"
@@ -47,9 +44,10 @@ typed-builder = "0.18"
 unicode_skeleton = "0.1"
 
 [dev-dependencies]
+axum-server = "0.5"
 rand = "0.8"
+reqwest = { version = "0.11", default-features = false, features = ["json"] }
 async-trait = "0.1"
-hyper-test = { path = "hyper-test" }
 
 [build-dependencies]
 npm_rs = "1.0"
