@@ -1,7 +1,7 @@
 import type {Transport} from '$lib/client/transport';
 import {WebSocketTransport} from '$lib/client/transport';
 import type {Connection} from '$lib/client/connection';
-import {mock} from 'jest-mock-extended';
+import {mock} from 'vitest-mock-extended';
 import {ClientResponse, HelloMessage, SuccessMessageType, VersionedMediumResponse} from '$lib/client/response';
 import {MediumType, RegisterRequest} from '$lib/client/request';
 import {Peer} from '$lib/client/model';

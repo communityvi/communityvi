@@ -1,4 +1,4 @@
-import {isA, mock} from 'jest-mock-extended';
+import {isA, mock} from 'vitest-mock-extended';
 import {ChatMessage, Peer} from '$lib/client/model';
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 import {ChatRequest} from '$lib/client/request';
@@ -6,6 +6,7 @@ import {BroadcastType, ChatBroadcast} from '$lib/client/broadcast';
 import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
 import {SuccessMessage, SuccessMessageType} from '$lib/client/response';
 import {RegisteredClientBuilder} from './helper/registered_client_builder';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('The registered client chat', () => {
 	it('can send chat messages', async () => {
@@ -30,7 +31,7 @@ describe('The registered client chat', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().id(0).connection(mockConnection).build();
-		const chatMessageCallback = jest.fn();
+		const chatMessageCallback = vi.fn();
 		client.subscribeToChatMessages(chatMessageCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ChatBroadcast>{
@@ -49,7 +50,7 @@ describe('The registered client chat', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().connection(mockConnection).build();
-		const chatMessageCallback = jest.fn();
+		const chatMessageCallback = vi.fn();
 		client.subscribeToChatMessages(chatMessageCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ChatBroadcast>{

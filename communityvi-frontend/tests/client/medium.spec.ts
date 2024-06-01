@@ -1,6 +1,6 @@
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 import {EnrichedResponse, ResponseMetadata} from '$lib/client/connection';
-import {isA, mock} from 'jest-mock-extended';
+import {isA, mock} from 'vitest-mock-extended';
 import {RegisteredClientBuilder} from './helper/registered_client_builder';
 import {BroadcastType, MediumStateChangedBroadcast, VersionedMediumBroadcast} from '$lib/client/broadcast';
 import {
@@ -24,6 +24,7 @@ import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchroni
 import type {TimeUpdatedCallback} from '$lib/client/reference_time_synchronizer';
 import type {SuccessMessage} from '$lib/client/response';
 import {SuccessMessageType} from '$lib/client/response';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('RegisteredClient medium handling', () => {
 	const warGames = new Medium('WarGames', 114 * 60 * 1000);
@@ -40,7 +41,7 @@ describe('RegisteredClient medium handling', () => {
 			let connectionDelegate: ConnectionDelegate | undefined;
 			mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 			const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 
 			client.subscribeToMediumStateChanges(subscriber);
 			connectionDelegate?.connectionDidReceiveBroadcast(<MediumStateChangedBroadcast>{
@@ -62,7 +63,7 @@ describe('RegisteredClient medium handling', () => {
 			let connectionDelegate: ConnectionDelegate | undefined;
 			mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 			const client = RegisteredClientBuilder.default().connection(mockConnection).build();
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 			client.subscribeToMediumStateChanges(subscriber);
 
 			connectionDelegate?.connectionDidReceiveBroadcast(<MediumStateChangedBroadcast>{
@@ -86,7 +87,7 @@ describe('RegisteredClient medium handling', () => {
 			);
 
 			// ...and we had a subscriber
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 
 			// ...that is subscribed to a registered client with a playing medium
 			const playingVersionedMedium = new VersionedMedium(
@@ -120,7 +121,7 @@ describe('RegisteredClient medium handling', () => {
 			);
 
 			// ...and we had a subscriber
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 
 			// ...that is subscribed to a registered client without a medium
 			const client = RegisteredClientBuilder.default()
@@ -147,7 +148,7 @@ describe('RegisteredClient medium handling', () => {
 
 		it('notifies subscribers', async () => {
 			const client = RegisteredClientBuilder.default().build();
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 
 			client.subscribeToMediumStateChanges(subscriber);
 			await client.insertFixedLengthMedium(warGames.name, warGames.lengthInMilliseconds);
@@ -182,7 +183,7 @@ describe('RegisteredClient medium handling', () => {
 
 		it('notifies subscribers', async () => {
 			const client = RegisteredClientBuilder.default().build();
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 
 			client.subscribeToMediumStateChanges(subscriber);
 			await client.ejectMedium();

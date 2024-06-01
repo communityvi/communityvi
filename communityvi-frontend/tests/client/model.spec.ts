@@ -1,4 +1,5 @@
 import {Medium, PausedPlaybackState, PlayingPlaybackState} from '$lib/client/model';
+import {describe, it, expect} from 'vitest';
 
 describe('Medium', () => {
 	describe('metadata change detection', () => {

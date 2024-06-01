@@ -1,9 +1,10 @@
 import {LeaveReason, Peer, PeerJoinedMessage, PeerLeftMessage} from '$lib/client/model';
-import {mock} from 'jest-mock-extended';
+import {mock} from 'vitest-mock-extended';
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 import type {ClientJoinedBroadcast, ClientLeftBroadcast} from '$lib/client/broadcast';
 import {BroadcastType, LeftReason} from '$lib/client/broadcast';
 import {RegisteredClientBuilder} from './helper/registered_client_builder';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('The registered client peer tracking', () => {
 	it('adds joined peers to the list of peers', () => {
@@ -27,7 +28,7 @@ describe('The registered client peer tracking', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
-		const peerLifecycleCallback = jest.fn();
+		const peerLifecycleCallback = vi.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientJoinedBroadcast>{
@@ -44,7 +45,7 @@ describe('The registered client peer tracking', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
-		const peerLifecycleCallback = jest.fn();
+		const peerLifecycleCallback = vi.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientJoinedBroadcast>{
@@ -80,7 +81,7 @@ describe('The registered client peer tracking', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().id(42).peer(existingPeer).connection(mockConnection).build();
-		const peerLifecycleCallback = jest.fn();
+		const peerLifecycleCallback = vi.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientLeftBroadcast>{
@@ -100,7 +101,7 @@ describe('The registered client peer tracking', () => {
 		let connectionDelegate: ConnectionDelegate | undefined;
 		mockConnection.setDelegate.mockImplementationOnce(delegate => (connectionDelegate = delegate));
 		const client = RegisteredClientBuilder.default().id(42).connection(mockConnection).build();
-		const peerLifecycleCallback = jest.fn();
+		const peerLifecycleCallback = vi.fn();
 		client.subscribeToPeerChanges(peerLifecycleCallback);
 
 		connectionDelegate?.connectionDidReceiveBroadcast(<ClientLeftBroadcast>{

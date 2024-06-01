@@ -9,17 +9,16 @@
 		"preview": "vite preview",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
 		"lint:fix": "prettier -w . && eslint --ignore-path .gitignore . --fix && echo 'ESLint Fixed!'",
-		"test": "jest tests",
-		"test:coverage": "jest tests --coverage",
-		"test:watch": "npm run test -- --watch",
-		"format": "prettier --write --plugin-search-dir=. ."
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest watch",
+		"format": "prettier --write ."
 	},
 	"devDependencies": {
 		"@faker-js/faker": "^8.0.0",
 		"@fortawesome/fontawesome-free": "^6.0.0",
 		"@sveltejs/adapter-static": "^2.0.2",
 		"@sveltejs/kit": "^1.0.1",
-		"@testing-library/jest-dom": "^5.16",
 		"@testing-library/svelte": "^3.0",
 		"@typescript-eslint/eslint-plugin": "^7.0.0",
 		"@typescript-eslint/parser": "^7.0.0",
@@ -27,19 +26,17 @@
 		"eslint": "^8.20",
 		"eslint-config-prettier": "^9.0.0",
 		"eslint-plugin-svelte3": "^4.0",
-		"jest": "^29.0.0",
-		"jest-environment-jsdom": "^29.0.0",
-		"jest-mock-extended": "^3.0.0-beta1",
 		"prettier": "~3.2.0",
 		"prettier-plugin-svelte": "^3",
 		"sass": "^1.49",
 		"svelte": "^3.46",
 		"svelte-check": "^3.0.0",
-		"svelte-jester": "^2.3.1",
-		"svelte-preprocess": "^5.0.0",
-		"ts-jest": "^29.0.0",
 		"tslib": "^2.3",
 		"typescript": "^5.0.0",
-		"vite": "^4.0.0"
+		"vite": "^4.0.0",
+		"vitest": "^1.6.0",
+		"vitest-mock-extended": "^1.3.1",
+		"vitest-dom": "^0.1.1",
+		"@vitest/coverage-v8": "^1.6.0"
 	}
 }
