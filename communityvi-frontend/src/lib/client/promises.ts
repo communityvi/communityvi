@@ -3,7 +3,7 @@ export function promiseWithTimout<T>(
 	timeoutInMilliseconds: number,
 	timeoutHandler: () => void,
 ): Promise<T> {
-	let timeoutId: NodeJS.Timeout;
+	let timeoutId: number;
 
 	const timeoutPromise = new Promise<never>((resolve, reject) => {
 		timeoutId = setTimeout(() => {
