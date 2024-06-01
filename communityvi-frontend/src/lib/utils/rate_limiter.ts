@@ -2,7 +2,7 @@ export default class RateLimiter {
 	private readonly intervalInMilliseconds: number;
 
 	private timeOfLastCall: DOMHighResTimeStamp;
-	private pendingTimeout?: NodeJS.Timeout;
+	private pendingTimeout?: number;
 
 	constructor(intervalInMilliseconds: number) {
 		this.intervalInMilliseconds = intervalInMilliseconds;
@@ -31,7 +31,7 @@ export default class RateLimiter {
 		this.replacePendingTimeout();
 	}
 
-	private replacePendingTimeout(newTimeout?: NodeJS.Timeout) {
+	private replacePendingTimeout(newTimeout?: number) {
 		if (this.pendingTimeout !== undefined) {
 			clearTimeout(this.pendingTimeout);
 		}

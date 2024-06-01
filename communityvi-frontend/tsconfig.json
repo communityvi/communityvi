@@ -1,21 +1,12 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"esModuleInterop": true,
-		"lib": ["DOM"],
+		"lib": ["ES2020", "DOM"],
 		"strict": true,
 		"noImplicitReturns": true,
-		"importsNotUsedAsValues": "remove",
-		"preserveValueImports": false,
-		"paths": {
-			// Don't even ask: https://github.com/vitejs/vite/issues/13027#issuecomment-1527384805
-			"vite": ["./node_modules/vite"],
-			"$lib/*": ["./src/lib/*"],
-			"$lib": ["./src/lib"],
-			"$client/*": ["./src/client/*"],
-			"$client": ["./src/client"]
-		},
+		"verbatimModuleSyntax": false,
 		"types": ["jest"]
 	}
 }

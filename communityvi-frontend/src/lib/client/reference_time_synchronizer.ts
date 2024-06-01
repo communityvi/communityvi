@@ -3,7 +3,7 @@ import {RESTClient} from '$lib/client/RESTClient';
 export default class ReferenceTimeSynchronizer {
 	private readonly restClient: RESTClient;
 	private callback?: TimeUpdatedCallback;
-	private intervalId?: NodeJS.Timeout;
+	private intervalId?: number;
 
 	private storedOffset: number;
 

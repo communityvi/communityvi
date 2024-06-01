@@ -31,7 +31,7 @@ describe('The reference time synchronizer', () => {
 
 	it('should inform its subscriber about offset updates', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			vi.spyOn(global, 'setInterval');
+			vi.spyOn(window, 'setInterval');
 
 			const initialReferenceTime = 1337;
 			const restClientMock = mock<RESTClient>();
@@ -56,7 +56,7 @@ describe('The reference time synchronizer', () => {
 
 	it('should not inform its subscriber if the offset stays the same', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			vi.spyOn(global, 'setInterval');
+			vi.spyOn(window, 'setInterval');
 
 			const initialReferenceTime = 1337;
 			const restClientMock = mock<RESTClient>();
