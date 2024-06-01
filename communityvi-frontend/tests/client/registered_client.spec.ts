@@ -2,10 +2,11 @@ import {RegisteredClientBuilder} from './helper/registered_client_builder';
 import {Peer} from '$lib/client/model';
 import type {Connection, ConnectionDelegate} from '$lib/client/connection';
 import {CloseReason} from '$lib/client/connection';
-import {mock} from 'jest-mock-extended';
+import {mock} from 'vitest-mock-extended';
 import type {BroadcastMessage, BroadcastType} from '$lib/client/broadcast';
 import {UnknownBroadcastError} from '$lib/client/registered_client';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('The registered client', () => {
 	it('can represent itself as a Peer', () => {
@@ -41,7 +42,7 @@ describe('The registered client', () => {
 	});
 
 	it('calls the disconnect callback when the connection is lost or closed', () => {
-		const disconnectCallback = jest.fn();
+		const disconnectCallback = vi.fn();
 
 		const connectionMock = mock<Connection>();
 		let connectionDelegate: ConnectionDelegate | undefined;

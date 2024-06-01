@@ -1,8 +1,10 @@
 import {sveltekit} from '@sveltejs/kit/vite';
-import type {UserConfig} from 'vite';
+import {defineConfig} from 'vitest/config';
 
-const config: UserConfig = {
+export default defineConfig({
 	plugins: [sveltekit()],
-};
-
-export default config;
+	test: {
+		include: ['tests/**/*.{test,spec}.{js,ts}'],
+		environment: 'jsdom',
+	},
+});

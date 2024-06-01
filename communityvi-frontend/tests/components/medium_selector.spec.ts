@@ -1,6 +1,7 @@
 import {formatMediumLength} from '$lib/components/medium_selector/helpers';
 import {Medium} from '$lib/client/model';
 import {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
+import {describe, it, expect} from 'vitest';
 
 describe('The MediumSelector component', () => {
 	describe('medium length formatting', () => {

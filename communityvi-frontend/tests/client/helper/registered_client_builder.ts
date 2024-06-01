@@ -1,10 +1,11 @@
 import {Peer, VersionedMedium} from '$lib/client/model';
 import RegisteredClient, {DisconnectCallback} from '$lib/client/registered_client';
-import {mock} from 'jest-mock-extended';
+import {mock} from 'vitest-mock-extended';
 import type ReferenceTimeSynchronizer from '$lib/client/reference_time_synchronizer';
 import type {Connection} from '$lib/client/connection';
 import {faker} from '@faker-js/faker';
 import {RESTClient} from '$lib/client/RESTClient';
+import {vi} from 'vitest';
 
 export class RegisteredClientBuilder {
 	private storedID = faker.number.int({min: 0});
@@ -15,7 +16,7 @@ export class RegisteredClientBuilder {
 	private storedPeers = new Array<Peer>();
 	private storedRestClient: RESTClient = mock<RESTClient>();
 	private storedConnection: Connection = mock<Connection>();
-	private storedDisconnectCallback: DisconnectCallback = jest.fn();
+	private storedDisconnectCallback: DisconnectCallback = vi.fn();
 
 	static default(): RegisteredClientBuilder {
 		return new RegisteredClientBuilder();

@@ -1,10 +1,11 @@
 import MessageBroker from '$lib/client/message_broker';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('The message broker', () => {
 	it('notifies subscribers', () => {
 		const messageBroker = new MessageBroker<string>();
-		const subscriber1 = jest.fn();
-		const subscriber2 = jest.fn();
+		const subscriber1 = vi.fn();
+		const subscriber2 = vi.fn();
 
 		messageBroker.subscribe(subscriber1);
 		messageBroker.subscribe(subscriber2);
@@ -17,8 +18,8 @@ describe('The message broker', () => {
 
 	it('allows subscribers to unsubscribe themselves', () => {
 		const messageBroker = new MessageBroker<string>();
-		const subscriber1 = jest.fn();
-		const subscriber2 = jest.fn();
+		const subscriber1 = vi.fn();
+		const subscriber2 = vi.fn();
 
 		const unsubscribeSubscriber1 = messageBroker.subscribe(subscriber1);
 		messageBroker.subscribe(subscriber2);

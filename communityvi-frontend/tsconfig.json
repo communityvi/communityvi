@@ -9,6 +9,8 @@
 		"importsNotUsedAsValues": "remove",
 		"preserveValueImports": false,
 		"paths": {
+			// Don't even ask: https://github.com/vitejs/vite/issues/13027#issuecomment-1527384805
+			"vite": ["./node_modules/vite"],
 			"$lib/*": ["./src/lib/*"],
 			"$lib": ["./src/lib"],
 			"$client/*": ["./src/client/*"],

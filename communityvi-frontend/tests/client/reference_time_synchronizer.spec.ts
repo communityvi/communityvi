@@ -1,7 +1,8 @@
 import ReferenceTimeSynchronizer, {AlreadyRunningError} from '$lib/client/reference_time_synchronizer';
-import {CalledWithMock, mock, mockReset} from 'jest-mock-extended';
+import {CalledWithMock, mock, mockReset} from 'vitest-mock-extended';
 import TimeMock from './helper/time_mock';
 import {ReferenceTimeResponse, RESTClient} from '$lib/client/RESTClient';
+import {describe, it, expect, vi} from 'vitest';
 
 describe('The reference time synchronizer', () => {
 	it('should not allow starting synchronization twice', async () => {
@@ -11,9 +12,9 @@ describe('The reference time synchronizer', () => {
 		const referenceTimeSynchronizer =
 			await ReferenceTimeSynchronizer.createInitializedWithRESTClient(restClientMock);
 
-		referenceTimeSynchronizer.start(jest.fn());
+		referenceTimeSynchronizer.start(vi.fn());
 
-		expect(() => referenceTimeSynchronizer.start(jest.fn())).toThrowError(AlreadyRunningError);
+		expect(() => referenceTimeSynchronizer.start(vi.fn())).toThrowError(AlreadyRunningError);
 	});
 
 	it('should have the correct initial offset after construction', async () => {
@@ -30,7 +31,7 @@ describe('The reference time synchronizer', () => {
 
 	it('should inform its subscriber about offset updates', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			jest.spyOn(global, 'setInterval');
+			vi.spyOn(global, 'setInterval');
 
 			const initialReferenceTime = 1337;
 			const restClientMock = mock<RESTClient>();
@@ -38,7 +39,7 @@ describe('The reference time synchronizer', () => {
 			const referenceTimeSynchronizer =
 				await ReferenceTimeSynchronizer.createInitializedWithRESTClient(restClientMock);
 
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 			referenceTimeSynchronizer.start(subscriber);
 
 			// 15s passed and server and client are out of sync by 230ms.
@@ -55,7 +56,7 @@ describe('The reference time synchronizer', () => {
 
 	it('should not inform its subscriber if the offset stays the same', async () => {
 		await TimeMock.run(async (timeMock: TimeMock) => {
-			jest.spyOn(global, 'setInterval');
+			vi.spyOn(global, 'setInterval');
 
 			const initialReferenceTime = 1337;
 			const restClientMock = mock<RESTClient>();
@@ -63,7 +64,7 @@ describe('The reference time synchronizer', () => {
 			const referenceTimeSynchronizer =
 				await ReferenceTimeSynchronizer.createInitializedWithRESTClient(restClientMock);
 
-			const subscriber = jest.fn();
+			const subscriber = vi.fn();
 			referenceTimeSynchronizer.start(subscriber);
 
 			// 15s passed and server and client are in sync.
