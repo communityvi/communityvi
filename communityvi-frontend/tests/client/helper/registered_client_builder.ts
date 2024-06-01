@@ -7,11 +7,11 @@ import {faker} from '@faker-js/faker';
 import {RESTClient} from '$lib/client/RESTClient';
 
 export class RegisteredClientBuilder {
-	private storedID = faker.datatype.number({min: 0});
+	private storedID = faker.number.int({min: 0});
 	private storedName = faker.internet.userName();
 	private storedReferenceTimeOffset = 0;
 	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer;
-	private storedVersionedMedium = new VersionedMedium(faker.datatype.number({min: 0}));
+	private storedVersionedMedium = new VersionedMedium(faker.number.int({min: 0}));
 	private storedPeers = new Array<Peer>();
 	private storedRestClient: RESTClient = mock<RESTClient>();
 	private storedConnection: Connection = mock<Connection>();
