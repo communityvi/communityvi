@@ -44,7 +44,7 @@ impl WebsocketTestClient {
 	pub fn in_room(name: &'static str, room: &Room) -> (Client, Self) {
 		let (sender, _, test_client) = Self::new();
 		let (client, _) = room
-			.add_client_and_return_existing(name.to_string(), sender)
+			.add_client_and_return_existing(name, sender)
 			.expect("Failed to add client to room");
 		tokio::spawn(send_broadcasts(client.clone()));
 		(client, test_client)

@@ -1,22 +1,23 @@
 use crate::connection::sender::MessageSender;
-use crate::message::outgoing::broadcast_message::BroadcastMessage;
+use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
-use crate::room::client_id::ClientId;
-use crate::room::clients::Clients;
 use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
+use crate::room::session_id::SessionId;
+use crate::room::session_repository::SessionRepository;
+use crate::user::UserRepository;
 use chrono::Duration;
-use js_int::UInt;
+use js_int::{uint, UInt};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
 pub mod client;
-pub mod client_id;
-mod client_id_sequence;
-pub mod clients;
 pub mod error;
 pub mod medium;
+pub mod session_id;
+mod session_id_sequence;
+pub mod session_repository;
 
 #[derive(Clone)]
 pub struct Room {
@@ -24,17 +25,41 @@ pub struct Room {
 }
 
 struct Inner {
-	clients: RwLock<Clients>,
+	user_repository: Mutex<UserRepository>,
+	session_repository: RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
+	message_counters: Mutex<MessageCounters>,
+}
+
+#[derive(Default)]
+struct MessageCounters {
+	chat_message_counter: UInt,
+	broadcast_counter: usize,
+}
+
+impl MessageCounters {
+	pub fn fetch_and_increment_chat_counter(&mut self) -> UInt {
+		let count = self.chat_message_counter;
+		self.chat_message_counter += uint!(1);
+		count
+	}
+
+	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
+		let count = self.broadcast_counter;
+		self.broadcast_counter += 1;
+		count
+	}
 }
 
 impl Room {
 	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
 		let inner = Inner {
-			clients: RwLock::new(Clients::with_limit(room_size_limit)),
+			user_repository: Mutex::default(),
+			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
+			message_counters: Default::default(),
 		};
 		Self { inner: Arc::new(inner) }
 	}
@@ -43,24 +68,50 @@ impl Room {
 	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
 	pub fn add_client_and_return_existing(
 		&self,
-		name: String,
+		name: &str,
 		message_sender: MessageSender,
 	) -> Result<(Client, Vec<Client>), RoomError> {
-		self.inner.clients.write().add_and_return_existing(name, message_sender)
+		let user = self.inner.user_repository.lock().create_user(name)?;
+		self.inner
+			.session_repository
+			.write()
+			.add_and_return_existing(user, message_sender)
 	}
 
-	pub fn remove_client(&self, client_id: ClientId) {
-		if self.inner.clients.write().remove(client_id) == 0 {
+	pub fn remove_client(&self, session_id: SessionId) {
+		let mut session_repository = self.inner.session_repository.write();
+
+		if let Some(client) = session_repository.remove(session_id) {
+			self.inner.user_repository.lock().remove(client.user());
+		}
+
+		if session_repository.is_empty() {
 			self.eject_medium();
 		}
 	}
 
 	pub fn send_chat_message(&self, sender: &Client, message: String) {
-		self.inner.clients.read().send_chat_message(sender, message);
+		let chat_counter = self.inner.message_counters.lock().fetch_and_increment_chat_counter();
+		let chat_message = ChatBroadcast {
+			sender_id: sender.id(),
+			sender_name: sender.name().to_string(),
+			message,
+			counter: chat_counter,
+		};
+		self.broadcast(chat_message);
 	}
 
 	pub fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
-		self.inner.clients.read().broadcast(response.into());
+		let message = response.into();
+		let count = self
+			.inner
+			.message_counters
+			.lock()
+			.fetch_and_increment_broadcast_counter();
+		let session_repository = self.inner.session_repository.read();
+		for client in session_repository.iter_clients() {
+			client.enqueue_broadcast(message.clone(), count);
+		}
 	}
 
 	/// Insert a medium based on `previous_version`. If `previous_version` is too low, nothing happens
@@ -116,13 +167,13 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client_and_return_existing(format!("{count}"), message_sender.clone()) {
+			if let Err(error) = room.add_client_and_return_existing(&format!("{count}"), message_sender.clone()) {
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client_and_return_existing("elephant".to_string(), message_sender);
+		let result = room.add_client_and_return_existing("elephant", message_sender);
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
@@ -133,7 +184,7 @@ mod test {
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		let (makise_kurisu, _) = room
-			.add_client_and_return_existing(name.to_string(), message_sender)
+			.add_client_and_return_existing(name, message_sender)
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
 		room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
@@ -177,14 +228,12 @@ mod test {
 	fn add_client_should_return_list_of_existing_clients() {
 		let room = Room::new(ReferenceTimer::default(), 10);
 		let jake_sender = FakeMessageSender::default();
-		let (jake, existing_clients) = room
-			.add_client_and_return_existing("Jake".to_string(), jake_sender.into())
-			.unwrap();
+		let (jake, existing_clients) = room.add_client_and_return_existing("Jake", jake_sender.into()).unwrap();
 		assert!(existing_clients.is_empty());
 
 		let elwood_sender = FakeMessageSender::default();
 		let (_, existing_clients) = room
-			.add_client_and_return_existing("Elwood".to_string(), elwood_sender.into())
+			.add_client_and_return_existing("Elwood", elwood_sender.into())
 			.unwrap();
 		assert_eq!(existing_clients.len(), 1);
 		let existing_jake = &existing_clients[0];
