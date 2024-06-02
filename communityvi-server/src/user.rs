@@ -1,11 +1,12 @@
 use std::borrow::Borrow;
-use std::collections::HashSet;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use thiserror::Error;
 use unicode_skeleton::UnicodeSkeleton;
 
 #[derive(Default)]
 pub struct UserRepository {
-	users: HashSet<User>,
+	users: HashMap<String, User>,
 }
 
 impl UserRepository {
@@ -14,24 +15,26 @@ impl UserRepository {
 			return Err(UserCreationError::NameEmpty);
 		}
 
-		let name = normalized_name(name);
+		let normalized_name = normalized_name(name);
 
 		const MAX_NAME_LENGTH: usize = 256;
 		if name.len() > MAX_NAME_LENGTH {
 			return Err(UserCreationError::NameTooLong);
 		}
 
-		if self.users.contains(name.as_str()) {
+		use Entry::*;
+		let Vacant(entry) = self.users.entry(normalized_name) else {
 			return Err(UserCreationError::NameAlreadyInUse);
-		}
+		};
 
-		let user = User { name };
-		self.users.insert(user.clone());
+		let user = User { name: name.to_owned() };
+		entry.insert(user.clone());
 		Ok(user)
 	}
 
 	pub fn remove(&mut self, user: &User) {
-		self.users.remove(user);
+		let normalized_name = normalized_name(user.name());
+		self.users.remove(&normalized_name);
 	}
 }
 
@@ -54,7 +57,7 @@ pub enum UserCreationError {
 	NameAlreadyInUse,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct User {
 	/// The effective ID value of any user.
 	name: String,
@@ -170,5 +173,42 @@ mod test {
 		let result = user_repository.create_user(&too_long_name);
 
 		assert!(matches!(result, Err(UserCreationError::NameTooLong)));
+	}
+
+	#[test]
+	fn should_not_return_user_with_normalized_name() {
+		const NAME: &str = "Thomas";
+
+		let mut repository = UserRepository::default();
+
+		let user = repository.create_user(NAME).expect("Failed to create user");
+
+		assert_ne!(
+			NAME,
+			normalized_name(NAME),
+			"This test only works if the normalization differs"
+		);
+		assert_eq!(NAME, user.name, "The created user should have had the original name.");
+	}
+
+	#[test]
+	fn should_not_allow_user_with_homograph_name() {
+		const NAME: &str = "Thomas";
+
+		let mut repository = UserRepository::default();
+
+		repository.create_user(NAME).expect("Failed to create user");
+
+		let error = repository
+			.create_user(&normalized_name(NAME))
+			.expect_err("Should not have created user with homograph name");
+
+		assert_eq!(UserCreationError::NameAlreadyInUse, error, "Incorrect error type");
+
+		assert_ne!(
+			NAME,
+			normalized_name(NAME),
+			"This test only works if the normalization differs"
+		);
 	}
 }
