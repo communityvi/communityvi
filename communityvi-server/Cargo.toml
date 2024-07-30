@@ -9,7 +9,7 @@ rust-version = "1.78"
 [dependencies]
 aide = { version = "0.13", features = ["axum", "axum-ws"] }
 axum = { version = "0.7", features = ["ws", "http2", "macros"] }
-axum-server = "0.6"
+axum-server = "0.7"
 anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
