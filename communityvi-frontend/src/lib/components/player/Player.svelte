@@ -12,8 +12,11 @@
 	// changed to catch all cases in which the player or its position require updating.
 	// Important: $registeredClient and $videoUrl are explicitly mentioned to trigger the reactive updates.
 	let playerCoordinator: PlayerCoordinator | undefined;
-	$: $registeredClient && initializeOrUpdatePlayerState();
-	$: $videoUrl && initializeOrUpdatePlayerState();
+	$: {
+		if ($registeredClient || $videoUrl) {
+			initializeOrUpdatePlayerState();
+		}
+	}
 
 	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(async change => {
 		await initializeOrUpdatePlayerState(change.medium);
