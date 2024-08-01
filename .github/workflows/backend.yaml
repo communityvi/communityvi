@@ -68,8 +68,6 @@ jobs:
           node-version: 18.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "communityvi-server"
