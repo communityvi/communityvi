@@ -52,7 +52,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --tests
+        run: cargo clippy --tests -- -Dwarnings
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -68,8 +68,6 @@ jobs:
           node-version: 18.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "communityvi-server"

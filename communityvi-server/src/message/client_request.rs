@@ -39,6 +39,7 @@ impl ClientRequest {
 	}
 }
 
+#[allow(dead_code)]
 trait RequestConvertible: Into<ClientRequest> {
 	fn with_id(self, request_id: UInt) -> ClientRequestWithId {
 		ClientRequestWithId {
