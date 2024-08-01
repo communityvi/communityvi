@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	if !should_bundle_frontend && !should_bundle_stoplight_elements {
 		// don't always rerun build.rs
-		println!("cargo:rerun-if-changed=build.rs")
+		println!("cargo:rerun-if-changed=build.rs");
 	}
 
 	Ok(())
