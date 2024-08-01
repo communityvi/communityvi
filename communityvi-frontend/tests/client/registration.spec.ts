@@ -6,7 +6,6 @@ import {ReferenceTimeResponse, RESTClient} from '$lib/client/RESTClient';
 import {describe, it, expect} from 'vitest';
 
 describe('Client registrations', () => {
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
 	const empty = () => {};
 
 	const transport = new TestTransport();
