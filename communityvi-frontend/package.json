@@ -38,7 +38,7 @@
 		"sass": "^1.49",
 		"svelte": "^4.0.0",
 		"svelte-check": "^3.0.0",
-		"svelte-eslint-parser": "^0.41.0",
+		"svelte-eslint-parser": "^0.42.0",
 		"tslib": "^2.3",
 		"typescript": "^5.0.0",
 		"vite": "^5.0.0",
