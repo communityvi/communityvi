@@ -57,6 +57,7 @@ pub struct BundledFileHandlerBuilder {
 }
 
 impl BundledFileHandlerBuilder {
+	#[allow(unused)]
 	/// Add files from a [`RustEmbed`] asset type, erasing the type in the process.
 	pub fn with_rust_embed<Bundle: RustEmbed>(mut self) -> Self {
 		self.files_by_path.extend(
@@ -70,12 +71,14 @@ impl BundledFileHandlerBuilder {
 		self
 	}
 
+	#[allow(unused)]
 	pub fn with_file(mut self, path: Cow<'static, str>, content: impl Into<Bytes>) -> Self {
 		let file = BundledFile::new(&path, content);
 		self.files_by_path.insert(path, file);
 		self
 	}
 
+	#[allow(unused)]
 	pub fn build(self) -> BundledFileHandler {
 		BundledFileHandler {
 			files_by_path: Arc::new(self.files_by_path),
@@ -111,6 +114,7 @@ struct BundledFile {
 }
 
 impl BundledFile {
+	#[allow(unused)]
 	fn new(path: &str, content: impl Into<Bytes>) -> Self {
 		let content = content.into();
 		let hash = hash_sha256(&content);
