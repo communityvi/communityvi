@@ -9,7 +9,7 @@ pub struct BacktraceDisabler<'mutex_guard> {
 
 const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
 
-impl<'mutex_guard> Default for BacktraceDisabler<'mutex_guard> {
+impl Default for BacktraceDisabler<'_> {
 	fn default() -> Self {
 		let mutex_guard = BACKTRACE_MUTEX.lock();
 		let previous_environment_variable = std::env::var_os(RUST_BACKTRACE);
@@ -21,7 +21,7 @@ impl<'mutex_guard> Default for BacktraceDisabler<'mutex_guard> {
 	}
 }
 
-impl<'mutex_guard> Drop for BacktraceDisabler<'mutex_guard> {
+impl Drop for BacktraceDisabler<'_> {
 	fn drop(&mut self) {
 		if let Some(text) = self.previous_environment_variable.as_ref() {
 			std::env::set_var(RUST_BACKTRACE, text);
