@@ -22,7 +22,7 @@
 </script>
 
 <div class="notification {type}" class:is-light={useLightAppearance} out:fade>
-	<button class="delete" onclick={() => dispatch('close')}></button>
+	<button class="delete" onclick={() => dispatch('close')} aria-label="Close notification"></button>
 	<div class="media">
 		<div class="media-left">
 			<span class="icon">
