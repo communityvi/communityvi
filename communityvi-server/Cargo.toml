@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.com>"]
 edition = "2021"
 repository = "https://github.com/communityvi/communityvi"
-rust-version = "1.78"
+rust-version = "1.83"
 
 [lints.clippy]
 correctness = { level = "deny", priority = -1 }
