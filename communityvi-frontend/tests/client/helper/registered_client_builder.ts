@@ -9,7 +9,7 @@ import {vi} from 'vitest';
 
 export class RegisteredClientBuilder {
 	private storedID = faker.number.int({min: 0});
-	private storedName = faker.internet.userName();
+	private storedName = faker.internet.username();
 	private storedReferenceTimeOffset = 0;
 	private storedReferenceTimeSynchronizer: ReferenceTimeSynchronizer;
 	private storedVersionedMedium = new VersionedMedium(faker.number.int({min: 0}));

@@ -6,9 +6,12 @@
 	import {onDestroy} from 'svelte';
 	import SingleChatMessage from '$lib/components/chat/SingleChatMessage.svelte';
 
-	let messages = new Array<OwnMessage | ChatMessage>();
+	let messages = $state(new Array<OwnMessage | ChatMessage>());
 
-	$: unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+	let unsubscribe: (() => void) | undefined = $state(undefined);
+	$effect(() => {
+		unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+	});
 
 	onDestroy(() => {
 		if (unsubscribe !== undefined) {
