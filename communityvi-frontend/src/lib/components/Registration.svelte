@@ -1,12 +1,21 @@
 <script lang="ts">
+	import { preventDefault } from 'svelte/legacy';
+
 	import type Client from '$lib/client/client';
 	import {notifications, registeredClient} from '$lib/stores';
 	import {CloseReason} from '$lib/client/connection';
 
-	export let client: Client;
+	interface Props {
+		client: Client;
+	}
 
-	$: registeredName = $registeredClient?.name ?? '';
-	$: isRegistered = $registeredClient !== undefined;
+	let { client }: Props = $props();
+
+	let registeredName = $state('');
+	$effect(() => {
+		registeredName = $registeredClient?.name ?? '';
+	});
+	let isRegistered = $derived($registeredClient !== undefined);
 
 	async function submit() {
 		if (isRegistered) {
@@ -41,7 +50,7 @@
 	}
 </script>
 
-<form on:submit|preventDefault={submit}>
+<form onsubmit={preventDefault(submit)}>
 	<div class="field has-addons">
 		<p class="control">
 			<span class="button is-static">Username:</span>

@@ -4,24 +4,34 @@
 
 	import {NotificationType} from '$lib/components/notification/notification_type';
 
-	export let type: NotificationType = NotificationType.PRIMARY;
-	export let useLightAppearance = true;
-	export let icon = 'exclamation-circle';
+	interface Props {
+		type?: NotificationType;
+		useLightAppearance?: boolean;
+		icon?: string;
+		children?: import('svelte').Snippet;
+	}
+
+	let {
+		type = NotificationType.PRIMARY,
+		useLightAppearance = true,
+		icon = 'exclamation-circle',
+		children
+	}: Props = $props();
 
 	const dispatch = createEventDispatcher();
 </script>
 
 <div class="notification {type}" class:is-light={useLightAppearance} out:fade>
-	<button class="delete" on:click={() => dispatch('close')} />
+	<button class="delete" onclick={() => dispatch('close')}></button>
 	<div class="media">
 		<div class="media-left">
 			<span class="icon">
-				<i class="fas fa-{icon}" />
+				<i class="fas fa-{icon}"></i>
 			</span>
 		</div>
 
 		<div class="media-content">
-			<slot />
+			{@render children?.()}
 		</div>
 	</div>
 </div>

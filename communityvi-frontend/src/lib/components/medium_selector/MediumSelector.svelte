@@ -6,24 +6,27 @@
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
 	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
 
-	$: isRegistered = $registeredClient !== undefined;
+	let isRegistered = $derived($registeredClient !== undefined);
 
-	let medium: Medium | undefined;
-	$: {
+	let medium: Medium | undefined = $state();
+	$effect(() => {
 		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
 			// Update the medium in case of relogin
 			medium = $registeredClient.currentMedium;
 			$videoUrl = undefined;
 		}
-	}
-	$: mediumIsOutdated = medium !== undefined && $videoUrl === undefined;
+	});
+	let mediumIsOutdated = $derived(medium !== undefined && $videoUrl === undefined);
 
-	let durationHelper: HTMLVideoElement | undefined;
-	$: metadataLoader = durationHelper ? new MetadataLoader(durationHelper) : undefined;
+	let durationHelper: HTMLVideoElement | undefined = $state();
+	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
 
-	let fileSelector: HTMLInputElement;
+	let fileSelector: HTMLInputElement = $state();
 
-	$: unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
+	let unsubscribe: (() => void) | undefined = $state(undefined);
+	$effect(() => {
+		unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
+	});
 
 	onDestroy(() => {
 		if (unsubscribe !== undefined) {
@@ -104,7 +107,7 @@
 </script>
 
 <!-- Hidden video element for parsing file metadata -->
-<video hidden={true} muted={true} bind:this={durationHelper} />
+<video hidden={true} muted={true} bind:this={durationHelper}></video>
 
 {#if isRegistered}
 	<section id="medium-selection">
@@ -118,11 +121,11 @@
 					type="file"
 					accept="video/*,audio/*"
 					bind:this={fileSelector}
-					on:change={onMediumSelection}
+					onchange={onMediumSelection}
 				/>
 				<span class="file-cta">
 					<span class="file-icon">
-						<i class="fas fa-upload" />
+						<i class="fas fa-upload"></i>
 					</span>
 					<span class="file-label">
 						{#if mediumIsOutdated && medium?.name !== undefined}
@@ -136,7 +139,7 @@
 		</div>
 
 		{#if medium !== undefined}
-			<button on:click={ejectMedium}>Eject Medium</button>
+			<button onclick={ejectMedium}>Eject Medium</button>
 		{/if}
 	</section>
 {/if}
