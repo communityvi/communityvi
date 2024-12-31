@@ -23,7 +23,7 @@ jobs:
           node-version: 18.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@1.83
-      - uses: Swatinem/rust-cache@v2.7.5
+      - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: "communityvi-server"
       - name: Check
@@ -46,7 +46,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.83
         with:
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2.7.5
+      - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: "communityvi-server"
       - name: Check formatting
@@ -68,7 +68,7 @@ jobs:
           node-version: 18.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@1.83
-      - uses: Swatinem/rust-cache@v2.7.5
+      - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: "communityvi-server"
       - name: Build
