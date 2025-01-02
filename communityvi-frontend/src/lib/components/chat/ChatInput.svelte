@@ -1,11 +1,13 @@
 <script lang="ts">
+	import { preventDefault } from 'svelte/legacy';
+
 	import {registeredClient, notifications} from '$lib/stores';
 	import {createEventDispatcher} from 'svelte';
 
-	$: isNotRegistered = $registeredClient === undefined;
+	let isNotRegistered = $derived($registeredClient === undefined);
 
-	let message = '';
-	$: isMessageEmpty = message.trim().length === 0;
+	let message = $state('');
+	let isMessageEmpty = $derived(message.trim().length === 0);
 
 	async function sendChatMessage() {
 		if ($registeredClient === undefined) {
@@ -27,7 +29,7 @@
 	const dispatch = createEventDispatcher();
 </script>
 
-<form on:submit|preventDefault={sendChatMessage}>
+<form onsubmit={preventDefault(sendChatMessage)}>
 	<input type="text" bind:value={message} disabled={isNotRegistered || undefined} />
 	<input type="submit" value="Send" disabled={isNotRegistered || isMessageEmpty || undefined} />
 </form>

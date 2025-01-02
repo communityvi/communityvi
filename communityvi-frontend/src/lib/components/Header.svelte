@@ -2,7 +2,7 @@
 	import {page} from '$app/stores';
 	import Notifications from '$lib/components/Notifications.svelte';
 
-	let isBurgerMenuExpanded = false;
+	let isBurgerMenuExpanded = $state(false);
 
 	function toggleBurgerMenu() {
 		isBurgerMenuExpanded = !isBurgerMenuExpanded;
@@ -19,8 +19,8 @@
 			role="button"
 			class="navbar-burger"
 			class:is-active={isBurgerMenuExpanded}
-			on:click={toggleBurgerMenu}
-			on:keypress={event => {
+			onclick={toggleBurgerMenu}
+			onkeypress={event => {
 				if (event.key === 'Enter') {
 					toggleBurgerMenu();
 				}
@@ -29,10 +29,10 @@
 			aria-label="menu"
 			aria-expanded={isBurgerMenuExpanded}
 		>
-			<span aria-hidden="true" />
-			<span aria-hidden="true" />
-			<span aria-hidden="true" />
-			<span aria-hidden="true" />
+			<span aria-hidden="true"></span>
+			<span aria-hidden="true"></span>
+			<span aria-hidden="true"></span>
+			<span aria-hidden="true"></span>
 		</span>
 	</div>
 
