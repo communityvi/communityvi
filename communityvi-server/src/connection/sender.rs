@@ -53,7 +53,7 @@ impl MessageSender {
 
 	pub async fn send_ping(&self, payload: Vec<u8>) -> Result<(), ()> {
 		let mut sink = self.sink.lock().await;
-		let ping = WebSocketMessage::Ping(payload);
+		let ping = WebSocketMessage::Ping(payload.into());
 		sink.send(ping)
 			.await
 			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
@@ -61,7 +61,7 @@ impl MessageSender {
 
 	pub async fn send_pong(&self, payload: Vec<u8>) -> Result<(), ()> {
 		let mut sink = self.sink.lock().await;
-		let pong = WebSocketMessage::Pong(payload);
+		let pong = WebSocketMessage::Pong(payload.into());
 		sink.send(pong)
 			.await
 			.map_err(|error| error!("Error while sending `pong`: {error:?}"))
