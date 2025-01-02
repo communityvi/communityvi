@@ -21,7 +21,7 @@
 	let durationHelper: HTMLVideoElement | undefined = $state();
 	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
 
-	let fileSelector: HTMLInputElement = $state();
+	let fileSelector: HTMLInputElement | undefined = $state();
 
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
@@ -47,7 +47,7 @@
 	}
 
 	async function onMediumSelection() {
-		const selectedFile = fileSelector.files?.item(0) ?? undefined;
+		const selectedFile = fileSelector?.files?.item(0) ?? undefined;
 		if (selectedFile === undefined || metadataLoader === undefined) {
 			return;
 		}
@@ -102,6 +102,10 @@
 	}
 
 	function resetFileSelector() {
+		if (fileSelector === undefined) {
+			return;
+		}
+
 		fileSelector.value = '';
 	}
 </script>

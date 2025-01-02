@@ -1,9 +1,11 @@
+type Timeout = ReturnType<typeof setTimeout>;
+
 export function promiseWithTimout<T>(
 	promise: Promise<T>,
 	timeoutInMilliseconds: number,
 	timeoutHandler: () => void,
 ): Promise<T> {
-	let timeoutId: number;
+	let timeoutId: Timeout;
 
 	const timeoutPromise = new Promise<never>((resolve, reject) => {
 		timeoutId = setTimeout(() => {

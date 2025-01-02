@@ -1,9 +1,11 @@
 import {RESTClient} from '$lib/client/RESTClient';
 
+type Timeout = ReturnType<typeof setInterval>;
+
 export default class ReferenceTimeSynchronizer {
 	private readonly restClient: RESTClient;
 	private callback?: TimeUpdatedCallback;
-	private intervalId?: number;
+	private intervalId?: Timeout;
 
 	private storedOffset: number;
 

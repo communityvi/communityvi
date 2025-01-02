@@ -1,8 +1,10 @@
+type Timeout = ReturnType<typeof setTimeout>;
+
 export default class RateLimiter {
 	private readonly intervalInMilliseconds: number;
 
 	private timeOfLastCall: DOMHighResTimeStamp;
-	private pendingTimeout?: number;
+	private pendingTimeout?: Timeout;
 
 	constructor(intervalInMilliseconds: number) {
 		this.intervalInMilliseconds = intervalInMilliseconds;
@@ -31,7 +33,7 @@ export default class RateLimiter {
 		this.replacePendingTimeout();
 	}
 
-	private replacePendingTimeout(newTimeout?: number) {
+	private replacePendingTimeout(newTimeout?: Timeout) {
 		if (this.pendingTimeout !== undefined) {
 			clearTimeout(this.pendingTimeout);
 		}
