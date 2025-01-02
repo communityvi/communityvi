@@ -35,7 +35,7 @@ impl MessageReceiver {
 						// respond to ping in-place. Previously, tungstenite did this for us, but now we need to
 						// to it manually and keep on looping until we receive a non-ping message
 						// TODO: Put this responding into a more appropriate place
-						if let Err(()) = self.sender.send_pong(payload).await {
+						if let Err(()) = self.sender.send_pong(payload.into()).await {
 							return Finished;
 						}
 					}
@@ -49,7 +49,11 @@ impl MessageReceiver {
 			};
 
 			let websocket_message = match websocket_message {
-				Pong(payload) => return ReceivedMessage::Pong { payload },
+				Pong(payload) => {
+					return ReceivedMessage::Pong {
+						payload: payload.to_vec(),
+					}
+				}
 				Close(_) => {
 					self.sender.close().await;
 					return Finished;

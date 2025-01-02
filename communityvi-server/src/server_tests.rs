@@ -35,14 +35,16 @@ async fn should_respond_to_websocket_messages() {
 async fn should_not_allow_invalid_messages_during_registration() {
 	let http_client = start_test_server().await;
 	let mut websocket_client = websocket_test_client(&http_client).await;
-	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8].into());
 	websocket_client.send_raw(invalid_message).await;
 
 	let response = websocket_client.receive_error_message(None).await;
 
 	let expected_response = ErrorMessage::builder()
 		.error(ErrorMessageType::InvalidFormat)
-		.message("Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string())
+		.message(
+			"Client request has incorrect message type. Message was: Binary(b\"\\x01\\x02\\x03\\x04\")".to_string(),
+		)
 		.build();
 	assert_eq!(expected_response, response);
 }
@@ -51,13 +53,15 @@ async fn should_not_allow_invalid_messages_during_registration() {
 async fn should_not_allow_invalid_messages_after_successful_registration() {
 	let http_client = start_test_server().await;
 	let (_session_id, mut websocket_client) = registered_websocket_test_client("Ferris", &http_client).await;
-	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8]);
+	let invalid_message = tungstenite::Message::Binary(vec![1u8, 2u8, 3u8, 4u8].into());
 	websocket_client.send_raw(invalid_message).await;
 	let response = websocket_client.receive_error_message(None).await;
 
 	let expected_response = ErrorMessage::builder()
 		.error(ErrorMessageType::InvalidFormat)
-		.message("Client request has incorrect message type. Message was: Binary([1, 2, 3, 4])".to_string())
+		.message(
+			"Client request has incorrect message type. Message was: Binary(b\"\\x01\\x02\\x03\\x04\")".to_string(),
+		)
 		.build();
 	assert_eq!(expected_response, response);
 }
@@ -126,7 +130,9 @@ async fn should_broadcast_when_client_leaves_the_room() {
 async fn test_server_should_upgrade_websocket_connection_and_ping_pong() {
 	let http_client = start_test_server().await;
 	let mut websocket_client = websocket_test_client(&http_client).await;
-	websocket_client.send_raw(tungstenite::Message::Ping(vec![])).await;
+	websocket_client
+		.send_raw(tungstenite::Message::Ping(Default::default()))
+		.await;
 
 	let pong = websocket_client.receive_raw().await;
 	assert!(pong.is_pong());

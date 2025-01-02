@@ -108,7 +108,7 @@ impl WebsocketTestClient {
 
 	pub async fn receive_ping(&mut self) -> Vec<u8> {
 		if let WebSocketMessage::Ping(payload) = self.receive_raw().await {
-			payload
+			payload.to_vec()
 		} else {
 			panic!("Invalid raw message received.");
 		}

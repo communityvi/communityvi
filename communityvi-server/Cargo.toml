@@ -35,8 +35,8 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 clap = { version = "4", features = ["derive"] }
 env_logger = "0.11"
 futures-util = "0.3"
-futures-channel = "0.3"
-governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
+futures-channel = { version = "0.3", features = ["sink"] }
+governor = { version = "0.8", default-features = false, features = ["std", "jitter"] }
 hex = "0.4"
 humantime-serde = "1"
 http-body-util = "0.1"
@@ -55,7 +55,7 @@ sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
-tokio-tungstenite = "0.24"
+tokio-tungstenite = "0.26"
 toml = "0.8"
 tower-http = { version = "0.6", features = ["cors"] }
 tower-service = "0.3"
