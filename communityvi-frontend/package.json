@@ -28,7 +28,7 @@
 		"@vitest/coverage-v8": "^2.0.0",
 		"bulma": "^1.0.0",
 		"eslint": "^9.0.0",
-		"eslint-config-prettier": "^9.0.0",
+		"eslint-config-prettier": "^10.0.0",
 		"eslint-plugin-svelte": "^2.45.1",
 		"globals": "^15.9.0",
 		"jsdom": "^25.0.0",
