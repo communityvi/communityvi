@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.83
+        uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: "communityvi-server"
@@ -43,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.83
+        uses: dtolnay/rust-toolchain@1.85
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2.7.7
@@ -58,7 +58,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-24.04, windows-2022, macos-14]
+        os: [ ubuntu-24.04, windows-2022, macos-14 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.83
+        uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: "communityvi-server"

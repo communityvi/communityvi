@@ -12,8 +12,8 @@ use crate::utils::websocket_message_conversion::{
 use aide::axum::routing::get_with;
 use aide::axum::{ApiRouter, IntoApiResponse};
 use aide::openapi::OpenApi;
-use axum::extract::{ws::WebSocket, Extension, State, WebSocketUpgrade};
 use axum::Router;
+use axum::extract::{Extension, State, WebSocketUpgrade, ws::WebSocket};
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Serialize, Serializer};
 use serde_json::value::RawValue;

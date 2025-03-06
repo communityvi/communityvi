@@ -50,8 +50,8 @@ impl Connection {
 #[cfg(test)]
 pub mod test {
 	use crate::connection::receiver::ReceivedMessage;
-	use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 	use crate::message::WebSocketMessage;
+	use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 	use crate::utils::test_client::WebsocketTestClient;
 
 	#[tokio::test]

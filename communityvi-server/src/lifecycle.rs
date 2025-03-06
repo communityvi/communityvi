@@ -9,10 +9,10 @@ use crate::message::outgoing::broadcast_message::{
 };
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::outgoing::success_message::{ClientResponse, SuccessMessage};
+use crate::room::Room;
 use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::medium::Medium;
-use crate::room::Room;
 use crate::utils::time_source::TimeSource;
 use chrono::Duration;
 use futures_channel::mpsc;
@@ -365,8 +365,8 @@ mod test {
 	use crate::message::outgoing::error_message::ErrorMessageType;
 	use crate::message::outgoing::success_message::{MediumResponse, PlaybackStateResponse, VersionedMediumResponse};
 	use crate::reference_time::ReferenceTimer;
-	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::room::medium::VersionedMedium;
+	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::room::session_id::SessionId;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;

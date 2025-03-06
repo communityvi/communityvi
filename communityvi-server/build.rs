@@ -82,7 +82,7 @@ fn limit_rerun_to_frontend_changes(frontend_path: &Path) {
 	}
 }
 
-fn files_and_directories_not_in_gitignore(path: &Path) -> impl Iterator<Item = DirEntry> {
+fn files_and_directories_not_in_gitignore(path: &Path) -> impl Iterator<Item = DirEntry> + use<> {
 	ignore::WalkBuilder::new(path)
 		.hidden(false)
 		.ignore(false)

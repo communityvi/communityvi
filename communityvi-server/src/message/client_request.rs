@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
-use crate::room::medium::fixed_length::FixedLengthMedium;
 use crate::room::medium::Medium;
+use crate::room::medium::fixed_length::FixedLengthMedium;
 use chrono::Duration;
 use js_int::{Int, UInt};
 use log::error;

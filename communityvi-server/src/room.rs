@@ -8,7 +8,7 @@ use crate::room::session_id::SessionId;
 use crate::room::session_repository::SessionRepository;
 use crate::user::UserRepository;
 use chrono::Duration;
-use js_int::{uint, UInt};
+use js_int::{UInt, uint};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
