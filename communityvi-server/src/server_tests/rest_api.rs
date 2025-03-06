@@ -1,6 +1,6 @@
 use crate::server_tests::start_test_server;
 use axum::http::StatusCode;
-use js_int::{uint, UInt};
+use js_int::{UInt, uint};
 use serde::Deserialize;
 
 #[cfg(feature = "api-docs")]

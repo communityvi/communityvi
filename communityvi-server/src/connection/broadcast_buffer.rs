@@ -3,7 +3,7 @@ use crate::message::outgoing::broadcast_message::{
 	BroadcastMessage, ChatBroadcast, ClientJoinedBroadcast, ClientLeftBroadcast, MediumStateChangedBroadcast,
 	VersionedMediumBroadcast,
 };
-use js_int::{uint, UInt};
+use js_int::{UInt, uint};
 use std::collections::{BTreeSet, VecDeque};
 use tokio::sync::Notify;
 
@@ -174,7 +174,6 @@ mod test {
 	use super::*;
 	use crate::message::outgoing::broadcast_message::{LeftReason, MediumBroadcast};
 	use crate::room::session_id::SessionId;
-	use crate::utils::backtrace_disabler::BacktraceDisabler;
 	use std::ops::Deref;
 
 	#[allow(clippy::cast_possible_truncation)]
@@ -363,7 +362,6 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn broadcast_number_must_not_stay_the_same() {
-		let _backtrace_disabler = BacktraceDisabler::default();
 		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
@@ -377,7 +375,6 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn broadcast_number_must_not_skip() {
-		let _backtrace_disabler = BacktraceDisabler::default();
 		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {
@@ -391,7 +388,6 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn broadcast_number_must_not_decrease() {
-		let _backtrace_disabler = BacktraceDisabler::default();
 		let broadcast_buffer = BroadcastBufferWithTestHelpers::default();
 
 		let message = BroadcastMessage::ClientJoined(ClientJoinedBroadcast {

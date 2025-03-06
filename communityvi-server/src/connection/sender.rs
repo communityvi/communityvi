@@ -1,8 +1,8 @@
+use crate::message::WebSocketMessage;
+use crate::message::outgoing::OutgoingMessage;
 use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
-use crate::message::outgoing::OutgoingMessage;
-use crate::message::WebSocketMessage;
 use futures_util::{Sink, SinkExt};
 use js_int::UInt;
 use log::error;

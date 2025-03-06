@@ -1,6 +1,6 @@
 use crate::room::medium::fixed_length::FixedLengthMedium;
 use chrono::Duration;
-use js_int::{uint, UInt};
+use js_int::{UInt, uint};
 
 pub mod fixed_length;
 pub mod playback_state;

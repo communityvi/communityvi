@@ -2,9 +2,9 @@
 name = "communityvi-server"
 version = "0.1.0"
 authors = ["Max Bruckner <max@maxbruckner.de>", "Thomas Keppler <winfr34k@gmail.com>"]
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/communityvi/communityvi"
-rust-version = "1.83"
+rust-version = "1.85"
 
 [lints.clippy]
 correctness = { level = "deny", priority = -1 }

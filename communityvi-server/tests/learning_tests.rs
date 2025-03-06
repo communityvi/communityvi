@@ -1,4 +1,4 @@
-use js_int::{int, uint, Int, UInt};
+use js_int::{Int, UInt, int, uint};
 
 #[test]
 fn js_int_supports_deserializing_from_floats() {

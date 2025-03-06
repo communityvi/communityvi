@@ -52,7 +52,7 @@ impl MessageReceiver {
 				Pong(payload) => {
 					return ReceivedMessage::Pong {
 						payload: payload.to_vec(),
-					}
+					};
 				}
 				Close(_) => {
 					self.sender.close().await;
