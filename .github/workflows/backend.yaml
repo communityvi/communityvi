@@ -20,7 +20,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4.2.0
         with:
-          node-version: 18.x
+          node-version: 22.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2.7.7
@@ -65,7 +65,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4.2.0
         with:
-          node-version: 18.x
+          node-version: 22.x
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2.7.7
