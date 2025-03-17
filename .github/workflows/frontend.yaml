@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
       - name: Install NodeJS
-        uses: actions/setup-node@v4.2.0
+        uses: actions/setup-node@v4.3.0
         with:
           node-version: 18.x
       - name: Install packages
@@ -30,7 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
       - name: Install NodeJS
-        uses: actions/setup-node@v4.2.0
+        uses: actions/setup-node@v4.3.0
         with:
           node-version: 18.x
       - name: Install packages
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
       - name: Install NodeJS
-        uses: actions/setup-node@v4.2.0
+        uses: actions/setup-node@v4.3.0
         with:
           node-version: 18.x
       - name: Install packages
