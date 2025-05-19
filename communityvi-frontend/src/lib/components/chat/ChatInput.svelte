@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault } from 'svelte/legacy';
-
 	import {registeredClient, notifications} from '$lib/stores';
 	import {createEventDispatcher} from 'svelte';
 
@@ -33,7 +31,7 @@
 	const dispatch = createEventDispatcher();
 </script>
 
-<form onsubmit={preventDefault(sendChatMessage)}>
+<form onsubmit={sendChatMessage}>
 	<input type="text" bind:this={textInput} bind:value={message} disabled={isNotRegistered || undefined} />
 	<input type="submit" value="Send" disabled={isNotRegistered || isMessageEmpty || undefined} />
 </form>

@@ -16,9 +16,11 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe !== undefined) {
-			unsubscribe();
+		if (unsubscribe === undefined) {
+			return;
 		}
+
+		unsubscribe();
 	});
 
 	function onChatMessageReceived(message: ChatMessage) {
