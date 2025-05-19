@@ -2,8 +2,8 @@ name: Frontend
 on:
   push:
     paths:
-    - 'communityvi-frontend/**'
-    - '.github/workflows/frontend.yaml'
+      - 'communityvi-frontend/**'
+      - '.github/workflows/frontend.yaml'
 defaults:
   run:
     # The frontend project is not in the repository root
@@ -18,7 +18,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4.4.0
         with:
-          node-version: 22.x
+          node-version: 22
       - name: Install packages
         run: npm install
       - name: ESLint & Prettier & Svelte check
@@ -32,7 +32,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4.4.0
         with:
-          node-version: 22.x
+          node-version: 22
       - name: Install packages
         run: npm install
       - name: Build static files
@@ -46,7 +46,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v4.4.0
         with:
-          node-version: 22.x
+          node-version: 22
       - name: Install packages
         run: npm install
       - name: Test
