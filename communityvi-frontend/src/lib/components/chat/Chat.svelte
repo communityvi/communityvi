@@ -8,6 +8,8 @@
 
 	let messages = $state(new Array<OwnMessage | ChatMessage>());
 
+	// NOTE: Can't use $derived because we need the side-effect of subscribing to chat messages
+	// eslint-disable-next-line svelte/prefer-writable-derived
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
 		unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
@@ -64,7 +66,8 @@
 		</thead>
 
 		<tbody>
-			{#each messages as message}
+			<!-- TODO: Look into whether the key is unique enough or whether we need an additional ID -->
+			{#each messages as message ([message.sender.id, message.message])}
 				{#if message instanceof ChatMessage}
 					<SingleChatMessage message={message.message} sender={message.sender} />
 				{:else if message instanceof OwnMessage}

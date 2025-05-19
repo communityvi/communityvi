@@ -9,13 +9,6 @@
 	let isRegistered = $derived($registeredClient !== undefined);
 
 	let medium: Medium | undefined = $state();
-	$effect(() => {
-		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
-			// Update the medium in case of relogin
-			medium = $registeredClient.currentMedium;
-			$videoUrl = undefined;
-		}
-	});
 	let mediumIsOutdated = $derived(medium !== undefined && $videoUrl === undefined);
 
 	let durationHelper: HTMLVideoElement | undefined = $state();
@@ -25,6 +18,12 @@
 
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
+		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
+			// Update the medium in case of relogin
+			medium = $registeredClient.currentMedium;
+			$videoUrl = undefined;
+		}
+
 		unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
 	});
 
