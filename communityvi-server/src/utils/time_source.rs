@@ -123,7 +123,7 @@ impl Interval {
 				.next()
 				.await
 				.unwrap_or_else(|| panic!("{} dropped prematurely.", type_name::<TimeSource>())),
-		};
+		}
 	}
 }
 
@@ -151,7 +151,7 @@ impl Stream for TestInterval {
 			}
 			Poll::Ready(None) => return Poll::Ready(None),
 			Poll::Pending => {}
-		};
+		}
 
 		if self.current_time >= self.next_deadline {
 			let period = self.period;
@@ -215,7 +215,7 @@ impl<ValueFuture: Future> Future for TestTimeout<ValueFuture> {
 		match value_poll {
 			Poll::Ready(value) => return Poll::Ready(Ok(value)),
 			Poll::Pending => {}
-		};
+		}
 
 		Poll::Pending
 	}

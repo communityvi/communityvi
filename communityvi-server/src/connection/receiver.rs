@@ -41,11 +41,11 @@ impl MessageReceiver {
 					}
 					Some(Ok(websocket_message)) => break websocket_message,
 					Some(Err(error)) => {
-						log::error!("Failed to receive websocket message: {}", error);
+						log::error!("Failed to receive websocket message: {error}");
 						return Finished;
 					}
 					None => return Finished,
-				};
+				}
 			};
 
 			let websocket_message = match websocket_message {
@@ -75,7 +75,7 @@ impl MessageReceiver {
 							format!("Client request has incorrect message type. Message was: {message:?}")
 						}
 					};
-					error!("{}", message);
+					error!("{message}");
 					let _ = self
 						.sender
 						.send_error_message(
