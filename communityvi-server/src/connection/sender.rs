@@ -48,7 +48,7 @@ impl MessageSender {
 
 		sink.send(websocket_message)
 			.await
-			.map_err(|error| error!("Error while sending message: {:?}", error))
+			.map_err(|error| error!("Error while sending message: {error:?}"))
 	}
 
 	pub async fn send_ping(&self, payload: Vec<u8>) -> Result<(), ()> {
@@ -56,7 +56,7 @@ impl MessageSender {
 		let ping = WebSocketMessage::Ping(payload.into());
 		sink.send(ping)
 			.await
-			.map_err(|error| error!("Error while sending `ping`: {:?}", error))
+			.map_err(|error| error!("Error while sending `ping`: {error:?}"))
 	}
 
 	pub async fn send_pong(&self, payload: Vec<u8>) -> Result<(), ()> {

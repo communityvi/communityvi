@@ -186,7 +186,7 @@ impl TryFrom<&WebSocketMessage> for RequestIdOnly {
 	fn try_from(websocket_message: &WebSocketMessage) -> Result<Self, Self::Error> {
 		match websocket_message {
 			WebSocketMessage::Text(json) => serde_json::from_str(json)
-				.map_err(|error| error!("Error while deserializing websocket message from JSON: {:?}", error)),
+				.map_err(|error| error!("Error while deserializing websocket message from JSON: {error:?}")),
 			_ => Err(()),
 		}
 	}

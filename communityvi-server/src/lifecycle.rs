@@ -49,7 +49,7 @@ pub async fn run_client(
 		};
 		room.remove_client(session_id);
 
-		info!("Client '{}' with id {} has left.", client_name, session_id);
+		info!("Client '{client_name}' with id {session_id} has left.");
 		room.broadcast(ClientLeftBroadcast {
 			id: session_id,
 			name: client_name,
@@ -77,7 +77,7 @@ async fn register_client(
 	};
 
 	let ClientRequest::Register(RegisterRequest { name }) = request.request else {
-		error!("Client registration failed. Invalid request: {:?}", request);
+		error!("Client registration failed. Invalid request: {request:?}");
 
 		let _ = message_sender
 			.send_error_message(
@@ -134,7 +134,7 @@ async fn register_client(
 		let id = client.id();
 		let name = client.name().to_string();
 
-		info!("Registered client: {} {}", id, name);
+		info!("Registered client: {id} {name}");
 
 		room.broadcast(ClientJoinedBroadcast { id, name });
 		Some((client, message_receiver))
