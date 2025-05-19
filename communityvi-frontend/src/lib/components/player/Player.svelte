@@ -27,9 +27,11 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe !== undefined) {
-			unsubscribe();
+		if (unsubscribe === undefined) {
+			return;
 		}
+
+		unsubscribe();
 	});
 
 	async function initializeOrUpdatePlayerState(medium?: Medium) {

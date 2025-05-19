@@ -28,9 +28,11 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe !== undefined) {
-			unsubscribe();
+		if (unsubscribe === undefined) {
+			return;
 		}
+
+		unsubscribe();
 	});
 
 	function onMediumStateChanged(change: MediumStateChanged): void {

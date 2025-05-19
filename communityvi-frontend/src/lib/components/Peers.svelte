@@ -12,9 +12,11 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe !== undefined) {
-			unsubscribe();
+		if (unsubscribe === undefined) {
+			return;
 		}
+
+		unsubscribe();
 	});
 
 	function onPeerChange(peerChange: PeerLifecycleMessage) {
