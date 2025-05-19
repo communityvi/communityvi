@@ -64,7 +64,8 @@
 		</thead>
 
 		<tbody>
-			{#each messages as message}
+			<!-- TODO: Look into whether the key is unique enough or whether we need an additional ID -->
+			{#each messages as message ([message.sender.id, message.message])}
 				{#if message instanceof ChatMessage}
 					<SingleChatMessage message={message.message} sender={message.sender} />
 				{:else if message instanceof OwnMessage}
