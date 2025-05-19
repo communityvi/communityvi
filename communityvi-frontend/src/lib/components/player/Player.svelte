@@ -17,6 +17,8 @@
 			initializeOrUpdatePlayerState();
 		}
 	});
+	// NOTE: Can't use $derived because we need the side-effect of subscribing to state changes
+	// eslint-disable-next-line svelte/prefer-writable-derived
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
 		unsubscribe = $registeredClient?.subscribeToMediumStateChanges(async change => {

@@ -5,11 +5,9 @@
 	import {onDestroy} from 'svelte';
 
 	let peers: Peer[] | undefined = $state(undefined);
-	$effect(() => {
-		peers = $registeredClient && [$registeredClient.asPeer(), ...$registeredClient.peers];
-	});
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
+		peers = $registeredClient && [$registeredClient.asPeer(), ...$registeredClient.peers];
 		unsubscribe = $registeredClient?.subscribeToPeerChanges(onPeerChange);
 	});
 

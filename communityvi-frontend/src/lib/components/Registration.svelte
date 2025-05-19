@@ -11,6 +11,9 @@
 
 	let { client }: Props = $props();
 
+	// NOTE: Disabling ESLint here because we haven't found a better way to ensure that the registeredName
+	//       is both bound to the text field and also updated when the registeredClient changes
+	// eslint-disable-next-line svelte/prefer-writable-derived
 	let registeredName = $state('');
 	$effect(() => {
 		registeredName = $registeredClient?.name ?? '';

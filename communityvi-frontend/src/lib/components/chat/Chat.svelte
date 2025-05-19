@@ -8,6 +8,8 @@
 
 	let messages = $state(new Array<OwnMessage | ChatMessage>());
 
+	// NOTE: Can't use $derived because we need the side-effect of subscribing to chat messages
+	// eslint-disable-next-line svelte/prefer-writable-derived
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
 		unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
