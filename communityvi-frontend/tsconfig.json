@@ -1,12 +1,15 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
-		"moduleResolution": "bundler",
 		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
 		"lib": ["ES2020", "DOM"],
-		"strict": true,
+		"moduleResolution": "bundler",
 		"noImplicitReturns": true,
-		"verbatimModuleSyntax": false,
-		"types": ["node", "vitest/globals"]
+		"resolveJsonModule": true,
+		"sourceMap": true,
+		"strict": true,
+		"types": ["node", "vitest/globals"],
+		"verbatimModuleSyntax": false
 	}
 }
