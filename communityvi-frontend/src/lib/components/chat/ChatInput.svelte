@@ -9,6 +9,8 @@
 	let message = $state('');
 	let isMessageEmpty = $derived(message.trim().length === 0);
 
+	let textInput: HTMLInputElement | undefined = $state(undefined);
+
 	async function sendChatMessage() {
 		if ($registeredClient === undefined) {
 			return;
@@ -20,6 +22,8 @@
 			message = '';
 			await $registeredClient.sendChatMessage(messageToSend);
 			dispatch('chatMessageAcknowledged', messageToSend);
+
+			textInput?.focus();
 		} catch (error) {
 			console.error('Error while sending chat message:', error);
 			notifications.reportError(new Error('Chat message sending failed!'));
@@ -30,6 +34,6 @@
 </script>
 
 <form onsubmit={preventDefault(sendChatMessage)}>
-	<input type="text" bind:value={message} disabled={isNotRegistered || undefined} />
+	<input type="text" bind:this={textInput} bind:value={message} disabled={isNotRegistered || undefined} />
 	<input type="submit" value="Send" disabled={isNotRegistered || isMessageEmpty || undefined} />
 </form>

@@ -6,7 +6,7 @@
 
 	// NOTE: currentTime needs to be accessed via the player itself because the binding provided by svelte
 	// as of 3.38.3 neither reads the currentTime reliably, nor sets it reliably.
-	let player: HTMLVideoElement | null | undefined = $state();
+	let player: HTMLVideoElement | undefined = $state(undefined);
 
 	// NOTE: Reactively act on registeredClient (e.g. reconnect) and videoUrl (e.g. local medium selection)
 	// changed to catch all cases in which the player or its position require updating.
