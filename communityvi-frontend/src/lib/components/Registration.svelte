@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { preventDefault } from 'svelte/legacy';
-
 	import type Client from '$lib/client/client';
 	import {notifications, registeredClient} from '$lib/stores';
 	import {CloseReason} from '$lib/client/connection';
@@ -53,7 +51,7 @@
 	}
 </script>
 
-<form onsubmit={preventDefault(submit)}>
+<form onsubmit={submit}>
 	<div class="field has-addons">
 		<p class="control">
 			<span class="button is-static">Username:</span>
