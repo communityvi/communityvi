@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 22.x
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.85
+        uses: dtolnay/rust-toolchain@1.87
       - uses: Swatinem/rust-cache@v2.7.8
         with:
           workspaces: "communityvi-server"
@@ -43,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.85
+        uses: dtolnay/rust-toolchain@1.87
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2.7.8
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: 22.x
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@1.85
+        uses: dtolnay/rust-toolchain@1.87
       - uses: Swatinem/rust-cache@v2.7.8
         with:
           workspaces: "communityvi-server"
