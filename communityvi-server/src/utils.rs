@@ -1,3 +1,4 @@
+pub mod atomic_uint;
 #[cfg(test)]
 pub mod fake_message_sender;
 #[cfg(test)]

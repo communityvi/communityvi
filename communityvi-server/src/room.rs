@@ -7,10 +7,12 @@ use crate::room::medium::{Medium, VersionedMedium};
 use crate::room::session_id::SessionId;
 use crate::room::session_repository::SessionRepository;
 use crate::user::UserRepository;
+use crate::utils::atomic_uint::AtomicUInt;
 use chrono::Duration;
 use js_int::{UInt, uint};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub mod client;
 pub mod error;
@@ -29,26 +31,24 @@ struct Inner {
 	session_repository: RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
-	message_counters: Mutex<MessageCounters>,
+	message_counters: MessageCounters,
 }
 
 #[derive(Default)]
 struct MessageCounters {
-	chat_message_counter: UInt,
-	broadcast_counter: usize,
+	chat_message_counter: AtomicUInt,
+	broadcast_counter: AtomicUsize,
 }
 
 impl MessageCounters {
-	pub fn fetch_and_increment_chat_counter(&mut self) -> UInt {
-		let count = self.chat_message_counter;
-		self.chat_message_counter += uint!(1);
-		count
+	pub fn fetch_and_increment_chat_counter(&self) -> UInt {
+		self.chat_message_counter
+			.increment(uint!(1), Ordering::Relaxed, Ordering::Relaxed)
+			.expect("Chat message counter overflowed!")
 	}
 
-	pub fn fetch_and_increment_broadcast_counter(&mut self) -> usize {
-		let count = self.broadcast_counter;
-		self.broadcast_counter += 1;
-		count
+	pub fn fetch_and_increment_broadcast_counter(&self) -> usize {
+		self.broadcast_counter.fetch_add(1, Ordering::Relaxed)
 	}
 }
 
@@ -91,7 +91,7 @@ impl Room {
 	}
 
 	pub fn send_chat_message(&self, sender: &Client, message: String) {
-		let chat_counter = self.inner.message_counters.lock().fetch_and_increment_chat_counter();
+		let chat_counter = self.inner.message_counters.fetch_and_increment_chat_counter();
 		let chat_message = ChatBroadcast {
 			sender_id: sender.id(),
 			sender_name: sender.name().to_string(),
@@ -103,11 +103,7 @@ impl Room {
 
 	pub fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
 		let message = response.into();
-		let count = self
-			.inner
-			.message_counters
-			.lock()
-			.fetch_and_increment_broadcast_counter();
+		let count = self.inner.message_counters.fetch_and_increment_broadcast_counter();
 		let session_repository = self.inner.session_repository.read();
 		for client in session_repository.iter_clients() {
 			client.enqueue_broadcast(message.clone(), count);
