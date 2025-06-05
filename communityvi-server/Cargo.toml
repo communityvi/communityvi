@@ -26,7 +26,7 @@ multiple_crate_versions = "allow"
 cargo_common_metadata = "allow"
 
 [dependencies]
-aide = { version = "0.14", features = ["axum", "axum-ws", "axum-json"] }
+aide = { version = "0.15", features = ["axum", "axum-ws", "axum-json"] }
 axum = { version = "0.8", features = ["ws", "http2", "macros"] }
 axum-server = "0.7"
 anyhow = "1"
