@@ -31,7 +31,9 @@ impl Commandline {
 	pub async fn run(self) -> Result<(), CommunityviError> {
 		let configuration = Configuration::from_file(&self.configuration_file_path)?;
 		let time_source = TimeSource::default();
-		let application_context = ApplicationContext::new(configuration, time_source);
+		let application_context = ApplicationContext::new(configuration, time_source)
+			.await
+			.expect("Failed to create application context.");
 
 		env_logger::Builder::new()
 			.parse_filters(&application_context.configuration.log_filters)
