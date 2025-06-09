@@ -370,6 +370,7 @@ mod test {
 	use crate::room::session_id::SessionId;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
+	use chrono::DateTime;
 	use js_int::{int, uint};
 
 	#[tokio::test]
@@ -476,7 +477,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
-		let room = Room::new(ReferenceTimer::default(), 2);
+		let room = Room::new(ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH), 2);
 		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
@@ -822,7 +823,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_get_currently_playing_medium_on_hello_response() {
-		let reference_timer = ReferenceTimer::default();
+		let reference_timer = ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH);
 		let room = Room::new(reference_timer, 1);
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
