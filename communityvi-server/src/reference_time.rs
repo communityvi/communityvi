@@ -91,4 +91,21 @@ mod test {
 			"Expected the elapsed time to be between 1ms, but was: {elapsed}ms",
 		);
 	}
+
+	#[test]
+	fn reference_time_should_resemble_unix_timestamp() {
+		let reference_timer = ReferenceTimer::default();
+		let now = Utc::now();
+
+		let reference_time = reference_timer.reference_time_milliseconds();
+
+		let unix_timestamp = now.timestamp_millis();
+		let reference_timestamp = i64::from(reference_time);
+
+		let diff = (unix_timestamp - reference_timestamp).abs();
+		assert!(
+			diff < 100,
+			"The reference time wasn't close enough to a UNIX timestamp. Diff: {diff} ms"
+		);
+	}
 }
