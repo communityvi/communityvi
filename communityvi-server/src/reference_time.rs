@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use js_int::UInt;
 use quanta::Clock;
 
@@ -5,11 +6,13 @@ use quanta::Clock;
 pub struct ReferenceTimer {
 	start: quanta::Instant,
 	clock: Clock,
+	/// Offset from UNIX epoch
+	start_offset: std::time::Duration,
 }
 
 impl ReferenceTimer {
 	pub fn reference_time(&self) -> std::time::Duration {
-		self.clock.now().duration_since(self.start)
+		self.clock.now().duration_since(self.start) + self.start_offset
 	}
 
 	pub fn reference_time_milliseconds(&self) -> UInt {
@@ -19,21 +22,32 @@ impl ReferenceTimer {
 			.expect("More milliseconds than can be represented by IEEE 754 doubles. This shouldn't happen unless the server was running for more than about 285000 years.")
 	}
 
-	#[cfg(test)]
-	fn with_clock(clock: Clock) -> Self {
-		Self {
-			start: clock.now(),
-			clock,
-		}
+	#[allow(unused)]
+	pub fn with_clock(mut self, clock: Clock) -> Self {
+		self.start = clock.now();
+		self.clock = clock;
+		self
+	}
+
+	#[allow(unused)]
+	pub fn with_start_time(mut self, start_time: DateTime<Utc>) -> Self {
+		self.start_offset = (start_time - DateTime::UNIX_EPOCH)
+			.to_std()
+			.expect("Time since UNIX epoch was negative or out of range");
+		self
 	}
 }
 
 impl Default for ReferenceTimer {
 	fn default() -> Self {
 		let clock = Clock::default();
+		let start_offset = (Utc::now() - DateTime::UNIX_EPOCH)
+			.to_std()
+			.expect("Time since UNIX epoch was negative or out of range");
 		Self {
 			start: clock.now(),
 			clock,
+			start_offset,
 		}
 	}
 }
@@ -47,7 +61,7 @@ mod test {
 	#[test]
 	fn should_time_the_passage_of_reference_time() {
 		let (clock, clock_mock) = Clock::mock();
-		let reference_timer = ReferenceTimer::with_clock(clock);
+		let reference_timer = ReferenceTimer::default().with_clock(clock);
 
 		let initial_time = reference_timer.reference_time();
 		clock_mock.increment(Duration::from_millis(1));
@@ -64,7 +78,7 @@ mod test {
 	#[test]
 	fn should_provide_the_passage_of_reference_time_in_milliseconds() {
 		let (clock, clock_mock) = Clock::mock();
-		let reference_timer = ReferenceTimer::with_clock(clock);
+		let reference_timer = ReferenceTimer::default().with_clock(clock);
 
 		let initial_milliseconds = reference_timer.reference_time_milliseconds();
 		clock_mock.increment(Duration::from_millis(1));

@@ -1,6 +1,7 @@
+use crate::reference_time::ReferenceTimer;
 use crate::server_tests::start_test_server;
 use axum::http::StatusCode;
-use js_int::{UInt, uint};
+use js_int::UInt;
 use serde::Deserialize;
 
 #[cfg(feature = "api-docs")]
@@ -8,6 +9,7 @@ mod api_docs;
 
 #[tokio::test]
 async fn should_return_reference_time() {
+	let reference_timer = ReferenceTimer::default();
 	let client = start_test_server().await;
 	let response = client
 		.get("/api/reference-time-milliseconds")
@@ -21,9 +23,12 @@ async fn should_return_reference_time() {
 		.await
 		.expect("Failed to parse reference time response");
 
+	let reference_time = i64::from(reference_time);
+	let expected_reference_time = i64::from(reference_timer.reference_time_milliseconds());
+	let diff = (reference_time - expected_reference_time).abs();
 	assert_eq!(status, StatusCode::OK);
-	assert!(reference_time >= uint!(0));
-	assert!(reference_time <= uint!(2_000), "Was {reference_time} ms");
+	assert!(diff >= 0);
+	assert!(diff <= 2_000, "Was {diff} ms");
 }
 
 #[tokio::test]
