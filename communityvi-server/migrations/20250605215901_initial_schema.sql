@@ -74,3 +74,5 @@ CREATE TABLE chat_message
 	constraint check_non_empty_message
 		check (length(message) > 0)
 );
+
+CREATE INDEX IF NOT EXISTS chat_message_created_at_index ON chat_message (room_uuid, created_at DESC);
