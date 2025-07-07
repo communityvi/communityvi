@@ -40,7 +40,7 @@
 		"tslib": "^2.3",
 		"typescript": "^5.5.0",
 		"typescript-eslint": "^8.32.1",
-		"vite": "^6.0.0",
+		"vite": "^7.0.0",
 		"vitest": "^3.0.0",
 		"vitest-mock-extended": "^3.0.0"
 	}
