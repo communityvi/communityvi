@@ -9,6 +9,7 @@
 	import {page} from '$app/stores';
 	import {browser} from '$app/environment';
 	import {RESTClient} from '$lib/client/RESTClient';
+	import {SvelteURL} from 'svelte/reactivity';
 
 	const transport = new WebSocketTransport(determineWebSocketURL());
 	const restClient = new RESTClient(determineAPIURL());
@@ -19,7 +20,7 @@
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
 		// as when the frontend is bundled with the backend.
-		const url = new URL(`ws://${pageHost()}/ws`);
+		const url = new SvelteURL(`ws://${pageHost()}/ws`);
 		url.port = '8000';
 
 		return url;
@@ -30,7 +31,7 @@
 		// the backend listens on port 8000. But this is good enough for now because it
 		// works both with `npm run watch` and the default backend settings as well
 		// as when the frontend is bundled with the backend.
-		const url = new URL(`http://${pageHost()}/api`);
+		const url = new SvelteURL(`http://${pageHost()}/api`);
 		url.port = '8000';
 
 		return url;

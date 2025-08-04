@@ -1,7 +1,6 @@
 node_modules
 coverage
-.svelte-kit/*
-!.svelte-kit/tsconfig.json
+.svelte-kit
 build
 functions
 .idea

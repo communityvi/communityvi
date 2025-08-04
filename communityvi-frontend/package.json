@@ -7,8 +7,8 @@
 		"watch": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"lint": "prettier --check . && eslint . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
-		"lint:fix": "prettier -w . && eslint . --fix && echo 'ESLint Fixed!'",
+		"lint": "svelte-kit sync && prettier --check . && eslint . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
+		"lint:fix": "svelte-kit sync && prettier -w . && eslint . --fix && echo 'ESLint Fixed!'",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest watch",
@@ -22,7 +22,7 @@
 		"@fortawesome/fontawesome-free": "^7.0.0",
 		"@sveltejs/adapter-static": "^3.0.0",
 		"@sveltejs/kit": "^2.5.27",
-		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"@sveltejs/vite-plugin-svelte": "^6.0.0",
 		"@types/node": "^22.10.7",
 		"@vitest/coverage-v8": "^3.0.0",
 		"bulma": "^1.0.0",
@@ -40,7 +40,7 @@
 		"tslib": "^2.3",
 		"typescript": "^5.5.0",
 		"typescript-eslint": "^8.32.1",
-		"vite": "^6.0.0",
+		"vite": "^7.0.0",
 		"vitest": "^3.0.0",
 		"vitest-mock-extended": "^3.0.0"
 	}
