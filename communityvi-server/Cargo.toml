@@ -55,7 +55,7 @@ sha2 = "0.10"
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
-tokio-tungstenite = "0.26"
+tokio-tungstenite = "0.27"
 toml = "0.9"
 tower-http = { version = "0.6", features = ["cors"] }
 tower-service = "0.3"
