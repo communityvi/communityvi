@@ -4,7 +4,7 @@
 
 	import {NotificationType} from '$lib/components/notification/notification_type';
 
-	interface Props {
+	interface Properties {
 		type?: NotificationType;
 		useLightAppearance?: boolean;
 		icon?: string;
@@ -16,7 +16,7 @@
 		useLightAppearance = true,
 		icon = 'exclamation-circle',
 		children
-	}: Props = $props();
+	}: Properties = $props();
 
 	const dispatch = createEventDispatcher();
 </script>

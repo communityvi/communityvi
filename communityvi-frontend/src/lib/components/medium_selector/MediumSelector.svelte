@@ -7,11 +7,11 @@
 	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
 	import RegisteredClient from '$lib/client/registered_client';
 
-	interface Props {
+	interface Properties {
 		registeredClient: RegisteredClient,
 	}
 
-	let {registeredClient}: Props = $props();
+	let {registeredClient}: Properties = $props();
 
 	let medium: Medium | undefined = $state();
 	let mediumIsOutdated = $derived(medium !== undefined && $videoUrl === undefined);

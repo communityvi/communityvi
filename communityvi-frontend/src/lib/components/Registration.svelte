@@ -3,11 +3,11 @@
 	import {notifications, registeredClient} from '$lib/stores';
 	import {CloseReason} from '$lib/client/connection';
 
-	interface Props {
+	interface Properties {
 		client: Client;
 	}
 
-	let { client }: Props = $props();
+	let { client }: Properties = $props();
 
 	// NOTE: Disabling ESLint here because we haven't found a better way to ensure that the registeredName
 	//       is both bound to the text field and also updated when the registeredClient changes
