@@ -6,7 +6,7 @@
 	import MediumSelector from '$lib/components/medium_selector/MediumSelector.svelte';
 	import Peers from '$lib/components/Peers.svelte';
 	import Player from '$lib/components/player/Player.svelte';
-	import {page} from '$app/stores';
+	import {page} from '$app/state';
 	import {browser} from '$app/environment';
 	import {RESTClient} from '$lib/client/RESTClient';
 	import {SvelteURL} from 'svelte/reactivity';
@@ -41,13 +41,13 @@
 		if (browser) {
 			return new URL(window.location.href).host;
 		} else {
-			return $page.url.host;
+			return page.url.host;
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Home</title>
+	<title>Communityvi</title>
 </svelte:head>
 
 <section id="registration">
