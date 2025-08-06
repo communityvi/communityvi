@@ -18,19 +18,19 @@
 		}
 	});
 	// NOTE: Can't use $derived because we need the side-effect of subscribing to state changes
-	// eslint-disable-next-line svelte/prefer-writable-derived
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		unsubscribe = $registeredClient?.subscribeToMediumStateChanges(async change => {
+		if ($registeredClient === undefined) {
+			unsubscribe = () => {};
+			return;
+		}
+
+		unsubscribe = $registeredClient.subscribeToMediumStateChanges(async change => {
 			await initializeOrUpdatePlayerState(change.medium);
 		});
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 

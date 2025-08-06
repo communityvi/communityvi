@@ -21,7 +21,7 @@
 
 	let fileSelector: HTMLInputElement | undefined = $state();
 
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
 		if (Medium.hasChangedMetadata(medium, registeredClient.currentMedium)) {
 			// Update the medium in case of relogin
@@ -33,10 +33,6 @@
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 
