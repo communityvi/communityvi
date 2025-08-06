@@ -10,6 +10,7 @@
 	import {browser} from '$app/environment';
 	import {RESTClient} from '$lib/client/RESTClient';
 	import {SvelteURL} from 'svelte/reactivity';
+	import {registeredClient} from '$lib/stores';
 
 	const transport = new WebSocketTransport(determineWebSocketURL());
 	const restClient = new RESTClient(determineAPIURL());
@@ -54,7 +55,9 @@
 	<Registration {client} />
 </section>
 
-<MediumSelector />
+{#if $registeredClient !== undefined}
+<MediumSelector registeredClient={$registeredClient} />
+{/if}
 
 <Player />
 
