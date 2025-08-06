@@ -17,7 +17,7 @@ export default class PlayerCoordinator {
 	private readonly playbackPositionAdjustmentThresholdMilliseconds: number;
 
 	static async forPlayerWithInitialState(
-		player: HTMLMediaElement | null | undefined,
+		player: HTMLMediaElement,
 		initialPlaybackState: PlayingPlaybackState | PausedPlaybackState | undefined,
 		playCallback: PlayCallback,
 		pauseCallback: PauseCallback,
