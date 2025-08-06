@@ -1,17 +1,23 @@
 <script lang="ts">
-	import {notifications, registeredClient, videoUrl} from '$lib/stores';
+	import {notifications, registeredClient} from '$lib/stores';
 	import {onDestroy} from 'svelte';
 	import PlayerCoordinator from '$lib/components/player/player_coordinator';
 	import type {Medium} from '$lib/client/model';
+
+	interface Properties {
+		videoUrl: string;
+	}
+
+	let {videoUrl}: Properties = $props();
 
 	let player: HTMLVideoElement;
 
 	// NOTE: Reactively act on registeredClient (e.g. reconnect) and videoUrl (e.g. local medium selection)
 	// changed to catch all cases in which the player or its position require updating.
-	// Important: $registeredClient and $videoUrl are explicitly mentioned to trigger the reactive updates.
+	// Important: $registeredClient is explicitly mentioned to trigger the reactive updates.
 	let playerCoordinator: PlayerCoordinator | undefined;
 	$effect(() => {
-		if ($registeredClient || $videoUrl) {
+		if ($registeredClient) {
 			initializeOrUpdatePlayerState();
 		}
 	});
@@ -92,6 +98,6 @@
 </script>
 
 <!-- svelte-ignore a11y_media_has_caption -->
-<section id="player" class:is-hidden={$videoUrl === undefined}>
-	<video controls src={$videoUrl ?? ''} bind:this={player}></video>
+<section id="player">
+	<video controls src={videoUrl} bind:this={player}></video>
 </section>

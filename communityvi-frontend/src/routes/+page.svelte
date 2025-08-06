@@ -16,6 +16,8 @@
 	const restClient = new RESTClient(determineAPIURL());
 	const client = new Client(transport, restClient);
 
+	let videoUrl: string | undefined;
+
 	function determineWebSocketURL(): URL {
 		// Just a stopgap measure for now. The (generally wrong) assumption is that
 		// the backend listens on port 8000. But this is good enough for now because it
@@ -56,10 +58,12 @@
 </section>
 
 {#if $registeredClient !== undefined}
-<MediumSelector registeredClient={$registeredClient} />
+<MediumSelector registeredClient={$registeredClient} bind:videoUrl />
 {/if}
 
-<Player />
+{#if videoUrl !== undefined}
+<Player {videoUrl} />
+{/if}
 
 {#if $registeredClient !== undefined}
 <Peers registeredClient={$registeredClient} />

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {notifications, videoUrl} from '$lib/stores';
+	import {notifications} from '$lib/stores';
 	import {Medium, MediumChangedByOurself} from '$lib/client/model';
 	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
@@ -8,13 +8,14 @@
 	import RegisteredClient from '$lib/client/registered_client';
 
 	interface Properties {
-		registeredClient: RegisteredClient,
+		registeredClient: RegisteredClient;
+		videoUrl?: string;
 	}
 
-	let {registeredClient}: Properties = $props();
+	let {registeredClient, videoUrl = $bindable()}: Properties = $props();
 
 	let medium: Medium | undefined = $state();
-	let mediumIsOutdated = $derived(medium !== undefined && $videoUrl === undefined);
+	let mediumIsOutdated = $derived(medium !== undefined && videoUrl === undefined);
 
 	let durationHelper: HTMLVideoElement | undefined = $state();
 	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
@@ -26,7 +27,7 @@
 		if (Medium.hasChangedMetadata(medium, registeredClient.currentMedium)) {
 			// Update the medium in case of relogin
 			medium = registeredClient.currentMedium;
-			$videoUrl = undefined;
+			videoUrl = undefined;
 		}
 
 		unsubscribe = registeredClient.subscribeToMediumStateChanges(onMediumStateChanged);
@@ -42,7 +43,7 @@
 		}
 
 		if (Medium.hasChangedMetadata(medium, change.medium)) {
-			$videoUrl = undefined;
+			videoUrl = undefined;
 		}
 
 		medium = change.medium;
@@ -68,7 +69,7 @@
 			return;
 		}
 
-		$videoUrl = URL.createObjectURL(selectedFile);
+		videoUrl = URL.createObjectURL(selectedFile);
 
 		if (mediumIsOutdated) {
 			return;
@@ -92,7 +93,7 @@
 		try {
 			await registeredClient.ejectMedium();
 			medium = undefined;
-			$videoUrl = undefined;
+			videoUrl = undefined;
 		} catch (error) {
 			console.error('Error while ejecting medium:', error);
 			notifications.reportError(new Error('Ejecting the medium failed!'));
