@@ -11,26 +11,19 @@
 
 	let {registeredClient}: Properties = $props();
 
-	let peers: Peer[] | undefined = $state(undefined);
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let peers: Peer[] = $derived([registeredClient.asPeer(), ...registeredClient.peers]);
+	// NOTE: Can't use $derived because we need the side-effect of subscribing to peer changes
+	// eslint-disable-next-line svelte/prefer-writable-derived
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		peers = [registeredClient.asPeer(), ...registeredClient.peers];
 		unsubscribe = registeredClient.subscribeToPeerChanges(onPeerChange);
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 
 	function onPeerChange(peerChange: PeerLifecycleMessage) {
-		if (peers === undefined) {
-			return;
-		}
-
 		if (peerChange instanceof PeerJoinedMessage) {
 			peers = [...peers, peerChange.peer];
 			notifications.inform(`'${peerChange.peer.name}' joined.`);
@@ -41,22 +34,20 @@
 	}
 </script>
 
-{#if peers !== undefined}
-	<table class="table">
-		<thead>
+<table class="table">
+	<thead>
+		<tr>
+			<th>Peers</th>
+		</tr>
+	</thead>
+	<tbody>
+		{#each peers as peer (peer.id)}
 			<tr>
-				<th>Peers</th>
+				<td>{peer.name}</td>
 			</tr>
-		</thead>
-		<tbody>
-			{#each peers as peer (peer.id)}
-				<tr>
-					<td>{peer.name}</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-{/if}
+		{/each}
+	</tbody>
+</table>
 
 <style lang="sass">
 tbody tr
