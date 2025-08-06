@@ -14,7 +14,6 @@ suspicious = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 
-module_name_repetitions = "allow"
 unseparated_literal_suffix = "allow"
 items_after_statements = "allow"
 default_trait_access = "allow"
