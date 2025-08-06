@@ -63,6 +63,6 @@
 
 {#if $registeredClient !== undefined}
 <Peers registeredClient={$registeredClient} />
+<Chat registeredClient={$registeredClient} />
 {/if}
 
-<Chat />

@@ -1,25 +1,27 @@
 <script lang="ts">
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import {ChatMessage} from '$lib/client/model';
-	import {registeredClient} from '$lib/stores';
 	import {OwnMessage} from '$lib/components/chat/own_message';
 	import {onDestroy} from 'svelte';
 	import SingleChatMessage from '$lib/components/chat/SingleChatMessage.svelte';
+	import RegisteredClient from '$lib/client/registered_client';
+
+	interface Properties {
+		registeredClient: RegisteredClient;
+	}
+
+	let {registeredClient}: Properties = $props();
 
 	let messages = $state(new Array<OwnMessage | ChatMessage>());
 
 	// NOTE: Can't use $derived because we need the side-effect of subscribing to chat messages
 	// eslint-disable-next-line svelte/prefer-writable-derived
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+		unsubscribe = registeredClient.subscribeToChatMessages(onChatMessageReceived);
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 
@@ -28,12 +30,8 @@
 	}
 
 	function onChatMessageSent(messageEvent: CustomEvent) {
-		if ($registeredClient === undefined) {
-			return;
-		}
-
 		const message = messageEvent.detail as string;
-		messages = [...messages, new OwnMessage(message, $registeredClient.asPeer())];
+		messages = [...messages, new OwnMessage(message, registeredClient.asPeer())];
 	}
 
 	function onChatMessageAcknowledged(acknowledgedEvent: CustomEvent) {
