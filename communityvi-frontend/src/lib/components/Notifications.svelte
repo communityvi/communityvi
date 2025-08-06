@@ -8,7 +8,7 @@
 </script>
 
 {#each $notifications as notification (notification.id)}
-	<Notification type={notification.type} on:close={() => deleteNotificationIdentifiedBy(notification.id)}>
+	<Notification type={notification.type} onClose={() => deleteNotificationIdentifiedBy(notification.id)}>
 		{notification.message}
 	</Notification>
 {/each}

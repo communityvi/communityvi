@@ -5,6 +5,7 @@
 	import {onDestroy} from 'svelte';
 	import SingleChatMessage from '$lib/components/chat/SingleChatMessage.svelte';
 	import RegisteredClient from '$lib/client/registered_client';
+	import {notifications} from '$lib/stores';
 
 	interface Properties {
 		registeredClient: RegisteredClient;
@@ -29,30 +30,19 @@
 		messages = [...messages, message];
 	}
 
-	function onChatMessageSent(messageEvent: CustomEvent) {
-		const message = messageEvent.detail as string;
-		messages = [...messages, new OwnMessage(message, registeredClient.asPeer())];
-	}
+	async function onNewMessage(message: string) {
+		const newMessage = new OwnMessage(message, registeredClient.asPeer());
+		messages = [...messages, newMessage];
 
-	function onChatMessageAcknowledged(acknowledgedEvent: CustomEvent) {
-		const message = acknowledgedEvent.detail as string;
-		// Array.map is used here because svelte needs an assignment to message to trigger a DOM update
-		messages = messages.map(existingMessage => {
-			if (!(existingMessage instanceof OwnMessage)) {
-				return existingMessage;
-			}
+		try {
+			await registeredClient.sendChatMessage(message);
+		} catch (error) {
+			console.error('Error while sending chat message:', error);
+			notifications.reportError(new Error('Chat message sending failed!'));
+			return;
+		}
 
-			if (existingMessage.acknowledged) {
-				return existingMessage;
-			}
-
-			if (existingMessage.message !== message) {
-				return existingMessage;
-			}
-
-			existingMessage.acknowledged = true;
-			return existingMessage;
-		});
+		newMessage.acknowledged = true;
 	}
 </script>
 
@@ -80,5 +70,5 @@
 			{/each}
 		</tbody>
 	</table>
-	<ChatInput on:chatMessageSent={onChatMessageSent} on:chatMessageAcknowledged={onChatMessageAcknowledged} />
+	<ChatInput {onNewMessage} />
 </section>

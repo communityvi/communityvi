@@ -27,6 +27,7 @@
 		try {
 			$registeredClient = await client.register(registeredName.trim(), onClose);
 		} catch (error) {
+			console.error("Error while registering: ", error);
 			notifications.reportError(error as Error);
 		}
 	}
