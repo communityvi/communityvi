@@ -61,6 +61,8 @@
 
 <Player />
 
-<Peers />
+{#if $registeredClient !== undefined}
+<Peers registeredClient={$registeredClient} />
+{/if}
 
 <Chat />

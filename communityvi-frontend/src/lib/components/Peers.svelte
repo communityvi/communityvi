@@ -1,14 +1,21 @@
 <script lang="ts">
-	import {registeredClient, notifications} from '$lib/stores';
+	import {notifications} from '$lib/stores';
 	import {Peer, PeerJoinedMessage, PeerLeftMessage} from '$lib/client/model';
 	import type {PeerLifecycleMessage} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
+	import RegisteredClient from '$lib/client/registered_client';
+
+	interface Properties {
+		registeredClient: RegisteredClient;
+	}
+
+	let {registeredClient}: Properties = $props();
 
 	let peers: Peer[] | undefined = $state(undefined);
 	let unsubscribe: (() => void) | undefined = $state(undefined);
 	$effect(() => {
-		peers = $registeredClient && [$registeredClient.asPeer(), ...$registeredClient.peers];
-		unsubscribe = $registeredClient?.subscribeToPeerChanges(onPeerChange);
+		peers = [registeredClient.asPeer(), ...registeredClient.peers];
+		unsubscribe = registeredClient.subscribeToPeerChanges(onPeerChange);
 	});
 
 	onDestroy(() => {
@@ -20,7 +27,7 @@
 	});
 
 	function onPeerChange(peerChange: PeerLifecycleMessage) {
-		if (peers === undefined || $registeredClient === undefined) {
+		if (peers === undefined) {
 			return;
 		}
 
@@ -28,7 +35,7 @@
 			peers = [...peers, peerChange.peer];
 			notifications.inform(`'${peerChange.peer.name}' joined.`);
 		} else if (peerChange instanceof PeerLeftMessage) {
-			peers = [$registeredClient.asPeer(), ...$registeredClient.peers];
+			peers = [registeredClient.asPeer(), ...registeredClient.peers];
 			notifications.inform(`'${peerChange.peer.name}' left.`);
 		}
 	}
