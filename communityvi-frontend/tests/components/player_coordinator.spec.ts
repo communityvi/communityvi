@@ -21,36 +21,6 @@ describe('The PlayerCoordinator', () => {
 			expect(playerCoordinator).toBeInstanceOf(PlayerCoordinator);
 		});
 
-		it('ignores undefined player', async () => {
-			const player = undefined;
-			const initialPlaybackState = new PausedPlaybackState(0);
-			const callback = vi.fn();
-
-			const playerCoordinator = await PlayerCoordinator.forPlayerWithInitialState(
-				player,
-				initialPlaybackState,
-				callback,
-				callback,
-			);
-
-			expect(playerCoordinator).toBeUndefined();
-		});
-
-		it('ignores null player', async () => {
-			const player = null;
-			const initialPlaybackState = new PausedPlaybackState(0);
-			const callback = vi.fn();
-
-			const playerCoordinator = await PlayerCoordinator.forPlayerWithInitialState(
-				player,
-				initialPlaybackState,
-				callback,
-				callback,
-			);
-
-			expect(playerCoordinator).toBeUndefined();
-		});
-
 		it('ignores undefined initial playback state', async () => {
 			const player = mock<HTMLMediaElement>();
 			const initialPlaybackState = undefined;

@@ -1,7 +1,9 @@
-$fa-font-path: "@fortawesome/fontawesome-free/webfonts"
+@use '@fortawesome/fontawesome-free/scss/variables' with (
+  $font-path: "@fortawesome/fontawesome-free/webfonts"
+)
 
-@import 'bulma/bulma'
-@import '@fortawesome/fontawesome-free/scss/fontawesome'
-@import '@fortawesome/fontawesome-free/scss/brands'
-@import '@fortawesome/fontawesome-free/scss/regular'
-@import '@fortawesome/fontawesome-free/scss/solid'
+@use 'bulma/bulma'
+@use '@fortawesome/fontawesome-free/scss/fontawesome'
+@use '@fortawesome/fontawesome-free/scss/brands'
+@use '@fortawesome/fontawesome-free/scss/regular'
+@use '@fortawesome/fontawesome-free/scss/solid'

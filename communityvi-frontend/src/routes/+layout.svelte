@@ -1,11 +1,11 @@
 <script lang="ts">
 	import Header from '$lib/components/Header.svelte';
 	import '../app.sass';
-	interface Props {
+	interface Properties {
 		children?: import('svelte').Snippet;
 	}
 
-	let { children }: Props = $props();
+	let { children }: Properties = $props();
 </script>
 
 <header>

@@ -1,25 +1,28 @@
 <script lang="ts">
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import {ChatMessage} from '$lib/client/model';
-	import {registeredClient} from '$lib/stores';
 	import {OwnMessage} from '$lib/components/chat/own_message';
 	import {onDestroy} from 'svelte';
 	import SingleChatMessage from '$lib/components/chat/SingleChatMessage.svelte';
+	import RegisteredClient from '$lib/client/registered_client';
+	import {notifications} from '$lib/stores';
+
+	interface Properties {
+		registeredClient: RegisteredClient;
+	}
+
+	let {registeredClient}: Properties = $props();
 
 	let messages = $state(new Array<OwnMessage | ChatMessage>());
 
 	// NOTE: Can't use $derived because we need the side-effect of subscribing to chat messages
 	// eslint-disable-next-line svelte/prefer-writable-derived
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		unsubscribe = $registeredClient?.subscribeToChatMessages(onChatMessageReceived);
+		unsubscribe = registeredClient.subscribeToChatMessages(onChatMessageReceived);
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 
@@ -27,34 +30,19 @@
 		messages = [...messages, message];
 	}
 
-	function onChatMessageSent(messageEvent: CustomEvent) {
-		if ($registeredClient === undefined) {
+	async function onNewMessage(message: string) {
+		const newMessage = new OwnMessage(message, registeredClient.asPeer());
+		messages = [...messages, newMessage];
+
+		try {
+			await registeredClient.sendChatMessage(message);
+		} catch (error) {
+			console.error('Error while sending chat message:', error);
+			notifications.reportError(new Error('Chat message sending failed!'));
 			return;
 		}
 
-		const message = messageEvent.detail as string;
-		messages = [...messages, new OwnMessage(message, $registeredClient.asPeer())];
-	}
-
-	function onChatMessageAcknowledged(acknowledgedEvent: CustomEvent) {
-		const message = acknowledgedEvent.detail as string;
-		// Array.map is used here because svelte needs an assignment to message to trigger a DOM update
-		messages = messages.map(existingMessage => {
-			if (!(existingMessage instanceof OwnMessage)) {
-				return existingMessage;
-			}
-
-			if (existingMessage.acknowledged) {
-				return existingMessage;
-			}
-
-			if (existingMessage.message !== message) {
-				return existingMessage;
-			}
-
-			existingMessage.acknowledged = true;
-			return existingMessage;
-		});
+		newMessage.acknowledged = true;
 	}
 </script>
 
@@ -82,5 +70,5 @@
 			{/each}
 		</tbody>
 	</table>
-	<ChatInput on:chatMessageSent={onChatMessageSent} on:chatMessageAcknowledged={onChatMessageAcknowledged} />
+	<ChatInput {onNewMessage} />
 </section>

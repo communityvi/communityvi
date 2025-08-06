@@ -1,37 +1,39 @@
 <script lang="ts">
-	import {registeredClient, notifications, videoUrl} from '$lib/stores';
+	import {notifications} from '$lib/stores';
 	import {Medium, MediumChangedByOurself} from '$lib/client/model';
 	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
 	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
+	import RegisteredClient from '$lib/client/registered_client';
 
-	let isRegistered = $derived($registeredClient !== undefined);
+	interface Properties {
+		registeredClient: RegisteredClient;
+		videoUrl?: string;
+	}
+
+	let {registeredClient, videoUrl = $bindable()}: Properties = $props();
 
 	let medium: Medium | undefined = $state();
-	let mediumIsOutdated = $derived(medium !== undefined && $videoUrl === undefined);
+	let mediumIsOutdated = $derived(medium !== undefined && videoUrl === undefined);
 
 	let durationHelper: HTMLVideoElement | undefined = $state();
 	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
 
 	let fileSelector: HTMLInputElement | undefined = $state();
 
-	let unsubscribe: (() => void) | undefined = $state(undefined);
+	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		if ($registeredClient !== undefined && Medium.hasChangedMetadata(medium, $registeredClient.currentMedium)) {
+		if (Medium.hasChangedMetadata(medium, registeredClient.currentMedium)) {
 			// Update the medium in case of relogin
-			medium = $registeredClient.currentMedium;
-			$videoUrl = undefined;
+			medium = registeredClient.currentMedium;
+			videoUrl = undefined;
 		}
 
-		unsubscribe = $registeredClient?.subscribeToMediumStateChanges(onMediumStateChanged);
+		unsubscribe = registeredClient.subscribeToMediumStateChanges(onMediumStateChanged);
 	});
 
 	onDestroy(() => {
-		if (unsubscribe === undefined) {
-			return;
-		}
-
 		unsubscribe();
 	});
 
@@ -41,7 +43,7 @@
 		}
 
 		if (Medium.hasChangedMetadata(medium, change.medium)) {
-			$videoUrl = undefined;
+			videoUrl = undefined;
 		}
 
 		medium = change.medium;
@@ -67,15 +69,15 @@
 			return;
 		}
 
-		$videoUrl = URL.createObjectURL(selectedFile);
+		videoUrl = URL.createObjectURL(selectedFile);
 
-		if (mediumIsOutdated || $registeredClient === undefined) {
+		if (mediumIsOutdated) {
 			return;
 		}
 
 		try {
-			await $registeredClient.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
-			medium = $registeredClient.currentMedium;
+			await registeredClient.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
+			medium = registeredClient.currentMedium;
 		} catch (error) {
 			console.error('Error while inserting medium:', error);
 			notifications.reportError(new Error(`Inserting new medium name '${selectedMedium.name}' failed!`));
@@ -88,14 +90,10 @@
 		// See https://github.com/communityvi/communityvi/issues/267
 		resetFileSelector();
 
-		if ($registeredClient === undefined) {
-			return;
-		}
-
 		try {
-			await $registeredClient.ejectMedium();
+			await registeredClient.ejectMedium();
 			medium = undefined;
-			$videoUrl = undefined;
+			videoUrl = undefined;
 		} catch (error) {
 			console.error('Error while ejecting medium:', error);
 			notifications.reportError(new Error('Ejecting the medium failed!'));
@@ -114,40 +112,38 @@
 <!-- Hidden video element for parsing file metadata -->
 <video hidden={true} muted={true} bind:this={durationHelper}></video>
 
-{#if isRegistered}
-	<section id="medium-selection">
-		<span class="medium-title">{medium?.name ?? 'n/a'}</span>
-		<span class="medium-duration">&nbsp;({medium ? formatMediumLength(medium) : 'n/a'})</span>
+<section id="medium-selection">
+	<span class="medium-title">{medium?.name ?? 'n/a'}</span>
+	<span class="medium-duration">&nbsp;({medium ? formatMediumLength(medium) : 'n/a'})</span>
 
-		<div class="file">
-			<label class="file-label">
-				<input
-					class="file-input"
-					type="file"
-					accept="video/*,audio/*"
-					bind:this={fileSelector}
-					onchange={onMediumSelection}
-				/>
-				<span class="file-cta">
-					<span class="file-icon">
-						<i class="fas fa-upload"></i>
-					</span>
-					<span class="file-label">
-						{#if mediumIsOutdated && medium?.name !== undefined}
-							Select file for "{medium.name}"
-						{:else}
-							Insert New Medium…
-						{/if}
-					</span>
+	<div class="file">
+		<label class="file-label">
+			<input
+				class="file-input"
+				type="file"
+				accept="video/*,audio/*"
+				bind:this={fileSelector}
+				onchange={onMediumSelection}
+			/>
+			<span class="file-cta">
+				<span class="file-icon">
+					<i class="fas fa-upload"></i>
 				</span>
-			</label>
-		</div>
+				<span class="file-label">
+					{#if mediumIsOutdated && medium?.name !== undefined}
+						Select file for "{medium.name}"
+					{:else}
+						Insert New Medium…
+					{/if}
+				</span>
+			</span>
+		</label>
+	</div>
 
-		{#if medium !== undefined}
-			<button onclick={ejectMedium}>Eject Medium</button>
-		{/if}
-	</section>
-{/if}
+	{#if medium !== undefined}
+		<button onclick={ejectMedium}>Eject Medium</button>
+	{/if}
+</section>
 
 <style lang="sass">
 	.medium-title

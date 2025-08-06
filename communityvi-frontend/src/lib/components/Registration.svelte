@@ -1,32 +1,35 @@
 <script lang="ts">
 	import type Client from '$lib/client/client';
-	import {notifications, registeredClient} from '$lib/stores';
+	import {notifications} from '$lib/stores';
 	import {CloseReason} from '$lib/client/connection';
+	import RegisteredClient from '$lib/client/registered_client';
 
-	interface Props {
+	interface Properties {
 		client: Client;
+		registeredClient?: RegisteredClient;
 	}
 
-	let { client }: Props = $props();
+	let { client, registeredClient = $bindable() }: Properties = $props();
 
 	// NOTE: Disabling ESLint here because we haven't found a better way to ensure that the registeredName
 	//       is both bound to the text field and also updated when the registeredClient changes
 	// eslint-disable-next-line svelte/prefer-writable-derived
 	let registeredName = $state('');
 	$effect(() => {
-		registeredName = $registeredClient?.name ?? '';
+		registeredName = registeredClient?.name ?? '';
 	});
-	let isRegistered = $derived($registeredClient !== undefined);
+	let isRegistered = $derived(registeredClient !== undefined);
 
 	async function submit() {
 		if (isRegistered) {
-			$registeredClient?.logout();
+			registeredClient?.logout();
 			return;
 		}
 
 		try {
-			$registeredClient = await client.register(registeredName.trim(), onClose);
+			registeredClient = await client.register(registeredName.trim(), onClose);
 		} catch (error) {
+			console.error("Error while registering: ", error);
 			notifications.reportError(error as Error);
 		}
 	}
@@ -47,7 +50,7 @@
 				break;
 		}
 
-		$registeredClient = undefined;
+		registeredClient = undefined;
 	}
 </script>
 

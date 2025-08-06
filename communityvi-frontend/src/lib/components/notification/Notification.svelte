@@ -1,28 +1,27 @@
 <script lang="ts">
-	import {createEventDispatcher} from 'svelte';
 	import {fade} from 'svelte/transition';
 
 	import {NotificationType} from '$lib/components/notification/notification_type';
 
-	interface Props {
+	interface Properties {
 		type?: NotificationType;
 		useLightAppearance?: boolean;
 		icon?: string;
 		children?: import('svelte').Snippet;
+		onClose: () => void;
 	}
 
 	let {
 		type = NotificationType.PRIMARY,
 		useLightAppearance = true,
 		icon = 'exclamation-circle',
-		children
-	}: Props = $props();
-
-	const dispatch = createEventDispatcher();
+		children,
+		onClose = () => {},
+	}: Properties = $props();
 </script>
 
 <div class="notification {type}" class:is-light={useLightAppearance} out:fade>
-	<button class="delete" onclick={() => dispatch('close')} aria-label="Close notification"></button>
+	<button class="delete" onclick={onClose} aria-label="Close notification"></button>
 	<div class="media">
 		<div class="media-left">
 			<span class="icon">

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type {Peer} from '$lib/client/model';
 
-	interface Props {
+	interface Properties {
 		message: string;
 		sender: Peer;
 		acknowledged?: boolean | undefined;
 	}
 
-	let { message, sender, acknowledged = undefined }: Props = $props();
+	let { message, sender, acknowledged = undefined }: Properties = $props();
 </script>
 
 <tr class:pendingMessage={acknowledged === false}>
