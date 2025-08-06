@@ -10,13 +10,14 @@
 	import {browser} from '$app/environment';
 	import {RESTClient} from '$lib/client/RESTClient';
 	import {SvelteURL} from 'svelte/reactivity';
-	import {registeredClient} from '$lib/stores';
+	import RegisteredClient from '$lib/client/registered_client';
 
 	const transport = new WebSocketTransport(determineWebSocketURL());
 	const restClient = new RESTClient(determineAPIURL());
 	const client = new Client(transport, restClient);
 
 	let videoUrl: string | undefined;
+	let registeredClient: RegisteredClient | undefined;
 
 	function determineWebSocketURL(): URL {
 		// Just a stopgap measure for now. The (generally wrong) assumption is that
@@ -54,19 +55,19 @@
 </svelte:head>
 
 <section id="registration">
-	<Registration {client} />
+	<Registration {client} bind:registeredClient />
 </section>
 
-{#if $registeredClient !== undefined}
-<MediumSelector registeredClient={$registeredClient} bind:videoUrl />
+{#if registeredClient !== undefined}
+<MediumSelector {registeredClient} bind:videoUrl />
 {/if}
 
 {#if videoUrl !== undefined}
 <Player {videoUrl} />
 {/if}
 
-{#if $registeredClient !== undefined}
-<Peers registeredClient={$registeredClient} />
-<Chat registeredClient={$registeredClient} />
+{#if registeredClient !== undefined}
+<Peers {registeredClient} />
+<Chat {registeredClient} />
 {/if}
 

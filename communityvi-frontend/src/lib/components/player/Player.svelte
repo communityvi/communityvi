@@ -1,14 +1,16 @@
 <script lang="ts">
-	import {notifications, registeredClient} from '$lib/stores';
+	import {notifications} from '$lib/stores';
 	import {onDestroy} from 'svelte';
 	import PlayerCoordinator from '$lib/components/player/player_coordinator';
 	import type {Medium} from '$lib/client/model';
+	import RegisteredClient from '$lib/client/registered_client';
 
 	interface Properties {
 		videoUrl: string;
+		registeredClient?: RegisteredClient;
 	}
 
-	let {videoUrl}: Properties = $props();
+	let {videoUrl, registeredClient}: Properties = $props();
 
 	let player: HTMLVideoElement;
 
@@ -17,19 +19,19 @@
 	// Important: $registeredClient is explicitly mentioned to trigger the reactive updates.
 	let playerCoordinator: PlayerCoordinator | undefined;
 	$effect(() => {
-		if ($registeredClient) {
+		if (registeredClient) {
 			initializeOrUpdatePlayerState();
 		}
 	});
 	// NOTE: Can't use $derived because we need the side-effect of subscribing to state changes
 	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
-		if ($registeredClient === undefined) {
+		if (registeredClient === undefined) {
 			unsubscribe = () => {};
 			return;
 		}
 
-		unsubscribe = $registeredClient.subscribeToMediumStateChanges(async change => {
+		unsubscribe = registeredClient.subscribeToMediumStateChanges(async change => {
 			await initializeOrUpdatePlayerState(change.medium);
 		});
 	});
@@ -40,12 +42,12 @@
 
 	async function initializeOrUpdatePlayerState(medium?: Medium) {
 		if (playerCoordinator !== undefined) {
-			const currentPlaybackState = medium?.playbackState ?? $registeredClient?.currentMedium?.playbackState;
+			const currentPlaybackState = medium?.playbackState ?? registeredClient?.currentMedium?.playbackState;
 			await playerCoordinator.setPlaybackState(currentPlaybackState);
 			return;
 		}
 
-		const initialPlaybackState = $registeredClient?.currentMedium?.playbackState;
+		const initialPlaybackState = registeredClient?.currentMedium?.playbackState;
 		playerCoordinator = await PlayerCoordinator.forPlayerWithInitialState(
 			player,
 			initialPlaybackState,
@@ -56,7 +58,7 @@
 
 	async function onPlay(startTimeInMilliseconds: number, skipped: boolean) {
 		try {
-			await $registeredClient?.play(startTimeInMilliseconds, skipped);
+			await registeredClient?.play(startTimeInMilliseconds, skipped);
 		} catch (error) {
 			await handleStateChangeError(error as Error, skipped, getPlayStateChangedErrorMessage);
 		}
@@ -72,7 +74,7 @@
 
 	async function onPause(positionInMilliseconds: number, skipped: boolean) {
 		try {
-			await $registeredClient?.pause(positionInMilliseconds, skipped);
+			await registeredClient?.pause(positionInMilliseconds, skipped);
 		} catch (error) {
 			await handleStateChangeError(error as Error, skipped, getPauseStateChangedErrorMessage);
 		}
