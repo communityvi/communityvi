@@ -68,6 +68,13 @@
 
 		videoUrl = URL.createObjectURL(selectedFile);
 
+		if (medium !== undefined && !selectedMedium.isMeaningfullyDifferentTo(medium)) {
+			// quick fix to prevent chrome and firefox from updating the medium metadata on the server and thereby
+			// unloading each other's videos due to different lengths (a couple of milliseconds).
+			// TODO: Properly model the different operations like selecting a file vs. inserting a new medium.
+			return;
+		}
+
 		try {
 			await registeredClient.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
 			medium = registeredClient.currentMedium;
