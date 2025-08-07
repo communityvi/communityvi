@@ -87,12 +87,11 @@ export class SelectedMedium {
 	}
 
 	isMeaningfullyDifferentTo(medium: Medium): boolean {
-		const ownLengthInSecondsTruncated = Math.trunc(this.lengthInMilliseconds / 1000);
-		const mediumLengthInSecondsTruncated = Math.trunc(medium.lengthInMilliseconds / 1000);
+		// NOTE: Different browsers tend to subtly disagree in how long the same given video file is.
+		const delta = Math.abs(this.lengthInMilliseconds - medium.lengthInMilliseconds);
+		const lengthDifferenceThreshold = 500;
 
-		return (
-			this.name.trim() !== medium.name.trim() || ownLengthInSecondsTruncated !== mediumLengthInSecondsTruncated
-		);
+		return this.name.trim() !== medium.name.trim() || delta >= lengthDifferenceThreshold;
 	}
 }
 
