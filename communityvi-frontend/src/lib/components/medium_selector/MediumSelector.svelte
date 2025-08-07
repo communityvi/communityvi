@@ -71,10 +71,6 @@
 
 		videoUrl = URL.createObjectURL(selectedFile);
 
-		if (mediumIsOutdated) {
-			return;
-		}
-
 		try {
 			await registeredClient.insertFixedLengthMedium(selectedMedium.name, selectedMedium.lengthInMilliseconds);
 			medium = registeredClient.currentMedium;
