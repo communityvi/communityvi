@@ -17,10 +17,8 @@
 	let medium: Medium | undefined = $state();
 	let mediumIsOutdated = $derived(medium !== undefined && videoUrl === undefined);
 
-	let durationHelper: HTMLVideoElement | undefined = $state();
-	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
-
-	let fileSelector: HTMLInputElement | undefined = $state();
+	let durationHelper: HTMLVideoElement;
+	let fileSelector: HTMLInputElement;
 
 	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
@@ -50,10 +48,12 @@
 	}
 
 	async function onMediumSelection() {
-		const selectedFile = fileSelector?.files?.item(0) ?? undefined;
-		if (selectedFile === undefined || metadataLoader === undefined) {
+		const selectedFile = fileSelector.files?.item(0) ?? undefined;
+		if (selectedFile === undefined) {
 			return;
 		}
+
+		const metadataLoader = new MetadataLoader(durationHelper);
 
 		let selectedMedium: SelectedMedium;
 		try {
@@ -97,10 +97,6 @@
 	}
 
 	function resetFileSelector() {
-		if (fileSelector === undefined) {
-			return;
-		}
-
 		fileSelector.value = '';
 	}
 </script>
