@@ -20,7 +20,7 @@
 			class="navbar-burger"
 			class:is-active={isBurgerMenuExpanded}
 			onclick={toggleBurgerMenu}
-			onkeypress={event => {
+			onkeydown={event => {
 				if (event.key === 'Enter') {
 					toggleBurgerMenu();
 				}
