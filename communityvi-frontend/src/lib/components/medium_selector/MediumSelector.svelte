@@ -4,7 +4,7 @@
 	import type {MediumStateChanged} from '$lib/client/model';
 	import {onDestroy} from 'svelte';
 	import {formatMediumLength} from '$lib/components/medium_selector/helpers';
-	import MetadataLoader, {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
+	import {MediumMetadata} from '$lib/components/medium_selector/medium_metadata';
 	import RegisteredClient from '$lib/client/registered_client';
 
 	interface Properties {
@@ -17,10 +17,7 @@
 	let medium: Medium | undefined = $state();
 	let mediumIsOutdated = $derived(medium !== undefined && videoUrl === undefined);
 
-	let durationHelper: HTMLVideoElement | undefined = $state();
-	let metadataLoader = $derived(durationHelper ? new MetadataLoader(durationHelper) : undefined);
-
-	let fileSelector: HTMLInputElement | undefined = $state();
+	let fileSelector: HTMLInputElement;
 
 	let unsubscribe: (() => void) = $state(() => {});
 	$effect(() => {
@@ -50,14 +47,14 @@
 	}
 
 	async function onMediumSelection() {
-		const selectedFile = fileSelector?.files?.item(0) ?? undefined;
-		if (selectedFile === undefined || metadataLoader === undefined) {
+		const selectedFile = fileSelector.files?.item(0) ?? undefined;
+		if (selectedFile === undefined) {
 			return;
 		}
 
-		let selectedMedium: SelectedMedium;
+		let selectedMedium: MediumMetadata;
 		try {
-			selectedMedium = await metadataLoader.selectedMediumFromFile(selectedFile);
+			selectedMedium = await MediumMetadata.fromFile(selectedFile);
 		} catch (error) {
 			console.error('Error while loading medium:', error);
 			notifications.reportError(error as Error);
@@ -71,7 +68,10 @@
 
 		videoUrl = URL.createObjectURL(selectedFile);
 
-		if (mediumIsOutdated) {
+		if (medium !== undefined && !selectedMedium.isMeaningfullyDifferentTo(medium)) {
+			// quick fix to prevent chrome and firefox from updating the medium metadata on the server and thereby
+			// unloading each other's videos due to different lengths (a couple of milliseconds).
+			// TODO: Properly model the different operations like selecting a file vs. inserting a new medium.
 			return;
 		}
 
@@ -101,16 +101,9 @@
 	}
 
 	function resetFileSelector() {
-		if (fileSelector === undefined) {
-			return;
-		}
-
 		fileSelector.value = '';
 	}
 </script>
-
-<!-- Hidden video element for parsing file metadata -->
-<video hidden={true} muted={true} bind:this={durationHelper}></video>
 
 <section id="medium-selection">
 	<span class="medium-title">{medium?.name ?? 'n/a'}</span>

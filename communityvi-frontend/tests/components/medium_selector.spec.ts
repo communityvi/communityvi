@@ -1,6 +1,6 @@
 import {formatMediumLength} from '$lib/components/medium_selector/helpers';
 import {Medium} from '$lib/client/model';
-import {SelectedMedium} from '$lib/components/medium_selector/metadata_loader';
+import {MediumMetadata} from '$lib/components/medium_selector/medium_metadata';
 import {describe, it, expect} from 'vitest';
 
 describe('The MediumSelector component', () => {
@@ -53,7 +53,7 @@ describe('SelectedMedium', () => {
 		const birdman = new Medium('Birdman', 116 * 60 * 1000);
 
 		it('detects meaningful differences in name', () => {
-			const bidman = new SelectedMedium('Bidman', birdman.lengthInMilliseconds);
+			const bidman = new MediumMetadata('Bidman', birdman.lengthInMilliseconds);
 
 			const isMeaningfullyDifferent = bidman.isMeaningfullyDifferentTo(birdman);
 
@@ -61,7 +61,7 @@ describe('SelectedMedium', () => {
 		});
 
 		it('does not detect whitespace naming differences', () => {
-			const birdmanWithWhitespace = new SelectedMedium(' Birdman ', birdman.lengthInMilliseconds);
+			const birdmanWithWhitespace = new MediumMetadata(' Birdman ', birdman.lengthInMilliseconds);
 
 			const isMeaningfullyDifferent = birdmanWithWhitespace.isMeaningfullyDifferentTo(birdman);
 
@@ -69,7 +69,7 @@ describe('SelectedMedium', () => {
 		});
 
 		it('detects meaningful differences in length', () => {
-			const birdmanDirectorsCut = new SelectedMedium('Birdman', birdman.lengthInMilliseconds + 1_000);
+			const birdmanDirectorsCut = new MediumMetadata('Birdman', birdman.lengthInMilliseconds + 1_000);
 
 			const isMeaningfullyDifferent = birdmanDirectorsCut.isMeaningfullyDifferentTo(birdman);
 
@@ -77,7 +77,7 @@ describe('SelectedMedium', () => {
 		});
 
 		it('does not detects differences within one second', () => {
-			const selectedBirdman = new SelectedMedium('Birdman', birdman.lengthInMilliseconds + 420);
+			const selectedBirdman = new MediumMetadata('Birdman', birdman.lengthInMilliseconds + 420);
 
 			const isMeaningfullyDifferent = selectedBirdman.isMeaningfullyDifferentTo(birdman);
 
