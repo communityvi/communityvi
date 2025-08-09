@@ -1,6 +1,7 @@
 CREATE TABLE medium
 (
 	uuid                          blob    not null
+		constraint medium_pk PRIMARY KEY,
 	name                          text    not null,
 	version                       integer not null,
 	length_ms                     integer not null,
