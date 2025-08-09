@@ -61,6 +61,7 @@ tower-http = { version = "0.6", features = ["cors"] }
 tower-service = "0.3"
 typed-builder = "0.21"
 unicode_skeleton = "0.1"
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 rand = "0.9"
