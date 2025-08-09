@@ -1,3 +1,4 @@
+use crate::store::Store;
 use crate::store::error::{IntoStoreResult, StoreError};
 use crate::store::models::Room;
 use sqlx::{SqlitePool, migrate, query_as};
@@ -22,8 +23,10 @@ impl SqliteStore {
 	async fn migrate(&self) -> Result<(), StoreError> {
 		migrate!().run(&self.pool).await.map_err(Into::into)
 	}
+}
 
-	pub async fn get_room(&self, room_uuid: Uuid) -> Result<Option<Room>, StoreError> {
+impl Store for SqliteStore {
+	async fn get_room(&self, room_uuid: Uuid) -> Result<Option<Room>, StoreError> {
 		query_as(r"SELECT * FROM room WHERE uuid = ?1")
 			.bind(room_uuid)
 			.fetch_optional(&self.pool)
@@ -31,7 +34,7 @@ impl SqliteStore {
 			.map_err(Into::into)
 	}
 
-	pub async fn create_room(&self, name: &str) -> Result<Room, StoreError> {
+	async fn create_room(&self, name: &str) -> Result<Room, StoreError> {
 		let uuid = Uuid::new_v4();
 		query_as(
 			r"INSERT INTO room (uuid, name) VALUES (?1, ?2)
@@ -47,7 +50,7 @@ impl SqliteStore {
 		.map_err(Into::into)
 	}
 
-	pub async fn update_room(
+	async fn update_room(
 		&self,
 		Room {
 			uuid,
