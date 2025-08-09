@@ -7,3 +7,9 @@ pub struct Room {
 	pub name: String,
 	pub medium_uuid: Option<Uuid>,
 }
+
+#[derive(FromRow, Clone, Debug, PartialEq, Eq)]
+pub struct User {
+	pub uuid: Uuid,
+	pub name: String,
+}

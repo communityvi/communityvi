@@ -1,7 +1,8 @@
 use crate::store::Store;
 use crate::store::error::{IntoStoreResult, StoreError};
-use crate::store::models::Room;
-use sqlx::{SqlitePool, migrate, query_as};
+use crate::store::models::{Room, User};
+use anyhow::anyhow;
+use sqlx::{SqlitePool, migrate, query, query_as};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -75,6 +76,68 @@ impl Store for SqliteStore {
 		.fetch_one(&self.pool)
 		.await
 		.map_err(Into::into)
+	}
+
+	async fn get_user(&self, user_uuid: Uuid) -> Result<Option<User>, StoreError> {
+		query_as(
+			r"SELECT uuid, name
+			FROM user
+			WHERE uuid = ?1",
+		)
+		.bind(user_uuid)
+		.fetch_optional(&self.pool)
+		.await
+		.map_err(Into::into)
+	}
+
+	async fn create_user(&self, name: &str) -> Result<User, StoreError> {
+		let uuid = Uuid::new_v4();
+		query_as(
+			r"INSERT INTO user(uuid, name) VALUES (?1, ?2)
+			RETURNING
+				uuid,
+				name",
+		)
+		.bind(uuid)
+		.bind(name)
+		.fetch_one(&self.pool)
+		.await
+		.map_err(Into::into)
+	}
+
+	async fn remove_user(&self, user_uuid: Uuid) -> Result<(), StoreError> {
+		query(r"DELETE FROM user WHERE uuid = ?1")
+			.bind(user_uuid)
+			.execute(&self.pool)
+			.await?;
+		Ok(())
+	}
+
+	async fn add_user_to_room(&self, room_uuid: Uuid, user_uuid: Uuid) -> Result<(), StoreError> {
+		let result = query(r#"INSERT INTO room_user (room_uuid, user_uuid) VALUES (?1, ?2)"#)
+			.execute(&self.pool)
+			.await?;
+		if result.rows_affected() == 0 {
+			return Err(StoreError::NotFound(anyhow!("Missing room or user")));
+		}
+
+		Ok(())
+	}
+
+	async fn remove_user_from_room(
+		&self,
+		room_uuid: Uuid,
+		user_uuid: Uuid,
+	) -> impl Future<Output = Result<(), StoreError>> + Send {
+		todo!()
+	}
+
+	async fn list_room_users(
+		&self,
+		room_uuid: Uuid,
+		user_uuid: Uuid,
+	) -> impl Future<Output = Result<(), StoreError>> + Send {
+		todo!()
 	}
 }
 
