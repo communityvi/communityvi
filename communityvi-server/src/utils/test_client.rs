@@ -10,7 +10,7 @@ use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::Room;
 use crate::room::client::Client;
 use anyhow::anyhow;
-use async_trait::async_trait;
+use dynosaur::dynosaur;
 use futures_channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 use js_int::UInt;
@@ -21,7 +21,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
 
 pub struct WebsocketTestClient {
-	websocket_client: Box<dyn WebSocketClient>,
+	websocket_client: Box<DynWebSocketClient<'static>>,
 	success_messages: BTreeMap<UInt, SuccessMessage>,
 	error_messages: BTreeMap<Option<UInt>, ErrorMessage>,
 	broadcast_messages: VecDeque<BroadcastMessage>,
@@ -140,7 +140,7 @@ where
 {
 	fn from(client: Client) -> Self {
 		Self {
-			websocket_client: Box::new(client),
+			websocket_client: DynWebSocketClient::new_box(client),
 			success_messages: Default::default(),
 			error_messages: Default::default(),
 			broadcast_messages: Default::default(),
@@ -148,13 +148,12 @@ where
 	}
 }
 
-#[async_trait]
+#[dynosaur(pub DynWebSocketClient = dyn(box) WebSocketClient)]
 pub trait WebSocketClient {
-	async fn send(&mut self, message: WebSocketMessage) -> anyhow::Result<()>;
-	async fn receive(&mut self) -> anyhow::Result<WebSocketMessage>;
+	fn send(&mut self, message: WebSocketMessage) -> impl Future<Output = anyhow::Result<()>> + Send;
+	fn receive(&mut self) -> impl Future<Output = anyhow::Result<WebSocketMessage>> + Send;
 }
 
-#[async_trait]
 impl WebSocketClient
 	for (
 		mpsc::UnboundedSender<WebSocketMessage>,
@@ -175,7 +174,6 @@ impl WebSocketClient
 	}
 }
 
-#[async_trait]
 impl<Socket> WebSocketClient for WebSocketStream<Socket>
 where
 	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
