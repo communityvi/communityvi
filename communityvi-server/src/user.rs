@@ -99,7 +99,7 @@ mod test {
 	}
 
 	#[test]
-	#[ignore]
+	#[ignore = "We don't currently prevent whole-script homographs, but we should!"]
 	fn should_prevent_whole_script_homographs() {
 		/*
 		 * "Our IDN threat model specifically excludes whole-script homographs, because they can't
