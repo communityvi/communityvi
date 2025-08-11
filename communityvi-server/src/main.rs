@@ -6,6 +6,7 @@ mod commandline;
 mod configuration;
 mod connection;
 mod context;
+mod database;
 mod error;
 mod lifecycle;
 mod message;
@@ -14,7 +15,6 @@ mod room;
 mod server;
 #[cfg(test)]
 mod server_tests;
-mod store;
 mod user;
 mod utils;
 

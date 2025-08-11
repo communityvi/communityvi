@@ -4,6 +4,9 @@ use std::collections::hash_map::Entry;
 use thiserror::Error;
 use unicode_skeleton::UnicodeSkeleton;
 
+pub mod model;
+pub mod repository;
+
 #[derive(Default)]
 pub struct UserRepository {
 	users: HashMap<String, User>,
