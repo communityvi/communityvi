@@ -209,7 +209,9 @@ async fn start_test_server() -> TestClient {
 		missed_heartbeat_limit: 3,
 	};
 	let time_source = TimeSource::test();
-	let application_context = ApplicationContext::new(configuration, time_source);
+	let application_context = ApplicationContext::new(configuration, time_source)
+		.await
+		.expect("Failed to create application context.");
 	let room = Room::new(application_context.reference_timer.clone(), 10);
 	TestClient::new_with_host(create_router(application_context, room), "localhost")
 		.await

@@ -6,6 +6,7 @@ mod commandline;
 mod configuration;
 mod connection;
 mod context;
+mod database;
 mod error;
 mod lifecycle;
 mod message;
