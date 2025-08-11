@@ -1,6 +1,6 @@
 CREATE TABLE medium
 (
-	uuid                          text    not null,
+	uuid                          blob    not null
 	name                          text    not null,
 	version                       integer not null,
 	length_ms                     integer not null,
@@ -20,13 +20,13 @@ CREATE TABLE medium
 
 CREATE TABLE room
 (
-	uuid        text not null
+	uuid        blob not null
 		constraint room_pk
 			primary key,
 	name        text not null
 		constraint room_name_uq
 			unique,
-	medium_uuid text
+	medium_uuid blob
 		constraint room_medium__fk
 			references medium (uuid)
 			on delete set null
@@ -34,7 +34,7 @@ CREATE TABLE room
 
 CREATE TABLE user
 (
-	uuid text not null
+	uuid blob not null
 		constraint user_pk
 			primary key,
 	name text
@@ -44,11 +44,11 @@ CREATE TABLE user
 
 CREATE TABLE room_user
 (
-	room_uuid integer not null
+	room_uuid blob not null
 		constraint room_user_room__fk
 			references room
 			on delete cascade,
-	user_uuid integer not null
+	user_uuid blob not null
 		constraint room_user_user__fk
 			references user
 			on delete cascade,
@@ -58,14 +58,14 @@ CREATE TABLE room_user
 
 CREATE TABLE chat_message
 (
-	uuid       text                               not null
+	uuid       blob                               not null
 		constraint chat_message_pk
 			primary key,
-	room_uuid  text                               not null
+	room_uuid  blob                               not null
 		constraint chat_message_room__fk
 			references room (uuid)
 			on delete cascade,
-	user_uuid  text                               not null
+	user_uuid  blob                               not null
 		constraint chat_message_user__fk
 			references user (uuid),
 	user_name  text                               not null,
