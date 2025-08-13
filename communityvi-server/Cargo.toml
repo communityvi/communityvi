@@ -23,6 +23,7 @@ used_underscore_binding = "allow"
 let_underscore_untyped = "allow"
 multiple_crate_versions = "allow"
 cargo_common_metadata = "allow"
+similar_names = "allow"
 
 [dependencies]
 aide = { version = "0.15", features = ["axum", "axum-ws", "axum-json"] }
