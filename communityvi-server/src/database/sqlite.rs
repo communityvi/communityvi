@@ -1,5 +1,5 @@
 use crate::database::error::{DatabaseError, IntoStoreResult};
-use crate::database::{Connection, Database, Repository};
+use crate::database::{Connection, Database, Repository, TransactionOperation};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use sqlx::pool::PoolConnection;
@@ -7,6 +7,9 @@ use sqlx::{Sqlite, SqliteConnection, SqlitePool, migrate};
 use std::any::Any;
 use std::ops::DerefMut;
 
+mod chat_message;
+mod medium;
+mod room;
 #[cfg(test)]
 mod test_utils;
 mod user;
@@ -39,6 +42,19 @@ impl Database for SqliteDatabase {
 			.await
 			.map(|connection| Box::new(connection) as Box<dyn Connection>)
 			.map_err(Into::into)
+	}
+
+	async fn run_in_transaction(&self, operation: &mut dyn TransactionOperation) -> Result<(), DatabaseError> {
+		let mut transaction = self.pool.begin().await?;
+
+		let result = operation.perform(&mut *transaction).await;
+		if result.is_err() {
+			transaction.rollback().await?;
+		} else {
+			transaction.commit().await?;
+		}
+
+		Ok(())
 	}
 }
 

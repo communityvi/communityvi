@@ -3,7 +3,9 @@ use chrono::Duration;
 use js_int::{UInt, uint};
 
 pub mod fixed_length;
+pub mod model;
 pub mod playback_state;
+pub mod repository;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct VersionedMedium {

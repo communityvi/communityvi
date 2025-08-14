@@ -15,6 +15,8 @@ use std::sync::Arc;
 pub mod client;
 pub mod error;
 pub mod medium;
+pub mod model;
+pub mod repository;
 pub mod session_id;
 mod session_id_sequence;
 pub mod session_repository;
