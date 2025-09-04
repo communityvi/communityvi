@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5.0.0
       - name: Install NodeJS
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: 22
       - name: Install rust toolchain
@@ -63,7 +63,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5.0.0
       - name: Install NodeJS
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: 22
       - name: Install rust toolchain
