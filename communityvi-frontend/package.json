@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"watch": "vite dev",
-		"build": "vite build",
+		"build": "svelte-kit sync && vite build",
 		"preview": "vite preview",
 		"lint": "svelte-kit sync && prettier --check . && eslint . && echo 'ESLint OK!' && svelte-check --fail-on-warnings && echo 'Svelte validate OK!'",
 		"lint:fix": "svelte-kit sync && prettier -w . && eslint . --fix && echo 'ESLint Fixed!'",
