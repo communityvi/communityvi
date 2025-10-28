@@ -18,7 +18,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v6.0.0
         with:
-          node-version: 22
+          node-version: 24
       - name: Install packages
         run: npm install
       - name: ESLint & Prettier & Svelte check
@@ -32,7 +32,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v6.0.0
         with:
-          node-version: 22
+          node-version: 24
       - name: Install packages
         run: npm install
       - name: Build static files
@@ -46,7 +46,7 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v6.0.0
         with:
-          node-version: 22
+          node-version: 24
       - name: Install packages
         run: npm install
       - name: Test
