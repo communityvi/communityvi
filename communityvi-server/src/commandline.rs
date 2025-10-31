@@ -13,18 +13,13 @@ pub struct Commandline {
 	pub command: Option<BaseCommand>,
 }
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Default)]
 pub enum BaseCommand {
 	/// Run the communityvi server (websocket mode only)
+	#[default]
 	Run,
 	/// Print the configuration
 	Configuration,
-}
-
-impl Default for BaseCommand {
-	fn default() -> Self {
-		Self::Run
-	}
 }
 
 impl Commandline {
