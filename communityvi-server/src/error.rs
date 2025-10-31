@@ -1,4 +1,5 @@
 use crate::configuration::ConfigurationError;
+use crate::database::error::DatabaseError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -9,4 +10,6 @@ pub enum CommunityviError {
 	Commandline(#[from] clap::Error),
 	#[error("IO error while serving requests: {0}")]
 	Server(#[from] std::io::Error),
+	#[error("Database error: {0}")]
+	Database(#[from] DatabaseError),
 }
