@@ -19,7 +19,10 @@ impl ApplicationContext {
 	pub async fn new(configuration: Configuration, time_source: TimeSource) -> anyhow::Result<ApplicationContext> {
 		let reference_timer = ReferenceTimer::default();
 
-		let database = Arc::new(SqliteDatabase::connect("sqlite::memory:").await?);
+		let mut concrete_database = SqliteDatabase::connect("sqlite::memory:").await?;
+		concrete_database.migrate().await?;
+
+		let database = Arc::new(concrete_database);
 		let repository = Arc::new(SqliteRepository);
 
 		Ok(Self {

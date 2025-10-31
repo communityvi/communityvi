@@ -2,6 +2,7 @@ use crate::commandline::Commandline;
 use crate::error::CommunityviError;
 use clap::Parser;
 
+mod chat;
 mod commandline;
 mod configuration;
 mod connection;

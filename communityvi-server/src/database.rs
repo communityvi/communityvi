@@ -1,4 +1,6 @@
+use crate::chat::repository::ChatRepository;
 use crate::database::error::DatabaseError;
+use crate::room::repository::RoomRepository;
 use crate::user::repository::UserRepository;
 use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
@@ -25,13 +27,10 @@ pub trait Connection: Any + Send {
 
 assert_obj_safe!(Connection);
 
-pub trait Repository: UserRepository + Send + Sync {
-	fn user(&self) -> &dyn UserRepository
-	where
-		Self: Sized,
-	{
-		self
-	}
+pub trait Repository: UserRepository + RoomRepository + ChatRepository + Send + Sync {
+	fn user(&self) -> &dyn UserRepository;
+	fn room(&self) -> &dyn RoomRepository;
+	fn chat(&self) -> &dyn ChatRepository;
 }
 
 assert_obj_safe!(Repository);

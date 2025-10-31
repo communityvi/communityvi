@@ -212,7 +212,27 @@ async fn start_test_server() -> TestClient {
 	let application_context = ApplicationContext::new(configuration, time_source)
 		.await
 		.expect("Failed to create application context.");
-	let room = Room::new(application_context.reference_timer.clone(), 10);
+	let test_room = application_context
+		.repository
+		.room()
+		.create(
+			application_context
+				.database
+				.connection()
+				.await
+				.expect("Database connection")
+				.as_mut(),
+			"test-room",
+		)
+		.await
+		.expect("Could not create room");
+	let room = Room::new(
+		test_room.uuid,
+		application_context.reference_timer.clone(),
+		10,
+		application_context.database.clone(),
+		application_context.repository.clone(),
+	);
 	TestClient::new_with_host(create_router(application_context, room), "localhost")
 		.await
 		.expect("Failed to start test server")
