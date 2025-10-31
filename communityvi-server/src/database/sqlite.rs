@@ -1,3 +1,4 @@
+use crate::chat::repository::ChatRepository;
 use crate::database::error::{DatabaseError, IntoStoreResult};
 use crate::database::{Connection, Database, Repository};
 use crate::room::repository::RoomRepository;
@@ -9,6 +10,7 @@ use sqlx::{Sqlite, SqliteConnection, SqlitePool, migrate};
 use std::any::Any;
 use std::ops::DerefMut;
 
+mod chat;
 mod room;
 #[cfg(test)]
 pub mod test_utils;
@@ -57,6 +59,10 @@ impl Repository for SqliteRepository {
 	}
 
 	fn room(&self) -> &dyn RoomRepository {
+		self
+	}
+
+	fn chat(&self) -> &dyn ChatRepository {
 		self
 	}
 }
