@@ -1,5 +1,4 @@
 use crate::connection::sender::MessageSender;
-use crate::database::sqlite::SqliteRepository;
 use crate::database::{Database, Repository};
 use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::reference_time::ReferenceTimer;
@@ -13,10 +12,13 @@ use chrono::Duration;
 use js_int::{UInt, uint};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
+use uuid::Uuid;
 
 pub mod client;
 pub mod error;
 pub mod medium;
+pub mod model;
+pub mod repository;
 pub mod session_id;
 mod session_id_sequence;
 pub mod session_repository;
@@ -26,7 +28,9 @@ pub struct Room {
 	inner: Arc<Inner>,
 }
 
+#[expect(dead_code)]
 struct Inner {
+	uuid: Uuid,
 	user_repository: Mutex<UserRepository>,
 	session_repository: RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
@@ -58,12 +62,14 @@ impl MessageCounters {
 
 impl Room {
 	pub fn new(
+		room_uuid: Uuid,
 		reference_timer: ReferenceTimer,
 		room_size_limit: usize,
 		database: Arc<dyn Database>,
 		repository: Arc<dyn Repository>,
 	) -> Self {
 		let inner = Inner {
+			uuid: room_uuid,
 			user_repository: Mutex::default(),
 			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
@@ -255,6 +261,7 @@ mod test {
 
 	async fn room(room_size_limit: usize) -> Room {
 		Room::new(
+			Uuid::new_v4(),
 			ReferenceTimer::default(),
 			room_size_limit,
 			database().await,

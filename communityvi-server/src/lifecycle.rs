@@ -1085,6 +1085,16 @@ mod test {
 	}
 
 	async fn room(reference_timer: ReferenceTimer, room_size_limit: usize) -> Room {
-		Room::new(reference_timer, room_size_limit, database().await, repository())
+		let database = database().await;
+		let test_room = repository()
+			.room()
+			.create(
+				database.connection().await.expect("Database connection").as_mut(),
+				"test-room",
+			)
+			.await
+			.expect("Could not create test room");
+
+		Room::new(test_room.uuid, reference_timer, room_size_limit, database, repository())
 	}
 }

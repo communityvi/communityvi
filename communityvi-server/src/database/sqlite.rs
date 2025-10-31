@@ -1,5 +1,6 @@
 use crate::database::error::{DatabaseError, IntoStoreResult};
 use crate::database::{Connection, Database, Repository};
+use crate::room::repository::RoomRepository;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use sqlx::pool::PoolConnection;
@@ -7,6 +8,7 @@ use sqlx::{Sqlite, SqliteConnection, SqlitePool, migrate};
 use std::any::Any;
 use std::ops::DerefMut;
 
+mod room;
 #[cfg(test)]
 pub mod test_utils;
 mod user;
@@ -48,7 +50,11 @@ impl Connection for PoolConnection<Sqlite> {}
 #[derive(Default, Clone, Copy)]
 pub struct SqliteRepository;
 
-impl Repository for SqliteRepository {}
+impl Repository for SqliteRepository {
+	fn room(&self) -> &dyn RoomRepository {
+		self
+	}
+}
 
 fn sqlite_connection(connection: &mut dyn Connection) -> Result<&mut SqliteConnection, DatabaseError> {
 	let type_name = connection.type_name();
