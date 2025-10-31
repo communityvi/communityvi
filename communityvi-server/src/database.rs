@@ -27,13 +27,7 @@ pub trait Connection: Any + Send {
 assert_obj_safe!(Connection);
 
 pub trait Repository: UserRepository + RoomRepository + Send + Sync {
-	fn user(&self) -> &dyn UserRepository
-	where
-		Self: Sized,
-	{
-		self
-	}
-
+	fn user(&self) -> &dyn UserRepository;
 	fn room(&self) -> &dyn RoomRepository;
 }
 

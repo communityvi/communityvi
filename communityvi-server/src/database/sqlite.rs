@@ -1,6 +1,7 @@
 use crate::database::error::{DatabaseError, IntoStoreResult};
 use crate::database::{Connection, Database, Repository};
 use crate::room::repository::RoomRepository;
+use crate::user::repository::UserRepository;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use sqlx::pool::PoolConnection;
@@ -51,6 +52,10 @@ impl Connection for PoolConnection<Sqlite> {}
 pub struct SqliteRepository;
 
 impl Repository for SqliteRepository {
+	fn user(&self) -> &dyn UserRepository {
+		self
+	}
+
 	fn room(&self) -> &dyn RoomRepository {
 		self
 	}
