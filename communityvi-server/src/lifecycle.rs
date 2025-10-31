@@ -359,6 +359,7 @@ fn handle_pause_request(
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::database::sqlite::test_utils::{database, repository};
 	use crate::lifecycle::{handle_messages, handle_request, register_client};
 	use crate::message::client_request::{MediumRequest, PauseRequest};
 	use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, MediumBroadcast};
@@ -375,7 +376,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_get_an_error_for_empty_chat_messages() {
-		let room = Room::new(ReferenceTimer::default(), 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 
 		let empty_chat_request = ChatRequest {
@@ -412,7 +413,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
-		let room = Room::new(ReferenceTimer::default(), 2);
+		let room = room(ReferenceTimer::default(), 2).await;
 		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
@@ -452,7 +453,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_insert_a_too_large_medium() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let room = Room::new(ReferenceTimer::default(), 2);
+		let room = room(ReferenceTimer::default(), 2).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
 			.expect("Did not get client handle!");
@@ -477,7 +478,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
-		let room = Room::new(ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH), 2);
+		let room = room(ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH), 2).await;
 		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
@@ -524,7 +525,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
-		let room = Room::new(ReferenceTimer::default(), 2);
+		let room = room(ReferenceTimer::default(), 2).await;
 		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
@@ -574,7 +575,7 @@ mod test {
 
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
-		let room = Room::new(ReferenceTimer::default(), 2);
+		let room = room(ReferenceTimer::default(), 2).await;
 		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
 
@@ -623,7 +624,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_play_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let room = Room::new(ReferenceTimer::default(), 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
 			.expect("Did not get client handle!");
@@ -655,7 +656,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_pause_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let room = Room::new(ReferenceTimer::default(), 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
 			.expect("Did not get client handle!");
@@ -687,7 +688,7 @@ mod test {
 	async fn the_client_should_not_be_able_to_insert_medium_with_incorrect_version() {
 		let (alice_message_sender, _message_receiver, _alice_test_client) = WebsocketTestClient::new();
 
-		let room = Room::new(ReferenceTimer::default(), 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
 			.expect("Did not get client handle!");
@@ -715,7 +716,7 @@ mod test {
 	async fn should_not_allow_registering_client_twice() {
 		let (message_sender, message_receiver, test_client) = WebsocketTestClient::new();
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 10);
+		let room = room(reference_timer, 10).await;
 
 		let (client_handle, message_receiver, mut test_client) =
 			register_test_client("Anorak", room.clone(), message_sender, message_receiver, test_client).await;
@@ -748,7 +749,7 @@ mod test {
 	async fn should_not_register_clients_with_blank_name() {
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 10);
+		let room = room(reference_timer, 10).await;
 		let register_request = RegisterRequest { name: "	 ".to_string() };
 
 		let request_id = test_client.send_request(register_request).await;
@@ -767,7 +768,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_register_clients_with_already_registered_name() {
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 10);
+		let room = room(reference_timer, 10).await;
 
 		// "Ferris" is already a registered client
 		let fake_message_sender = FakeMessageSender::default().into();
@@ -797,7 +798,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_register_clients_if_room_is_full() {
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(reference_timer, 1).await;
 		{
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 			room.add_client_and_return_existing("Fake", message_sender).unwrap();
@@ -824,7 +825,7 @@ mod test {
 	#[tokio::test]
 	async fn should_get_currently_playing_medium_on_hello_response() {
 		let reference_timer = ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH);
-		let room = Room::new(reference_timer, 1);
+		let room = room(reference_timer, 1).await;
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
@@ -865,7 +866,7 @@ mod test {
 	#[tokio::test]
 	async fn should_list_other_clients_when_joining_a_room() {
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 2);
+		let room = room(reference_timer, 2).await;
 		let fake_message_sender = FakeMessageSender::default();
 		let (stephanie, _) = room
 			.add_client_and_return_existing("Stephanie", fake_message_sender.into())
@@ -896,7 +897,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_list_any_clients_when_joining_an_empty_room() {
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(reference_timer, 1).await;
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
 		let register_request = RegisterRequest {
 			name: "Johnny 5".to_string(),
@@ -919,7 +920,7 @@ mod test {
 	#[tokio::test]
 	async fn should_get_currently_paused_medium_on_hello_response() {
 		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(reference_timer, 1).await;
 		let video_name = "Short Circuit".to_string();
 		let video_length = Duration::minutes(98);
 		let short_circuit = FixedLengthMedium::new(video_name.clone(), video_length);
@@ -955,8 +956,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_send_heartbeats_with_test_time_source() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::test();
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
@@ -980,8 +980,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_send_heartbeats_with_real_time_source() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::default();
 		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
@@ -1000,8 +999,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_stop_after_missed_heartbeat_limit_with_test_time_source() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::test();
 		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
@@ -1036,8 +1034,7 @@ mod test {
 
 	#[tokio::test]
 	async fn should_stop_after_missed_heartbeats_with_real_time_source() {
-		let reference_timer = ReferenceTimer::default();
-		let room = Room::new(reference_timer, 1);
+		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::default();
 		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
@@ -1085,5 +1082,9 @@ mod test {
 			BroadcastMessage::ClientJoined(ClientJoinedBroadcast { id: _, name: _ })
 		));
 		(client, message_receiver, test_client)
+	}
+
+	async fn room(reference_timer: ReferenceTimer, room_size_limit: usize) -> Room {
+		Room::new(reference_timer, room_size_limit, database().await, repository())
 	}
 }

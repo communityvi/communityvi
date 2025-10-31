@@ -8,7 +8,7 @@ use std::any::Any;
 use std::ops::DerefMut;
 
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;
 mod user;
 
 #[derive(Clone)]

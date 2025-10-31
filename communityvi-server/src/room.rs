@@ -1,4 +1,6 @@
 use crate::connection::sender::MessageSender;
+use crate::database::sqlite::SqliteRepository;
+use crate::database::{Database, Repository};
 use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast};
 use crate::reference_time::ReferenceTimer;
 use crate::room::client::Client;
@@ -30,6 +32,8 @@ struct Inner {
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
 	message_counters: Mutex<MessageCounters>,
+	database: Arc<dyn Database>,
+	repository: Arc<dyn Repository>,
 }
 
 #[derive(Default)]
@@ -53,13 +57,20 @@ impl MessageCounters {
 }
 
 impl Room {
-	pub fn new(reference_timer: ReferenceTimer, room_size_limit: usize) -> Self {
+	pub fn new(
+		reference_timer: ReferenceTimer,
+		room_size_limit: usize,
+		database: Arc<dyn Database>,
+		repository: Arc<dyn Repository>,
+	) -> Self {
 		let inner = Inner {
 			user_repository: Mutex::default(),
 			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
 			message_counters: Default::default(),
+			database,
+			repository,
 		};
 		Self { inner: Arc::new(inner) }
 	}
@@ -156,14 +167,15 @@ impl Room {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
+	use crate::database::sqlite::test_utils::{database, repository};
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use chrono::Duration;
 	use js_int::uint;
 
-	#[test]
-	fn should_not_allow_adding_more_clients_than_room_size() {
-		let room = Room::new(ReferenceTimer::default(), 2);
+	#[tokio::test]
+	async fn should_not_allow_adding_more_clients_than_room_size() {
+		let room = room(2).await;
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
@@ -177,9 +189,9 @@ mod test {
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
-	#[test]
-	fn should_eject_the_inserted_medium_once_all_clients_have_left_the_room() {
-		let room = Room::new(ReferenceTimer::default(), 10);
+	#[tokio::test]
+	async fn should_eject_the_inserted_medium_once_all_clients_have_left_the_room() {
+		let room = room(10).await;
 		let name = "牧瀬 紅莉栖";
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
@@ -200,9 +212,9 @@ mod test {
 		);
 	}
 
-	#[test]
-	fn should_not_insert_medium_with_smaller_previous_version() {
-		let room = Room::new(ReferenceTimer::default(), 1);
+	#[tokio::test]
+	async fn should_not_insert_medium_with_smaller_previous_version() {
+		let room = room(1).await;
 		room.insert_medium(Medium::Empty, uint!(0))
 			.expect("Failed to insert medium"); // increase the version
 		assert_eq!(room.medium().version, uint!(1));
@@ -214,9 +226,9 @@ mod test {
 		assert_eq!(room.medium().version, uint!(1));
 	}
 
-	#[test]
-	fn should_not_insert_medium_with_larger_previous_version() {
-		let room = Room::new(ReferenceTimer::default(), 1);
+	#[tokio::test]
+	async fn should_not_insert_medium_with_larger_previous_version() {
+		let room = room(1).await;
 		assert!(
 			room.insert_medium(Medium::Empty, uint!(1)).is_none(),
 			"Must not be able to insert"
@@ -224,9 +236,9 @@ mod test {
 		assert_eq!(room.medium().version, uint!(0));
 	}
 
-	#[test]
-	fn add_client_should_return_list_of_existing_clients() {
-		let room = Room::new(ReferenceTimer::default(), 10);
+	#[tokio::test]
+	async fn add_client_should_return_list_of_existing_clients() {
+		let room = room(10).await;
 		let jake_sender = FakeMessageSender::default();
 		let (jake, existing_clients) = room.add_client_and_return_existing("Jake", jake_sender.into()).unwrap();
 		assert!(existing_clients.is_empty());
@@ -239,5 +251,14 @@ mod test {
 		let existing_jake = &existing_clients[0];
 		assert_eq!(jake.id(), existing_jake.id());
 		assert_eq!(jake.name(), existing_jake.name());
+	}
+
+	async fn room(room_size_limit: usize) -> Room {
+		Room::new(
+			ReferenceTimer::default(),
+			room_size_limit,
+			database().await,
+			repository(),
+		)
 	}
 }

@@ -27,6 +27,8 @@ pub async fn run_server(application_context: ApplicationContext) -> Result<(), C
 	let room = Room::new(
 		application_context.reference_timer.clone(),
 		application_context.configuration.room_size_limit,
+		application_context.database.clone(),
+		application_context.repository.clone(),
 	);
 	let address = application_context.configuration.address;
 
