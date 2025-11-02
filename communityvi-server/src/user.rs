@@ -18,7 +18,7 @@ impl UserRepository {
 			return Err(UserCreationError::NameEmpty);
 		}
 
-		let normalized_name = normalized_name(name);
+		let normalized_name = normalize_name(name);
 
 		const MAX_NAME_LENGTH: usize = 256;
 		if name.len() > MAX_NAME_LENGTH {
@@ -36,14 +36,14 @@ impl UserRepository {
 	}
 
 	pub fn remove(&mut self, user: &User) {
-		let normalized_name = normalized_name(user.name());
+		let normalized_name = normalize_name(user.name());
 		self.users.remove(&normalized_name);
 	}
 }
 
 /// Ensure that unicode characters get correctly decomposed,
 /// normalized and some homograph attacks are hindered, disregarding whitespace.
-fn normalized_name(name: &str) -> String {
+pub fn normalize_name(name: &str) -> String {
 	name.split_whitespace()
 		.flat_map(UnicodeSkeleton::skeleton_chars)
 		.collect()
@@ -85,20 +85,20 @@ mod test {
 
 	#[test]
 	fn should_normalize_unicode_strings() {
-		assert_eq!(normalized_name("C\u{327}"), "C\u{326}");
-		assert_eq!(normalized_name("é"), "e\u{301}");
-		assert_eq!(normalized_name("\u{0C5}"), "A\u{30A}");
-		assert_eq!(normalized_name("\u{212B}"), "A\u{30A}");
-		assert_eq!(normalized_name("\u{391}"), "A");
-		assert_eq!(normalized_name("\u{410}"), "A");
-		assert_eq!(normalized_name("𝔭𝒶ỿ𝕡𝕒ℓ"), "paypal");
-		assert_eq!(normalized_name("𝒶𝒷𝒸"), "abc");
-		assert_eq!(normalized_name("ℝ𝓊𝓈𝓉"), "Rust");
-		assert_eq!(normalized_name("аррӏе.com"), "appie.corn");
-		assert_eq!(normalized_name("𝔭𝒶   ỿ𝕡𝕒		ℓ"), "paypal");
-		assert_eq!(normalized_name("𝒶𝒷\r\n𝒸"), "abc");
-		assert_eq!(normalized_name("ℝ		𝓊𝓈 𝓉"), "Rust");
-		assert_eq!(normalized_name("арр    ӏе.	com"), "appie.corn");
+		assert_eq!(normalize_name("C\u{327}"), "C\u{326}");
+		assert_eq!(normalize_name("é"), "e\u{301}");
+		assert_eq!(normalize_name("\u{0C5}"), "A\u{30A}");
+		assert_eq!(normalize_name("\u{212B}"), "A\u{30A}");
+		assert_eq!(normalize_name("\u{391}"), "A");
+		assert_eq!(normalize_name("\u{410}"), "A");
+		assert_eq!(normalize_name("𝔭𝒶ỿ𝕡𝕒ℓ"), "paypal");
+		assert_eq!(normalize_name("𝒶𝒷𝒸"), "abc");
+		assert_eq!(normalize_name("ℝ𝓊𝓈𝓉"), "Rust");
+		assert_eq!(normalize_name("аррӏе.com"), "appie.corn");
+		assert_eq!(normalize_name("𝔭𝒶   ỿ𝕡𝕒		ℓ"), "paypal");
+		assert_eq!(normalize_name("𝒶𝒷\r\n𝒸"), "abc");
+		assert_eq!(normalize_name("ℝ		𝓊𝓈 𝓉"), "Rust");
+		assert_eq!(normalize_name("арр    ӏе.	com"), "appie.corn");
 	}
 
 	#[test]
@@ -112,7 +112,7 @@ mod test {
 		 *  domain owners to check for whole-script homographs and register them."
 		 *  - https://bugzilla.mozilla.org/show_bug.cgi?id=1332714#c5 by Gervase Markham, 2017-01-25
 		 */
-		assert_eq!(normalized_name("аррӏе.com"), normalized_name("apple.com"));
+		assert_eq!(normalize_name("аррӏе.com"), normalize_name("apple.com"));
 	}
 
 	#[test]
@@ -188,7 +188,7 @@ mod test {
 
 		assert_ne!(
 			NAME,
-			normalized_name(NAME),
+			normalize_name(NAME),
 			"This test only works if the normalization differs"
 		);
 		assert_eq!(NAME, user.name, "The created user should have had the original name.");
@@ -203,14 +203,14 @@ mod test {
 		repository.create_user(NAME).expect("Failed to create user");
 
 		let error = repository
-			.create_user(&normalized_name(NAME))
+			.create_user(&normalize_name(NAME))
 			.expect_err("Should not have created user with homograph name");
 
 		assert_eq!(UserCreationError::NameAlreadyInUse, error, "Incorrect error type");
 
 		assert_ne!(
 			NAME,
-			normalized_name(NAME),
+			normalize_name(NAME),
 			"This test only works if the normalization differs"
 		);
 	}
