@@ -5,7 +5,7 @@ use crate::message::outgoing::broadcast_message::BroadcastMessage;
 use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::session_id::SessionId;
-use crate::user::User;
+use crate::user::model::User;
 use js_int::UInt;
 use log::info;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ impl Client {
 	}
 
 	pub fn name(&self) -> &str {
-		self.inner.user.name()
+		&self.inner.user.name
 	}
 
 	pub fn user(&self) -> &User {

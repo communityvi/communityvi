@@ -1,43 +1,49 @@
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
+use crate::database::Connection;
+use crate::database::error::DatabaseError;
+use crate::user::model::User;
+use crate::user::repository::UserRepository;
+use std::sync::Arc;
 use thiserror::Error;
 use unicode_skeleton::UnicodeSkeleton;
+use uuid::Uuid;
 
 pub mod model;
 pub mod repository;
 
-#[derive(Default)]
-pub struct UserRepository {
-	users: HashMap<String, User>,
+#[derive(Clone)]
+pub struct UserService {
+	repository: Arc<dyn UserRepository>,
 }
 
-impl UserRepository {
-	pub fn create_user(&mut self, name: &str) -> Result<User, UserCreationError> {
+impl UserService {
+	pub fn new(repository: Arc<dyn UserRepository>) -> Self {
+		Self { repository }
+	}
+
+	pub async fn create_user(&self, name: &str, connection: &mut dyn Connection) -> Result<User, UserCreationError> {
 		if name.trim().is_empty() {
 			return Err(UserCreationError::NameEmpty);
 		}
-
-		let normalized_name = normalize_name(name);
 
 		const MAX_NAME_LENGTH: usize = 256;
 		if name.len() > MAX_NAME_LENGTH {
 			return Err(UserCreationError::NameTooLong);
 		}
 
-		use Entry::*;
-		let Vacant(entry) = self.users.entry(normalized_name) else {
-			return Err(UserCreationError::NameAlreadyInUse);
-		};
+		let user = self
+			.repository
+			.create(connection, name, &normalize_name(name))
+			.await
+			.map_err(|error| match error {
+				DatabaseError::UniqueViolation(_) => UserCreationError::NameAlreadyInUse,
+				other => other.into(),
+			})?;
 
-		let user = User { name: name.to_owned() };
-		entry.insert(user.clone());
 		Ok(user)
 	}
 
-	pub fn remove(&mut self, user: &User) {
-		let normalized_name = normalize_name(user.name());
-		self.users.remove(&normalized_name);
+	pub async fn remove(&self, user_uuid: Uuid, connection: &mut dyn Connection) -> Result<(), DatabaseError> {
+		self.repository.remove(connection, user_uuid).await
 	}
 }
 
@@ -49,7 +55,7 @@ pub fn normalize_name(name: &str) -> String {
 		.collect()
 }
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)] // same prefix is OK, other error types will also live in here.
 pub enum UserCreationError {
 	#[error("Username was empty or whitespace-only.")]
@@ -58,30 +64,15 @@ pub enum UserCreationError {
 	NameTooLong,
 	#[error("Username is already in use.")]
 	NameAlreadyInUse,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct User {
-	/// The effective ID value of any user.
-	name: String,
-}
-
-impl User {
-	pub fn name(&self) -> &str {
-		&self.name
-	}
-}
-
-impl Borrow<str> for User {
-	fn borrow(&self) -> &str {
-		&self.name
-	}
+	#[error("Database error: {0}")]
+	Database(#[from] DatabaseError),
 }
 
 #[cfg(test)]
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
+	use crate::database::sqlite::test_utils::{connection, repository};
 
 	#[test]
 	fn should_normalize_unicode_strings() {
@@ -115,76 +106,95 @@ mod test {
 		assert_eq!(normalize_name("аррӏе.com"), normalize_name("apple.com"));
 	}
 
-	#[test]
-	fn should_not_create_with_empty_name() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_not_create_with_empty_name() {
+		let user_service = user_service();
+		let mut connection = connection().await;
 
-		let result = user_repository.create_user("");
-
-		assert!(matches!(result, Err(UserCreationError::NameEmpty)));
-	}
-
-	#[test]
-	fn should_not_create_with_blank_name() {
-		let mut user_repository = UserRepository::default();
-
-		let result = user_repository.create_user("  	 ");
+		let result = user_service.create_user("", connection.as_mut()).await;
 
 		assert!(matches!(result, Err(UserCreationError::NameEmpty)));
 	}
 
-	#[test]
-	fn should_not_create_two_users_with_the_same_name() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_not_create_with_blank_name() {
+		let user_service = user_service();
+		let mut connection = connection().await;
 
-		user_repository
-			.create_user("Anorak  ")
+		let result = user_service.create_user("  	 ", connection.as_mut()).await;
+
+		assert!(matches!(result, Err(UserCreationError::NameEmpty)));
+	}
+
+	#[tokio::test]
+	async fn should_not_create_two_users_with_the_same_name() {
+		let user_service = user_service();
+		let mut connection = connection().await;
+
+		user_service
+			.create_user("Anorak  ", connection.as_mut())
+			.await
 			.expect("First create did not succeed!");
-		let result = user_repository.create_user("   Anorak");
+		let result = user_service.create_user("   Anorak", connection.as_mut()).await;
 
 		assert!(matches!(result, Err(UserCreationError::NameAlreadyInUse)));
 	}
 
-	#[test]
-	fn should_allow_creating_user_with_the_same_name_after_first_has_been_removed() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_allow_creating_user_with_the_same_name_after_first_has_been_removed() {
+		let user_service = user_service();
+		let mut connection = connection().await;
 		let name = "牧瀬 紅莉栖";
 
-		let user = user_repository.create_user(name).expect("Failed to create user");
-		user_repository.remove(&user);
+		let user = user_service
+			.create_user(name, connection.as_mut())
+			.await
+			.expect("Failed to create user");
+		user_service
+			.remove(user.uuid, connection.as_mut())
+			.await
+			.expect("Failed to remove user");
 
-		user_repository
-			.create_user(name)
+		user_service
+			.create_user(name, connection.as_mut())
+			.await
 			.expect("Failed to create user with same name after first is gone");
 	}
 
-	#[test]
-	fn should_allow_creating_users_with_name_no_longer_than_256_bytes() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_allow_creating_users_with_name_no_longer_than_256_bytes() {
+		let user_service = user_service();
+		let mut connection = connection().await;
 		let long_name = String::from_utf8(vec![0x41u8; 256]).unwrap();
 
-		user_repository
-			.create_user(&long_name)
+		user_service
+			.create_user(&long_name, connection.as_mut())
+			.await
 			.expect("Failed to create user with name that has valid length");
 	}
 
-	#[test]
-	fn should_not_allow_creating_users_with_name_longer_than_256_bytes() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_not_allow_creating_users_with_name_longer_than_256_bytes() {
+		let user_service = user_service();
+		let mut connection = connection().await;
 		let too_long_name = String::from_utf8(vec![0x41u8; 257]).unwrap();
 
-		let result = user_repository.create_user(&too_long_name);
+		let result = user_service.create_user(&too_long_name, connection.as_mut()).await;
 
 		assert!(matches!(result, Err(UserCreationError::NameTooLong)));
 	}
 
-	#[test]
-	fn should_not_return_user_with_normalized_name() {
+	#[tokio::test]
+	async fn should_not_return_user_with_normalized_name() {
 		const NAME: &str = "Thomas";
 
-		let mut repository = UserRepository::default();
+		let user_service = user_service();
+		let mut connection = connection().await;
 
-		let user = repository.create_user(NAME).expect("Failed to create user");
+		let user = user_service
+			.create_user(NAME, connection.as_mut())
+			.await
+			.expect("Failed to create user");
 
 		assert_ne!(
 			NAME,
@@ -194,24 +204,37 @@ mod test {
 		assert_eq!(NAME, user.name, "The created user should have had the original name.");
 	}
 
-	#[test]
-	fn should_not_allow_user_with_homograph_name() {
+	#[tokio::test]
+	async fn should_not_allow_user_with_homograph_name() {
 		const NAME: &str = "Thomas";
 
-		let mut repository = UserRepository::default();
+		let user_service = user_service();
+		let mut connection = connection().await;
 
-		repository.create_user(NAME).expect("Failed to create user");
+		user_service
+			.create_user(NAME, connection.as_mut())
+			.await
+			.expect("Failed to create user");
 
-		let error = repository
-			.create_user(&normalize_name(NAME))
+		let error = user_service
+			.create_user(&normalize_name(NAME), connection.as_mut())
+			.await
 			.expect_err("Should not have created user with homograph name");
 
-		assert_eq!(UserCreationError::NameAlreadyInUse, error, "Incorrect error type");
+		assert!(
+			matches!(error, UserCreationError::NameAlreadyInUse),
+			"Incorrect error type"
+		);
 
 		assert_ne!(
 			NAME,
 			normalize_name(NAME),
 			"This test only works if the normalization differs"
 		);
+	}
+
+	fn user_service() -> UserService {
+		let repository = repository();
+		UserService::new(repository)
 	}
 }
