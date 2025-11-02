@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 #[async_trait]
-pub trait ChatRepository {
+pub trait ChatRepository: Send + Sync + 'static {
 	async fn create(
 		&self,
 		connection: &mut dyn Connection,

@@ -4,7 +4,7 @@ use crate::room::client::Client;
 use crate::room::error::RoomError;
 use crate::room::session_id::SessionId;
 use crate::room::session_id_sequence::SessionIdSequence;
-use crate::user::User;
+use crate::user::model::User;
 use std::collections::HashMap;
 
 pub struct SessionRepository {
@@ -62,14 +62,19 @@ impl SessionRepository {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::user::UserRepository;
+	use crate::database::sqlite::test_utils::{connection, repository};
+	use crate::user::UserService;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 
-	#[test]
-	fn add_should_return_empty_list_when_adding_to_an_empty_list() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn add_should_return_empty_list_when_adding_to_an_empty_list() {
+		let user_repository = user_repository();
+		let mut connection = connection().await;
 		let mut session_repository = SessionRepository::with_limit(10);
-		let jake = user_repository.create_user("Jake").expect("Could not create user");
+		let jake = user_repository
+			.create_user("Jake", connection.as_mut())
+			.await
+			.expect("Could not create user");
 		let jake_sender = FakeMessageSender::default();
 		let (_, existing_clients) = session_repository
 			.add_and_return_existing(jake, jake_sender.into())
@@ -77,12 +82,19 @@ mod test {
 		assert!(existing_clients.is_empty());
 	}
 
-	#[test]
-	fn add_should_return_list_of_existing_clients() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn add_should_return_list_of_existing_clients() {
+		let user_repository = user_repository();
+		let mut connection = connection().await;
 		let mut session_repository = SessionRepository::with_limit(10);
-		let jake = user_repository.create_user("Jake").expect("Could not create user");
-		let elwood = user_repository.create_user("Elwood").expect("Could not create user");
+		let jake = user_repository
+			.create_user("Jake", connection.as_mut())
+			.await
+			.expect("Could not create user");
+		let elwood = user_repository
+			.create_user("Elwood", connection.as_mut())
+			.await
+			.expect("Could not create user");
 		let jake_sender = FakeMessageSender::default();
 		let (jake, existing_clients) = session_repository
 			.add_and_return_existing(jake, jake_sender.into())
@@ -99,12 +111,19 @@ mod test {
 		assert_eq!(jake.name(), existing_jake.name());
 	}
 
-	#[test]
-	fn should_track_if_there_are_any_clients_left() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_track_if_there_are_any_clients_left() {
+		let user_repository = user_repository();
+		let mut connection = connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
-		let ferris = user_repository.create_user("Ferris").expect("Could not create Ferris!");
-		let spidey = user_repository.create_user("Spidey").expect("Could not create Spidey!");
+		let ferris = user_repository
+			.create_user("Ferris", connection.as_mut())
+			.await
+			.expect("Could not create Ferris!");
+		let spidey = user_repository
+			.create_user("Spidey", connection.as_mut())
+			.await
+			.expect("Could not create Spidey!");
 
 		let ferris_connection = MessageSender::from(FakeMessageSender::default());
 		let (ferris_client, _) = session_repository
@@ -122,20 +141,25 @@ mod test {
 		assert!(session_repository.is_empty());
 
 		// And a subsequent add also works
-		let crab = user_repository.create_user("Crab").expect("Could not create Crab!");
+		let crab = user_repository
+			.create_user("Crab", connection.as_mut())
+			.await
+			.expect("Could not create Crab!");
 		let crab_connection = MessageSender::from(FakeMessageSender::default());
 		session_repository
 			.add_and_return_existing(crab, crab_connection)
 			.expect("Could not add client!");
 	}
 
-	#[test]
-	fn should_allow_adding_clients_up_to_limit() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_allow_adding_clients_up_to_limit() {
+		let user_repository = user_repository();
+		let mut connection = connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
 		for count in 1..=2 {
 			let user = user_repository
-				.create_user(&format!("{count}"))
+				.create_user(&format!("{count}"), connection.as_mut())
+				.await
 				.expect("Could not create user!");
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
@@ -145,13 +169,15 @@ mod test {
 		}
 	}
 
-	#[test]
-	fn should_not_allow_adding_more_clients_than_limit() {
-		let mut user_repository = UserRepository::default();
+	#[tokio::test]
+	async fn should_not_allow_adding_more_clients_than_limit() {
+		let user_repository = user_repository();
+		let mut connection = connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
 		for count in 1..=2 {
 			let user = user_repository
-				.create_user(&format!("{count}"))
+				.create_user(&format!("{count}"), connection.as_mut())
+				.await
 				.expect("Could not create user!");
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
@@ -160,9 +186,17 @@ mod test {
 			}
 		}
 
-		let elephant = user_repository.create_user("elephant").expect("Could not create user!");
+		let elephant = user_repository
+			.create_user("elephant", connection.as_mut())
+			.await
+			.expect("Could not create user!");
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		let result = session_repository.add_and_return_existing(elephant, message_sender);
 		assert!(matches!(result, Err(RoomError::RoomFull)));
+	}
+
+	fn user_repository() -> UserService {
+		let repository = repository();
+		UserService::new(repository)
 	}
 }

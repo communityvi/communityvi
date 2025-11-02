@@ -231,6 +231,7 @@ async fn start_test_server() -> TestClient {
 		application_context.reference_timer.clone(),
 		10,
 		application_context.database.clone(),
+		application_context.user_service.clone(),
 		application_context.repository.clone(),
 	);
 	TestClient::new_with_host(create_router(application_context, room), "localhost")

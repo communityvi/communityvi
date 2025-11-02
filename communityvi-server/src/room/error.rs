@@ -1,7 +1,8 @@
+use crate::database::error::DatabaseError;
 use crate::user::UserCreationError;
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug)]
 pub enum RoomError {
 	#[error("Name was empty or whitespace-only.")]
 	EmptyClientName,
@@ -11,6 +12,8 @@ pub enum RoomError {
 	ClientNameTooLong,
 	#[error("Can't join, room is already full.")]
 	RoomFull,
+	#[error("Database error: {0}")]
+	Database(#[from] DatabaseError),
 }
 
 impl From<UserCreationError> for RoomError {
@@ -21,6 +24,7 @@ impl From<UserCreationError> for RoomError {
 			NameEmpty => Self::EmptyClientName,
 			NameTooLong => Self::ClientNameTooLong,
 			NameAlreadyInUse => Self::ClientNameAlreadyInUse,
+			Database(error) => Self::Database(error),
 		}
 	}
 }

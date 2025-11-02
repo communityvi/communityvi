@@ -41,10 +41,11 @@ impl WebsocketTestClient {
 	}
 
 	// async because it uses tokio::spawn. This make it clear that this should not be run outside of a runtime.
-	pub fn in_room(name: &'static str, room: &Room) -> (Client, Self) {
+	pub async fn in_room(name: &'static str, room: &Room) -> (Client, Self) {
 		let (sender, _, test_client) = Self::new();
 		let (client, _) = room
 			.add_client_and_return_existing(name, sender)
+			.await
 			.expect("Failed to add client to room");
 		tokio::spawn(send_broadcasts(client.clone()));
 		(client, test_client)

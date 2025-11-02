@@ -7,10 +7,10 @@ use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use crate::room::session_id::SessionId;
 use crate::room::session_repository::SessionRepository;
-use crate::user::UserRepository;
+use crate::user::UserService;
 use chrono::Duration;
 use js_int::{UInt, uint};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -31,8 +31,9 @@ pub struct Room {
 #[expect(dead_code)]
 struct Inner {
 	uuid: Uuid,
-	user_repository: Mutex<UserRepository>,
-	session_repository: RwLock<SessionRepository>,
+	user_service: UserService,
+	// FIXME: Get rid of this tokio mutex
+	session_repository: tokio::sync::RwLock<SessionRepository>,
 	medium: Mutex<VersionedMedium>,
 	reference_timer: ReferenceTimer,
 	message_counters: Mutex<MessageCounters>,
@@ -66,12 +67,13 @@ impl Room {
 		reference_timer: ReferenceTimer,
 		room_size_limit: usize,
 		database: Arc<dyn Database>,
+		user_service: UserService,
 		repository: Arc<dyn Repository>,
 	) -> Self {
 		let inner = Inner {
 			uuid: room_uuid,
-			user_repository: Mutex::default(),
-			session_repository: RwLock::new(SessionRepository::with_limit(room_size_limit)),
+			user_service,
+			session_repository: tokio::sync::RwLock::new(SessionRepository::with_limit(room_size_limit)),
 			medium: Mutex::default(),
 			reference_timer,
 			message_counters: Default::default(),
@@ -83,31 +85,39 @@ impl Room {
 
 	/// Add a new client to the room, passing in a sender for sending messages to it.
 	/// Returns the newly added client and a list of clients that had existed prior to adding this one.
-	pub fn add_client_and_return_existing(
+	pub async fn add_client_and_return_existing(
 		&self,
 		name: &str,
 		message_sender: MessageSender,
 	) -> Result<(Client, Vec<Client>), RoomError> {
-		let user = self.inner.user_repository.lock().create_user(name)?;
+		let mut connection = self.inner.database.connection().await?;
+		let user = self.inner.user_service.create_user(name, connection.as_mut()).await?;
 		self.inner
 			.session_repository
 			.write()
+			.await
 			.add_and_return_existing(user, message_sender)
 	}
 
-	pub fn remove_client(&self, session_id: SessionId) {
-		let mut session_repository = self.inner.session_repository.write();
+	pub async fn remove_client(&self, session_id: SessionId) -> Result<(), RoomError> {
+		let mut session_repository = self.inner.session_repository.write().await;
 
 		if let Some(client) = session_repository.remove(session_id) {
-			self.inner.user_repository.lock().remove(client.user());
+			let mut connection = self.inner.database.connection().await?;
+			self.inner
+				.user_service
+				.remove(client.user().uuid, connection.as_mut())
+				.await?;
 		}
 
 		if session_repository.is_empty() {
 			self.eject_medium();
 		}
+
+		Ok(())
 	}
 
-	pub fn send_chat_message(&self, sender: &Client, message: String) {
+	pub async fn send_chat_message(&self, sender: &Client, message: String) {
 		let chat_counter = self.inner.message_counters.lock().fetch_and_increment_chat_counter();
 		let chat_message = ChatBroadcast {
 			sender_id: sender.id(),
@@ -115,17 +125,17 @@ impl Room {
 			message,
 			counter: chat_counter,
 		};
-		self.broadcast(chat_message);
+		self.broadcast(chat_message).await;
 	}
 
-	pub fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
+	pub async fn broadcast(&self, response: impl Into<BroadcastMessage> + Clone) {
 		let message = response.into();
 		let count = self
 			.inner
 			.message_counters
 			.lock()
 			.fetch_and_increment_broadcast_counter();
-		let session_repository = self.inner.session_repository.read();
+		let session_repository = self.inner.session_repository.read().await;
 		for client in session_repository.iter_clients() {
 			client.enqueue_broadcast(message.clone(), count);
 		}
@@ -185,13 +195,16 @@ mod test {
 		for count in 1..=2 {
 			let message_sender = MessageSender::from(FakeMessageSender::default());
 
-			if let Err(error) = room.add_client_and_return_existing(&format!("{count}"), message_sender.clone()) {
+			if let Err(error) = room
+				.add_client_and_return_existing(&format!("{count}"), message_sender.clone())
+				.await
+			{
 				panic!("Failed to add client {count}: {error}");
 			}
 		}
 
 		let message_sender = MessageSender::from(FakeMessageSender::default());
-		let result = room.add_client_and_return_existing("elephant", message_sender);
+		let result = room.add_client_and_return_existing("elephant", message_sender).await;
 		assert!(matches!(result, Err(RoomError::RoomFull)));
 	}
 
@@ -203,11 +216,14 @@ mod test {
 		let message_sender = MessageSender::from(FakeMessageSender::default());
 		let (makise_kurisu, _) = room
 			.add_client_and_return_existing(name, message_sender)
+			.await
 			.expect("Failed to add client with same name after first is gone");
 		let medium = FixedLengthMedium::new("愛のむきだし".to_string(), Duration::minutes(237));
 		room.insert_medium(medium, uint!(0)).expect("Failed to insert medium");
 
-		room.remove_client(makise_kurisu.id());
+		room.remove_client(makise_kurisu.id())
+			.await
+			.expect("Failed to remove client");
 		assert_eq!(
 			room.medium(),
 			VersionedMedium {
@@ -246,12 +262,16 @@ mod test {
 	async fn add_client_should_return_list_of_existing_clients() {
 		let room = room(10).await;
 		let jake_sender = FakeMessageSender::default();
-		let (jake, existing_clients) = room.add_client_and_return_existing("Jake", jake_sender.into()).unwrap();
+		let (jake, existing_clients) = room
+			.add_client_and_return_existing("Jake", jake_sender.into())
+			.await
+			.unwrap();
 		assert!(existing_clients.is_empty());
 
 		let elwood_sender = FakeMessageSender::default();
 		let (_, existing_clients) = room
 			.add_client_and_return_existing("Elwood", elwood_sender.into())
+			.await
 			.unwrap();
 		assert_eq!(existing_clients.len(), 1);
 		let existing_jake = &existing_clients[0];
@@ -260,12 +280,15 @@ mod test {
 	}
 
 	async fn room(room_size_limit: usize) -> Room {
+		let repository = repository();
+		let user_service = UserService::new(repository.clone());
 		Room::new(
 			Uuid::new_v4(),
 			ReferenceTimer::default(),
 			room_size_limit,
 			database().await,
-			repository(),
+			user_service,
+			repository,
 		)
 	}
 }

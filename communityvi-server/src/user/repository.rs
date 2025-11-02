@@ -6,7 +6,7 @@ use static_assertions::assert_obj_safe;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait UserRepository {
+pub trait UserRepository: Send + Sync + 'static {
 	async fn get(&self, connection: &mut dyn Connection, user_uuid: Uuid)
 	-> Result<Option<model::User>, DatabaseError>;
 	async fn create(

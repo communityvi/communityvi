@@ -47,14 +47,17 @@ pub async fn run_client(
 				application_context.configuration.missed_heartbeat_limit
 			) => left_reason,
 		};
-		room.remove_client(session_id);
+		if let Err(error) = room.remove_client(session_id).await {
+			error!("Failed to remove client '{client_name}' with id {session_id} from room: {error}");
+		}
 
 		info!("Client '{client_name}' with id {session_id} has left.");
 		room.broadcast(ClientLeftBroadcast {
 			id: session_id,
 			name: client_name,
 			reason: left_reason,
-		});
+		})
+		.await;
 	}
 }
 
@@ -91,11 +94,11 @@ async fn register_client(
 		return None;
 	};
 
-	let (client, existing_clients) = match room.add_client_and_return_existing(&name, message_sender.clone()) {
+	let (client, existing_clients) = match room.add_client_and_return_existing(&name, message_sender.clone()).await {
 		Ok(success) => success,
 		Err(error) => {
 			use RoomError::*;
-			let error_response = match error {
+			let error_response = match &error {
 				EmptyClientName | ClientNameTooLong => {
 					error!("Client registration failed. Tried to register with invalid name.");
 					ErrorMessageType::InvalidFormat
@@ -107,6 +110,10 @@ async fn register_client(
 				RoomFull => {
 					error!("Client registration failed. Room is full.");
 					ErrorMessageType::InvalidOperation
+				}
+				Database(error) => {
+					error!("Internal error: {error}.");
+					ErrorMessageType::InternalServerError
 				}
 			};
 
@@ -136,7 +143,7 @@ async fn register_client(
 
 		info!("Registered client: {id} {name}");
 
-		room.broadcast(ClientJoinedBroadcast { id, name });
+		room.broadcast(ClientJoinedBroadcast { id, name }).await;
 		Some((client, message_receiver))
 	} else {
 		None
@@ -226,25 +233,25 @@ async fn handle_messages(
 			client.id(),
 		);
 
-		match handle_request(room, &client, message.request) {
+		match handle_request(room, &client, message.request).await {
 			Ok(success_message) => client.send_success_message(success_message, message.request_id).await,
 			Err(error_message) => client.send_error_message(error_message, Some(message.request_id)).await,
 		};
 	}
 }
 
-fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
+async fn handle_request(room: &Room, client: &Client, request: ClientRequest) -> Result<SuccessMessage, ErrorMessage> {
 	use ClientRequest::*;
 	match request {
-		Chat(chat_request) => handle_chat_request(room, client, chat_request),
+		Chat(chat_request) => handle_chat_request(room, client, chat_request).await,
 		Register { .. } => handle_register_request(client),
-		InsertMedium(insert_medium_request) => handle_insert_medium_request(room, client, insert_medium_request),
-		Play(play_request) => handle_play_request(room, client, play_request),
-		Pause(pause_request) => handle_pause_request(room, client, pause_request),
+		InsertMedium(insert_medium_request) => handle_insert_medium_request(room, client, insert_medium_request).await,
+		Play(play_request) => handle_play_request(room, client, play_request).await,
+		Pause(pause_request) => handle_pause_request(room, client, pause_request).await,
 	}
 }
 
-fn handle_chat_request(
+async fn handle_chat_request(
 	room: &Room,
 	client: &Client,
 	ChatRequest { message }: ChatRequest,
@@ -255,7 +262,7 @@ fn handle_chat_request(
 			.message("Chat messages must not be empty!".to_string())
 			.build());
 	}
-	room.send_chat_message(client, message);
+	room.send_chat_message(client, message).await;
 	Ok(SuccessMessage::Success)
 }
 
@@ -270,7 +277,7 @@ fn handle_register_request(client: &Client) -> Result<SuccessMessage, ErrorMessa
 		.build())
 }
 
-fn handle_insert_medium_request(
+async fn handle_insert_medium_request(
 	room: &Room,
 	client: &Client,
 	InsertMediumRequest {
@@ -293,12 +300,13 @@ fn handle_insert_medium_request(
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
 		medium: VersionedMediumBroadcast::new(versioned_medium, false),
-	});
+	})
+	.await;
 
 	Ok(SuccessMessage::Success)
 }
 
-fn handle_play_request(
+async fn handle_play_request(
 	room: &Room,
 	client: &Client,
 	PlayRequest {
@@ -323,11 +331,12 @@ fn handle_play_request(
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
 		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-	});
+	})
+	.await;
 	Ok(SuccessMessage::Success)
 }
 
-fn handle_pause_request(
+async fn handle_pause_request(
 	room: &Room,
 	client: &Client,
 	PauseRequest {
@@ -352,7 +361,8 @@ fn handle_pause_request(
 		changed_by_name: client.name().to_string(),
 		changed_by_id: client.id(),
 		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-	});
+	})
+	.await;
 	Ok(SuccessMessage::Success)
 }
 
@@ -369,6 +379,7 @@ mod test {
 	use crate::room::medium::VersionedMedium;
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::room::session_id::SessionId;
+	use crate::user::UserService;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use crate::utils::test_client::WebsocketTestClient;
 	use chrono::DateTime;
@@ -377,7 +388,7 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_get_an_error_for_empty_chat_messages() {
 		let room = room(ReferenceTimer::default(), 1).await;
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 
 		let empty_chat_request = ChatRequest {
 			message: " \t".to_string(),
@@ -385,9 +396,11 @@ mod test {
 		let non_empty_chat_request = ChatRequest {
 			message: "Hi!".to_string(),
 		};
-		let error =
-			handle_request(&room, &client, empty_chat_request.into()).expect_err("Accepted empty chat message.");
+		let error = handle_request(&room, &client, empty_chat_request.into())
+			.await
+			.expect_err("Accepted empty chat message.");
 		handle_request(&room, &client, non_empty_chat_request.clone().into())
+			.await
 			.expect("Failed to send proper chat message");
 
 		assert_eq!(
@@ -414,8 +427,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_insert_a_medium() {
 		let room = room(ReferenceTimer::default(), 2).await;
-		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
-		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let response = handle_request(
@@ -427,6 +440,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect("Failed to get successful response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -456,6 +470,7 @@ mod test {
 		let room = room(ReferenceTimer::default(), 2).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
+			.await
 			.expect("Did not get client handle!");
 
 		let request = InsertMediumRequest {
@@ -465,7 +480,9 @@ mod test {
 			},
 			previous_version: uint!(0),
 		};
-		let response = handle_request(&room, &alice, request.into()).expect_err("Failed to ger error response");
+		let response = handle_request(&room, &alice, request.into())
+			.await
+			.expect_err("Failed to ger error response");
 
 		assert_eq!(
 			response,
@@ -479,8 +496,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_play_the_inserted_medium() {
 		let room = room(ReferenceTimer::default().with_start_time(DateTime::UNIX_EPOCH), 2).await;
-		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
-		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
+		let (alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (_bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -497,6 +514,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -526,8 +544,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_pause_the_inserted_medium() {
 		let room = room(ReferenceTimer::default(), 2).await;
-		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
-		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -547,6 +565,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -576,8 +595,8 @@ mod test {
 	#[tokio::test]
 	async fn the_client_should_be_able_to_skip_in_paused_mode() {
 		let room = room(ReferenceTimer::default(), 2).await;
-		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room);
-		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room);
+		let (_alice, mut alice_test_client) = WebsocketTestClient::in_room("Alice", &room).await;
+		let (bob, mut bob_test_client) = WebsocketTestClient::in_room("Bob", &room).await;
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
 		let inserted_medium = room
@@ -594,6 +613,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect("Failed to get success response");
 		assert_eq!(response, SuccessMessage::Success);
 
@@ -627,6 +647,7 @@ mod test {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
+			.await
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
@@ -642,6 +663,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -659,6 +681,7 @@ mod test {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
+			.await
 			.expect("Did not get client handle!");
 
 		let medium = FixedLengthMedium::new("Metropolis".to_string(), Duration::minutes(153));
@@ -674,6 +697,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -691,6 +715,7 @@ mod test {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let (alice, _) = room
 			.add_client_and_return_existing("Alice", alice_message_sender)
+			.await
 			.expect("Did not get client handle!");
 
 		let response = handle_request(
@@ -702,6 +727,7 @@ mod test {
 			}
 			.into(),
 		)
+		.await
 		.expect_err("Failed to get error response");
 		assert_eq!(
 			response,
@@ -773,6 +799,7 @@ mod test {
 		// "Ferris" is already a registered client
 		let fake_message_sender = FakeMessageSender::default().into();
 		room.add_client_and_return_existing("Ferris", fake_message_sender)
+			.await
 			.expect("Could not register 'Ferris'!");
 
 		// And I register another client with the same name
@@ -801,7 +828,9 @@ mod test {
 		let room = room(reference_timer, 1).await;
 		{
 			let message_sender = MessageSender::from(FakeMessageSender::default());
-			room.add_client_and_return_existing("Fake", message_sender).unwrap();
+			room.add_client_and_return_existing("Fake", message_sender)
+				.await
+				.unwrap();
 		}
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
@@ -870,6 +899,7 @@ mod test {
 		let fake_message_sender = FakeMessageSender::default();
 		let (stephanie, _) = room
 			.add_client_and_return_existing("Stephanie", fake_message_sender.into())
+			.await
 			.unwrap();
 
 		let (message_sender, message_receiver, mut test_client) = WebsocketTestClient::new();
@@ -958,7 +988,7 @@ mod test {
 	async fn should_send_heartbeats_with_test_time_source() {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::test();
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -982,7 +1012,7 @@ mod test {
 	async fn should_send_heartbeats_with_real_time_source() {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::default();
-		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (client, mut test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (mut pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -1001,7 +1031,7 @@ mod test {
 	async fn should_stop_after_missed_heartbeat_limit_with_test_time_source() {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::test();
-		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -1036,7 +1066,7 @@ mod test {
 	async fn should_stop_after_missed_heartbeats_with_real_time_source() {
 		let room = room(ReferenceTimer::default(), 1).await;
 		let time_source = TimeSource::default();
-		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room);
+		let (client, _test_client) = WebsocketTestClient::in_room("Alice", &room).await;
 		let (_pong_sender, pong_receiver) = mpsc::channel(0);
 
 		let heartbeat_interval = std::time::Duration::from_millis(1);
@@ -1095,6 +1125,15 @@ mod test {
 			.await
 			.expect("Could not create test room");
 
-		Room::new(test_room.uuid, reference_timer, room_size_limit, database, repository())
+		let repository = repository();
+		let user_service = UserService::new(repository.clone());
+		Room::new(
+			test_room.uuid,
+			reference_timer,
+			room_size_limit,
+			database,
+			user_service,
+			repository,
+		)
 	}
 }
