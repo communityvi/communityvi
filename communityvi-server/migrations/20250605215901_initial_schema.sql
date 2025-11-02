@@ -40,6 +40,9 @@ CREATE TABLE user
 			primary key,
 	name text
 		constraint user_name_uq
+			unique,
+	normalized_name text
+		constraint user_normalized_name_uq
 			unique
 );
 

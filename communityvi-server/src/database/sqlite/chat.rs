@@ -54,6 +54,7 @@ mod tests {
 	use crate::database::{Connection, Repository};
 	use crate::room::model::Room;
 	use crate::user::model::User;
+	use crate::user::normalize_name;
 
 	#[tokio::test]
 	async fn creates_chat_message() {
@@ -66,7 +67,8 @@ mod tests {
 		let ChatMessage {
 			uuid,
 			room_uuid,
-			user: chat_user,
+			user_uuid,
+			user_name,
 			message: chat_message,
 			created_at: chat_created_at,
 		} = SqliteRepository
@@ -84,8 +86,8 @@ mod tests {
 
 		assert_eq!(4, uuid.get_version_num());
 		assert_eq!(room.uuid, room_uuid);
-		assert_eq!(user.uuid, chat_user.uuid);
-		assert_eq!(user.name, chat_user.name);
+		assert_eq!(user.uuid, user_uuid);
+		assert_eq!(user.name, user_name);
 		assert_eq!(message, chat_message);
 		// Compare timestamps at second precision to avoid driver precision differences
 		assert_eq!(created_at.timestamp(), chat_created_at.timestamp());
@@ -119,7 +121,7 @@ mod tests {
 	async fn user(connection: &mut dyn Connection, name: &str) -> User {
 		SqliteRepository
 			.user()
-			.create(connection, name)
+			.create(connection, name, &normalize_name(name))
 			.await
 			.expect("Failed to create user")
 	}

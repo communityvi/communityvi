@@ -9,7 +9,12 @@ use uuid::Uuid;
 pub trait UserRepository {
 	async fn get(&self, connection: &mut dyn Connection, user_uuid: Uuid)
 	-> Result<Option<model::User>, DatabaseError>;
-	async fn create(&self, connection: &mut dyn Connection, name: &str) -> Result<model::User, DatabaseError>;
+	async fn create(
+		&self,
+		connection: &mut dyn Connection,
+		name: &str,
+		normalized_name: &str,
+	) -> Result<model::User, DatabaseError>;
 	async fn remove(&self, connection: &mut dyn Connection, user_uuid: Uuid) -> Result<(), DatabaseError>;
 }
 
