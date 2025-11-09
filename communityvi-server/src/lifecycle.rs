@@ -31,34 +31,36 @@ pub async fn run_client(
 	message_sender: MessageSender,
 	message_receiver: MessageReceiver,
 ) {
-	if let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await {
-		let session_id = client.id();
-		let client_name = client.name().to_string();
-		let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
+	let Some((client, message_receiver)) = register_client(room.clone(), message_sender, message_receiver).await else {
+		return;
+	};
+	let session_id = client.id();
+	let client_name = client.name().to_string();
+	let (pong_sender, pong_receiver) = mpsc::channel(MISSED_HEARTBEAT_LIMIT as usize);
 
-		let left_reason = tokio::select! {
-			() = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
-			() = send_broadcasts(client.clone()) => LeftReason::Closed,
-			left_reason = heartbeat(
-				client,
-				&application_context.time_source,
-				pong_receiver,
-				application_context.configuration.heartbeat_interval,
-				application_context.configuration.missed_heartbeat_limit
-			) => left_reason,
-		};
-		if let Err(error) = room.remove_client(session_id).await {
-			error!("Failed to remove client '{client_name}' with id {session_id} from room: {error}");
-		}
-
-		info!("Client '{client_name}' with id {session_id} has left.");
-		room.broadcast(ClientLeftBroadcast {
-			id: session_id,
-			name: client_name,
-			reason: left_reason,
-		})
-		.await;
+	let left_reason = tokio::select! {
+		() = handle_messages(&room, client.clone(), message_receiver, pong_sender) => LeftReason::Closed,
+		() = send_broadcasts(client.clone()) => LeftReason::Closed,
+		left_reason = heartbeat(
+			client,
+			&application_context.time_source,
+			pong_receiver,
+			application_context.configuration.heartbeat_interval,
+			application_context.configuration.missed_heartbeat_limit
+		) => left_reason,
+	};
+	if let Err(error) = room.remove_client(session_id).await {
+		error!("Failed to remove client '{client_name}' with id {session_id} from room: {error}");
 	}
+
+	info!("Client '{client_name}' with id {session_id} has left.");
+	room.broadcast(ClientLeftBroadcast {
+		id: session_id,
+		name: client_name,
+		reason: left_reason,
+	})
+	.await
+	.ok();
 }
 
 async fn register_client(
@@ -115,6 +117,10 @@ async fn register_client(
 					error!("Internal error: {error}.");
 					ErrorMessageType::InternalServerError
 				}
+				Overflow(error) => {
+					error!("{error}");
+					ErrorMessageType::InternalServerError
+				}
 			};
 
 			let _ = message_sender
@@ -143,7 +149,10 @@ async fn register_client(
 
 		info!("Registered client: {id} {name}");
 
-		room.broadcast(ClientJoinedBroadcast { id, name }).await;
+		room.broadcast(ClientJoinedBroadcast { id, name })
+			.await
+			.inspect_err(|error| todo!("Log error: {error}"))
+			.ok()?;
 		Some((client, message_receiver))
 	} else {
 		None
@@ -262,7 +271,15 @@ async fn handle_chat_request(
 			.message("Chat messages must not be empty!".to_string())
 			.build());
 	}
-	room.send_chat_message(client, message).await;
+
+	if let Err(error) = room.send_chat_message(client, message).await {
+		log::error!("Failed sending chat message: {error}");
+		return Err(ErrorMessage::builder()
+			.error(ErrorMessageType::InternalServerError)
+			.message("Failed sending chat message".to_string())
+			.build());
+	}
+
 	Ok(SuccessMessage::Success)
 }
 
@@ -296,12 +313,20 @@ async fn handle_insert_medium_request(
 		});
 	};
 
-	room.broadcast(MediumStateChangedBroadcast {
-		changed_by_name: client.name().to_string(),
-		changed_by_id: client.id(),
-		medium: VersionedMediumBroadcast::new(versioned_medium, false),
-	})
-	.await;
+	if let Err(error) = room
+		.broadcast(MediumStateChangedBroadcast {
+			changed_by_name: client.name().to_string(),
+			changed_by_id: client.id(),
+			medium: VersionedMediumBroadcast::new(versioned_medium, false),
+		})
+		.await
+	{
+		log::error!("Failed sending broadcast: {error}");
+		return Err(ErrorMessage::builder()
+			.error(ErrorMessageType::InternalServerError)
+			.message("Failed sending broadcast".to_string())
+			.build());
+	}
 
 	Ok(SuccessMessage::Success)
 }
@@ -327,12 +352,21 @@ async fn handle_play_request(
 			),
 		});
 	};
-	room.broadcast(MediumStateChangedBroadcast {
-		changed_by_name: client.name().to_string(),
-		changed_by_id: client.id(),
-		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-	})
-	.await;
+	if let Err(error) = room
+		.broadcast(MediumStateChangedBroadcast {
+			changed_by_name: client.name().to_string(),
+			changed_by_id: client.id(),
+			medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
+		})
+		.await
+	{
+		error!("Failed sending broadcast: {error}");
+		return Err(ErrorMessage::builder()
+			.error(ErrorMessageType::InternalServerError)
+			.message("Failed sending broadcast".to_string())
+			.build());
+	}
+
 	Ok(SuccessMessage::Success)
 }
 
@@ -357,12 +391,22 @@ async fn handle_pause_request(
 			),
 		});
 	};
-	room.broadcast(MediumStateChangedBroadcast {
-		changed_by_name: client.name().to_string(),
-		changed_by_id: client.id(),
-		medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
-	})
-	.await;
+
+	if let Err(error) = room
+		.broadcast(MediumStateChangedBroadcast {
+			changed_by_name: client.name().to_string(),
+			changed_by_id: client.id(),
+			medium: VersionedMediumBroadcast::new(versioned_medium, skipped),
+		})
+		.await
+	{
+		log::error!("Failed sending broadcast: {error}");
+		return Err(ErrorMessage::builder()
+			.error(ErrorMessageType::InternalServerError)
+			.message("Failed sending broadcast".to_string())
+			.build());
+	}
+
 	Ok(SuccessMessage::Success)
 }
 

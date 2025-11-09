@@ -1,4 +1,5 @@
 use crate::database::error::DatabaseError;
+use crate::room::OverflowError;
 use crate::user::UserCreationError;
 use thiserror::Error;
 
@@ -14,6 +15,8 @@ pub enum RoomError {
 	RoomFull,
 	#[error("Database error: {0}")]
 	Database(#[from] DatabaseError),
+	#[error("{0}")]
+	Overflow(#[from] OverflowError),
 }
 
 impl From<UserCreationError> for RoomError {
