@@ -140,7 +140,6 @@ mod tests {
 	use crate::database::Repository;
 	use crate::database::sqlite::test_utils::connection;
 	use crate::user::normalize_name;
-	use sqlx::query_scalar;
 
 	#[tokio::test]
 	async fn creates_room() {
@@ -224,15 +223,21 @@ mod tests {
 	#[tokio::test]
 	async fn adds_user_to_room() {
 		let mut connection = connection().await;
-		let (room_uuid, user_uuid) = create_sample_room_and_user(&mut *connection).await;
+		let (room_uuid, user) = create_sample_room_and_user(&mut *connection).await;
 
 		SqliteRepository
 			.room()
-			.add_user(&mut *connection, room_uuid, user_uuid)
+			.add_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("add link");
 
-		assert_eq!(1, join_count(&mut *connection, room_uuid, user_uuid).await);
+		let expected = vec![user];
+		let users_in_room = SqliteRepository
+			.room()
+			.get_all_users(&mut *connection, room_uuid)
+			.await
+			.expect("failed to get_all_users");
+		assert_eq!(expected, users_in_room);
 	}
 
 	#[tokio::test]
@@ -254,7 +259,7 @@ mod tests {
 
 		match result {
 			Err(DatabaseError::ForeignKeyViolation(_)) => { /* ok */ }
-			Ok(_) => panic!("Expected ForeignKeyViolation when room is missing"),
+			Ok(()) => panic!("Expected ForeignKeyViolation when room is missing"),
 			Err(err) => panic!("Expected ForeignKeyViolation, got: {err:?}"),
 		}
 	}
@@ -277,7 +282,7 @@ mod tests {
 
 		match result {
 			Err(DatabaseError::ForeignKeyViolation(_)) => { /* ok */ }
-			Ok(_) => panic!("Expected ForeignKeyViolation when user is missing"),
+			Ok(()) => panic!("Expected ForeignKeyViolation when user is missing"),
 			Err(err) => panic!("Expected ForeignKeyViolation, got: {err:?}"),
 		}
 	}
@@ -285,22 +290,22 @@ mod tests {
 	#[tokio::test]
 	async fn does_not_add_duplicate_user_to_room_relationship() {
 		let mut connection = connection().await;
-		let (room_uuid, user_uuid) = create_sample_room_and_user(&mut *connection).await;
+		let (room_uuid, user) = create_sample_room_and_user(&mut *connection).await;
 
 		SqliteRepository
 			.room()
-			.add_user(&mut *connection, room_uuid, user_uuid)
+			.add_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("add join");
 
 		let result = SqliteRepository
 			.room()
-			.add_user(&mut *connection, room_uuid, user_uuid)
+			.add_user(&mut *connection, room_uuid, user.uuid)
 			.await;
 
 		match result {
 			Err(DatabaseError::UniqueViolation(_)) => { /* ok */ }
-			Ok(_) => panic!("Expected UniqueViolation for duplicate link"),
+			Ok(()) => panic!("Expected UniqueViolation for duplicate link"),
 			Err(err) => panic!("Expected UniqueViolation, got: {err:?}"),
 		}
 	}
@@ -308,50 +313,55 @@ mod tests {
 	#[tokio::test]
 	async fn removes_user_from_room() {
 		let mut connection = connection().await;
-		let (room_uuid, user_uuid) = create_sample_room_and_user(&mut *connection).await;
-
+		let (room_uuid, user) = create_sample_room_and_user(&mut *connection).await;
 		SqliteRepository
 			.room()
-			.add_user(&mut *connection, room_uuid, user_uuid)
+			.add_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("add link");
-		assert_eq!(1, join_count(&mut *connection, room_uuid, user_uuid).await);
 
 		SqliteRepository
 			.room()
-			.remove_user(&mut *connection, room_uuid, user_uuid)
+			.remove_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("remove link");
 
-		assert_eq!(0, join_count(&mut *connection, room_uuid, user_uuid).await);
+		assert!(
+			SqliteRepository
+				.room()
+				.get_all_users(&mut *connection, room_uuid)
+				.await
+				.expect("failed to get_all_users")
+				.is_empty()
+		);
 	}
 
 	#[tokio::test]
 	async fn removes_user_from_room_idempotently() {
 		let mut connection = connection().await;
-		let (room_uuid, user_uuid) = create_sample_room_and_user(&mut *connection).await;
+		let (room_uuid, user) = create_sample_room_and_user(&mut *connection).await;
 
 		// remove twice, second should still be Ok
 		SqliteRepository
 			.room()
-			.remove_user(&mut *connection, room_uuid, user_uuid)
+			.remove_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("first remove ok");
 		SqliteRepository
 			.room()
-			.remove_user(&mut *connection, room_uuid, user_uuid)
+			.remove_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("second remove ok");
 	}
 
 	#[tokio::test]
-	async fn removes_user_from_room_when_no_link_but_entities_exist() {
+	async fn removes_user_from_room_when_they_have_not_joined_but_entities_exist() {
 		let mut connection = connection().await;
-		let (room_uuid, user_uuid) = create_sample_room_and_user(&mut *connection).await;
+		let (room_uuid, user) = create_sample_room_and_user(&mut *connection).await;
 
 		SqliteRepository
 			.room()
-			.remove_user(&mut *connection, room_uuid, user_uuid)
+			.remove_user(&mut *connection, room_uuid, user.uuid)
 			.await
 			.expect("remove ok without link");
 	}
@@ -369,7 +379,7 @@ mod tests {
 			.expect("removes_user_from_room_regardless_of_presence should succeed even if no rows match");
 	}
 
-	async fn create_sample_room_and_user(connection: &mut dyn Connection) -> (Uuid, Uuid) {
+	async fn create_sample_room_and_user(connection: &mut dyn Connection) -> (Uuid, User) {
 		let Room { uuid: room_uuid, .. } = SqliteRepository
 			.room()
 			.create(connection, "room-a")
@@ -380,17 +390,7 @@ mod tests {
 			.create(connection, "alice", &normalize_name("alice"))
 			.await
 			.expect("create user");
-		(room_uuid, user.uuid)
-	}
-
-	async fn join_count(connection: &mut dyn Connection, room_uuid: Uuid, user_uuid: Uuid) -> i64 {
-		let connection = sqlite_connection(connection).expect("sqlite connection");
-		query_scalar::<_, i64>(r"SELECT COUNT(*) FROM room_user WHERE room_uuid = ?1 AND user_uuid = ?2")
-			.bind(room_uuid)
-			.bind(user_uuid)
-			.fetch_one(connection)
-			.await
-			.expect("count link")
+		(room_uuid, user)
 	}
 
 	#[tokio::test]
