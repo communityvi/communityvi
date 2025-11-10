@@ -11,6 +11,18 @@ pub trait RoomRepository: Send + Sync + 'static {
 	-> Result<Option<model::Room>, DatabaseError>;
 	async fn create(&self, connection: &mut dyn Connection, name: &str) -> Result<model::Room, DatabaseError>;
 	async fn remove(&self, connection: &mut dyn Connection, room_uuid: Uuid) -> Result<(), DatabaseError>;
+	async fn add_user(
+		&self,
+		connection: &mut dyn Connection,
+		room_uuid: Uuid,
+		user_uuid: Uuid,
+	) -> Result<(), DatabaseError>;
+	async fn remove_user(
+		&self,
+		connection: &mut dyn Connection,
+		room_uuid: Uuid,
+		user_uuid: Uuid,
+	) -> Result<(), DatabaseError>;
 }
 
 assert_obj_safe!(RoomRepository);
