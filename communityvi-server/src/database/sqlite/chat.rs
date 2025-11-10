@@ -86,7 +86,7 @@ mod tests {
 
 		assert_eq!(4, uuid.get_version_num());
 		assert_eq!(room.uuid, room_uuid);
-		assert_eq!(user.uuid, user_uuid);
+		assert_eq!(Some(user.uuid), user_uuid);
 		assert_eq!(user.name, user_name);
 		assert_eq!(message, chat_message);
 		// Compare timestamps at second precision to avoid driver precision differences
