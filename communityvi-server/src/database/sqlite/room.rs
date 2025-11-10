@@ -3,8 +3,10 @@ use crate::database::Connection;
 use crate::database::error::DatabaseError;
 use crate::room::model::Room;
 use crate::room::repository::RoomRepository;
+use crate::user::model::User;
+use anyhow::anyhow;
 use async_trait::async_trait;
-use sqlx::{query, query_as};
+use sqlx::{FromRow, query, query_as};
 use uuid::Uuid;
 
 #[async_trait]
@@ -49,6 +51,54 @@ impl RoomRepository for SqliteRepository {
 			.execute(connection)
 			.await?;
 		Ok(())
+	}
+
+	async fn get_all_users(
+		&self,
+		connection: &mut dyn Connection,
+		room_uuid: Uuid,
+	) -> Result<Vec<User>, DatabaseError> {
+		#[derive(FromRow)]
+		struct OptionalUser {
+			uuid: Option<Uuid>,
+			name: Option<String>,
+			normalized_name: Option<String>,
+		}
+
+		let connection = sqlite_connection(connection)?;
+
+		let result = query_as::<_, OptionalUser>(
+			r"SELECT u.uuid, u.name, u.normalized_name
+				FROM room r
+				LEFT JOIN room_user ru ON ru.room_uuid = r.uuid
+				LEFT JOIN user u ON ru.user_uuid = u.uuid
+				WHERE r.uuid = ?1
+				ORDER BY u.uuid ASC",
+		)
+		.bind(room_uuid)
+		.fetch_all(&mut *connection)
+		.await?;
+
+		if result.is_empty() {
+			return Err(DatabaseError::NotFound(anyhow!("Room not found")));
+		}
+
+		result
+			.into_iter()
+			.filter_map(
+				|OptionalUser {
+				     uuid,
+				     name,
+				     normalized_name,
+				 }| {
+					Some(Ok(User {
+						uuid: uuid?,
+						name: name?,
+						normalized_name: normalized_name?,
+					}))
+				},
+			)
+			.collect()
 	}
 
 	async fn add_user(
@@ -341,5 +391,84 @@ mod tests {
 			.fetch_one(connection)
 			.await
 			.expect("count link")
+	}
+
+	#[tokio::test]
+	async fn gets_all_users_is_empty_for_new_room() {
+		let mut connection = connection().await;
+		let Room { uuid: room_uuid, .. } = SqliteRepository
+			.room()
+			.create(&mut *connection, "lonely-room")
+			.await
+			.expect("create room");
+
+		let users = SqliteRepository
+			.room()
+			.get_all_users(&mut *connection, room_uuid)
+			.await
+			.expect("get_all_users");
+
+		assert!(users.is_empty(), "expected no users, got: {users:?}");
+	}
+
+	#[tokio::test]
+	async fn fails_get_all_users_for_nonexistent_room() {
+		let mut connection = connection().await;
+		let random_room = Uuid::new_v4();
+
+		let result = SqliteRepository
+			.room()
+			.get_all_users(&mut *connection, random_room)
+			.await;
+
+		match result {
+			Err(DatabaseError::NotFound(_)) => { /* ok */ }
+			Ok(users) => panic!("Expected NotFound error, got Ok with users: {users:?}"),
+			Err(err) => panic!("Expected NotFound, got: {err:?}"),
+		}
+	}
+
+	#[tokio::test]
+	async fn gets_all_users_ordered_by_user_uuid() {
+		let mut connection = connection().await;
+		let Room { uuid: room_uuid, .. } = SqliteRepository
+			.room()
+			.create(&mut *connection, "room-users")
+			.await
+			.expect("create room");
+
+		let alice = SqliteRepository
+			.user()
+			.create(&mut *connection, "alice", &normalize_name("alice"))
+			.await
+			.expect("create alice");
+		let bob = SqliteRepository
+			.user()
+			.create(&mut *connection, "bob", &normalize_name("bob"))
+			.await
+			.expect("create bob");
+
+		// link both users
+		SqliteRepository
+			.room()
+			.add_user(&mut *connection, room_uuid, bob.uuid)
+			.await
+			.expect("link bob");
+		SqliteRepository
+			.room()
+			.add_user(&mut *connection, room_uuid, alice.uuid)
+			.await
+			.expect("link alice");
+
+		let users = SqliteRepository
+			.room()
+			.get_all_users(&mut *connection, room_uuid)
+			.await
+			.expect("get_all_users");
+
+		let mut expected = [alice, bob];
+		expected.sort_by_key(|user| user.uuid);
+
+		assert_eq!(expected.as_slice(), &users);
 	}
 }
