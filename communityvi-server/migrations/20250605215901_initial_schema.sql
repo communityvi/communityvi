@@ -69,9 +69,10 @@ CREATE TABLE chat_message
 		constraint chat_message_room__fk
 			references room (uuid)
 			on delete cascade,
-	user_uuid  blob                               not null
+	user_uuid  blob                               null
 		constraint chat_message_user__fk
-			references user (uuid),
+			references user (uuid)
+	        on delete set null,
 	user_name  text                               not null,
 	message    text                               not null,
 	created_at datetime default current_timestamp not null,
