@@ -33,7 +33,6 @@ anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 clap = { version = "4", features = ["derive"] }
-env_logger = "0.11"
 futures-util = "0.3"
 futures-channel = { version = "0.3", features = ["sink"] }
 governor = { version = "0.10", default-features = false, features = ["std", "jitter"] }
@@ -41,7 +40,6 @@ hex = "0.4"
 humantime-serde = "1"
 http-body-util = "0.1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
-log = "0.4"
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
@@ -61,6 +59,8 @@ tokio-tungstenite = "0.28"
 toml = "0.9"
 tower-http = { version = "0.6", features = ["cors"] }
 tower-service = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 typed-builder = "0.23"
 unicode_skeleton = "0.1"
 uuid = { version = "1", features = ["v4"] }

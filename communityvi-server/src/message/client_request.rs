@@ -6,7 +6,7 @@ use crate::room::medium::Medium;
 use crate::room::medium::fixed_length::FixedLengthMedium;
 use chrono::Duration;
 use js_int::{Int, UInt};
-use log::error;
+use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ClientRequestWithId {

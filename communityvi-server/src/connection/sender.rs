@@ -5,9 +5,9 @@ use crate::message::outgoing::error_message::ErrorMessage;
 use crate::message::outgoing::success_message::SuccessMessage;
 use futures_util::{Sink, SinkExt};
 use js_int::UInt;
-use log::error;
 use std::pin::Pin;
 use std::sync::Arc;
+use tracing::error;
 
 #[derive(Clone)]
 pub struct MessageSender {

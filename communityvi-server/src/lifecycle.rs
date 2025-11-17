@@ -19,8 +19,8 @@ use futures_channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
 use js_int::UInt;
-use log::{debug, error, info};
 use nonzero_ext::nonzero;
+use tracing::{debug, error, info};
 
 /// Once this count of heartbeats are missed, the client is kicked.
 const MISSED_HEARTBEAT_LIMIT: u32 = 3;
@@ -273,7 +273,7 @@ async fn handle_chat_request(
 	}
 
 	if let Err(error) = room.send_chat_message(client, message).await {
-		log::error!("Failed sending chat message: {error}");
+		error!("Failed sending chat message: {error}");
 		return Err(ErrorMessage::builder()
 			.error(ErrorMessageType::InternalServerError)
 			.message("Failed sending chat message".to_string())
@@ -321,7 +321,7 @@ async fn handle_insert_medium_request(
 		})
 		.await
 	{
-		log::error!("Failed sending broadcast: {error}");
+		error!("Failed sending broadcast: {error}");
 		return Err(ErrorMessage::builder()
 			.error(ErrorMessageType::InternalServerError)
 			.message("Failed sending broadcast".to_string())
@@ -400,7 +400,7 @@ async fn handle_pause_request(
 		})
 		.await
 	{
-		log::error!("Failed sending broadcast: {error}");
+		error!("Failed sending broadcast: {error}");
 		return Err(ErrorMessage::builder()
 			.error(ErrorMessageType::InternalServerError)
 			.message("Failed sending broadcast".to_string())
