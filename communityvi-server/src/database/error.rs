@@ -13,6 +13,8 @@ pub enum DatabaseError {
 	ForeignKeyViolation(anyhow::Error),
 	#[error("Other constraint violation: {0}")]
 	OtherConstraintViolation(anyhow::Error),
+	#[error("Transaction serialization error: {0}")]
+	TransactionSerialization(anyhow::Error),
 	#[error("Encoding values: {0}")]
 	Encode(anyhow::Error),
 	#[error("Decoding values: {0}")]
