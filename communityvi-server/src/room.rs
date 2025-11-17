@@ -29,7 +29,6 @@ pub struct Room {
 	inner: Arc<Inner>,
 }
 
-#[expect(dead_code)]
 struct Inner {
 	uuid: Uuid,
 	user_service: UserService,
