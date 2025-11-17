@@ -17,6 +17,8 @@ pub enum DatabaseError {
 	ForeignKeyViolation(anyhow::Error),
 	#[error("Other constraint violation: {0}")]
 	OtherConstraintViolation(anyhow::Error),
+	#[error("Transaction serialization error: {0}")]
+	TransactionSerialization(anyhow::Error),
 	#[error("Encoding values: {0}")]
 	Encode(anyhow::Error),
 	#[error("Decoding values: {0}")]
@@ -50,6 +52,8 @@ impl From<Box<dyn sqlx::error::DatabaseError>> for DatabaseError {
 			ErrorKind::UniqueViolation => Self::UniqueViolation(error.into()),
 			ErrorKind::ForeignKeyViolation => Self::ForeignKeyViolation(error.into()),
 			ErrorKind::NotNullViolation | ErrorKind::CheckViolation => Self::OtherConstraintViolation(error.into()),
+			// See https://sqlite.org/rescode.html#busy_snapshot
+			ErrorKind::Other if error.code().as_deref() == Some("517") => Self::TransactionSerialization(error.into()),
 			_ => Self::Database(error.into()),
 		}
 	}
