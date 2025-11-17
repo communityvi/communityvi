@@ -3,7 +3,8 @@ use crate::context::ApplicationContext;
 use crate::error::CommunityviError;
 use crate::server::run_server;
 use crate::utils::time_source::TimeSource;
-use log::info;
+use std::io::{IsTerminal, stdout};
+use tracing::info;
 
 #[derive(clap::Parser)]
 pub struct Commandline {
@@ -30,8 +31,9 @@ impl Commandline {
 			.await
 			.expect("Failed to create application context.");
 
-		env_logger::Builder::new()
-			.parse_filters(&application_context.configuration.log_filters)
+		tracing_subscriber::fmt()
+			.with_env_filter(&application_context.configuration.log_filters)
+			.with_ansi(stdout().is_terminal())
 			.init();
 
 		let base_command = self.command.unwrap_or_default();

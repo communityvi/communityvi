@@ -3,8 +3,8 @@ use crate::message::client_request::{ClientRequestWithId, RequestIdOnly};
 use crate::message::outgoing::error_message::{ErrorMessage, ErrorMessageType};
 use crate::message::{MessageError, WebSocketMessage};
 use futures_util::{Stream, StreamExt};
-use log::error;
 use std::pin::Pin;
+use tracing::error;
 
 pub struct MessageReceiver {
 	stream: Pin<Box<dyn Stream<Item = anyhow::Result<WebSocketMessage>> + Unpin + Send>>,
@@ -41,7 +41,7 @@ impl MessageReceiver {
 					}
 					Some(Ok(websocket_message)) => break websocket_message,
 					Some(Err(error)) => {
-						log::error!("Failed to receive websocket message: {error}");
+						error!("Failed to receive websocket message: {error}");
 						return Finished;
 					}
 					None => return Finished,

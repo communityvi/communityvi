@@ -7,8 +7,8 @@ use crate::message::outgoing::success_message::SuccessMessage;
 use crate::room::session_id::SessionId;
 use crate::user::model::User;
 use js_int::UInt;
-use log::info;
 use std::sync::Arc;
+use tracing::info;
 
 #[derive(Clone)]
 pub struct Client {
