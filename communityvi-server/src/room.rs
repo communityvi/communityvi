@@ -283,13 +283,21 @@ mod test {
 	}
 
 	async fn room(room_size_limit: usize) -> Room {
+		let database = DefaultTestFactory::database().await;
+		let mut connection = database.connection().await.expect("Failed to get database connection");
 		let repository = DefaultTestFactory::repository();
 		let user_service = UserService::new(repository.clone());
+		let room = repository
+			.room()
+			.create(connection.as_mut(), "test room")
+			.await
+			.expect("Failed to create test room");
+
 		Room::new(
-			Uuid::new_v4(),
+			room.uuid,
 			ReferenceTimer::default(),
 			room_size_limit,
-			DefaultTestFactory::database().await,
+			database,
 			user_service,
 			repository,
 		)
