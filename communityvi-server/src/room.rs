@@ -98,6 +98,11 @@ impl Room {
 		let mut connection = self.inner.database.connection().await?;
 		let user = self.inner.user_service.create_user(name, connection.as_mut()).await?;
 		self.inner
+			.repository
+			.room()
+			.add_user(connection.as_mut(), self.inner.uuid, user.uuid)
+			.await?;
+		self.inner
 			.session_repository
 			.write()
 			.await
