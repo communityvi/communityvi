@@ -120,3 +120,76 @@ fn sqlite_connection(connection: &mut dyn Connection) -> Result<&mut SqliteConne
 		"Expected SQLite connection, got {type_name}",
 	)))
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::database::transaction::{ConnectionTransactionExtension, TransactionError};
+	use sqlx::{Executor, query, query_scalar};
+	use std::sync::Arc;
+
+	#[tokio::test]
+	async fn commits_transaction() {
+		let database = database().await;
+		let mut connection = database.connection().await.expect("Failed to get database connection");
+		let test_number = 42;
+
+		connection
+			.run_in_transaction(move |transaction| async move {
+				TestRepository
+					.create(transaction.deref_mut(), test_number)
+					.await
+					.map_err(TransactionError::<()>::from)
+			})
+			.await
+			.expect("Failed to write value in transaction");
+
+		let number = TestRepository
+			.get(connection.as_mut(), test_number)
+			.await
+			.expect("Failed to read row written in transaction");
+
+		assert_eq!(Some(test_number), number);
+	}
+
+	struct TestRepository;
+
+	impl TestRepository {
+		async fn get(&self, connection: &mut dyn Connection, number: i32) -> Result<Option<i32>, DatabaseError> {
+			let connection = sqlite_connection(connection)?;
+
+			query_scalar("SELECT number FROM test WHERE number = ?1")
+				.bind(number)
+				.fetch_optional(connection)
+				.await
+				.map_err(Into::into)
+		}
+
+		async fn create(&self, connection: &mut dyn Connection, number: i32) -> Result<(), DatabaseError> {
+			let connection = sqlite_connection(connection)?;
+
+			query("INSERT INTO test (number) VALUES(?1)")
+				.bind(number)
+				.execute(connection)
+				.await
+				.map(drop)
+				.map_err(Into::into)
+		}
+	}
+
+	async fn database() -> Arc<dyn Database> {
+		let database = SqliteDatabase::connect("sqlite::memory:")
+			.await
+			.expect("Failed to create in-memory SQLite database");
+
+		database
+			.pool
+			.execute(TEST_SCHEMA)
+			.await
+			.expect("Failed to create test schema");
+
+		Arc::new(database)
+	}
+
+	const TEST_SCHEMA: &str = "CREATE TABLE test (number INTEGER NOT NULL PRIMARY KEY);";
+}

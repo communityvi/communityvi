@@ -24,30 +24,30 @@ fn rollback_reason_string(reason: Option<&str>) -> String {
 }
 
 pub trait ConnectionTransactionExtension {
-	fn run_in_transaction<Operation, OperationFuture, Output, ApplicationError>(
-		self,
+	fn run_in_transaction<'connection, Operation, OperationFuture, Output, ApplicationError>(
+		&'connection mut self,
 		operation: Operation,
 	) -> impl Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send
 	where
 		Output: Send,
 		ApplicationError: Send,
-		Operation: for<'connection> FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send;
+		Operation: FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
+		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'connection;
 }
 
 impl<T> ConnectionTransactionExtension for T
 where
 	T: Connection,
 {
-	async fn run_in_transaction<Operation, OperationFuture, Output, ApplicationError>(
-		mut self,
+	async fn run_in_transaction<'connection, Operation, OperationFuture, Output, ApplicationError>(
+		&'connection mut self,
 		mut operation: Operation,
 	) -> Result<Output, TransactionError<ApplicationError>>
 	where
 		Output: Send,
 		ApplicationError: Send,
-		Operation: for<'connection> FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send,
+		Operation: FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
+		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'connection,
 	{
 		const MAXIMUM_ATTEMPTS: usize = 5;
 		for attempt in 1..=MAXIMUM_ATTEMPTS {
