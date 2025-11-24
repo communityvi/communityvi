@@ -28,12 +28,21 @@ pub trait Connection: Any + Send {
 		type_name::<Self>()
 	}
 
-	async fn begin_transaction<'connection>(&'connection mut self) -> Result<Transaction<'connection>, DatabaseError>;
+	async fn begin_transaction<'connection, 'transaction>(
+		&'connection mut self,
+	) -> Result<Transaction<'transaction>, DatabaseError>
+	where
+		'connection: 'transaction;
 }
 
 #[async_trait]
 impl Connection for Box<dyn Connection> {
-	async fn begin_transaction<'connection>(&'connection mut self) -> Result<Transaction<'connection>, DatabaseError> {
+	async fn begin_transaction<'connection, 'transaction>(
+		&'connection mut self,
+	) -> Result<Transaction<'transaction>, DatabaseError>
+	where
+		'connection: 'transaction,
+	{
 		self.deref_mut().begin_transaction().await
 	}
 }

@@ -50,14 +50,24 @@ impl Database for SqliteDatabase {
 
 #[async_trait]
 impl Connection for SqliteConnection {
-	async fn begin_transaction<'connection>(&'connection mut self) -> Result<Transaction<'connection>, DatabaseError> {
+	async fn begin_transaction<'connection, 'transaction>(
+		&'connection mut self,
+	) -> Result<Transaction<'transaction>, DatabaseError>
+	where
+		'connection: 'transaction,
+	{
 		self.begin().await.map(Transaction::new).map_err(Into::into)
 	}
 }
 
 #[async_trait]
 impl Connection for PoolConnection<Sqlite> {
-	async fn begin_transaction<'connection>(&'connection mut self) -> Result<Transaction<'connection>, DatabaseError> {
+	async fn begin_transaction<'connection, 'transaction>(
+		&'connection mut self,
+	) -> Result<Transaction<'transaction>, DatabaseError>
+	where
+		'connection: 'transaction,
+	{
 		// FIXME: Handle cancellation unsafety of the SQLX pool (if this is even an issue with SQLite)
 		self.begin().await.map(Transaction::new).map_err(Into::into)
 	}

@@ -24,34 +24,37 @@ fn rollback_reason_string(reason: Option<&str>) -> String {
 }
 
 pub trait ConnectionTransactionExtension {
-	fn run_in_transaction<'connection, Operation, OperationFuture, Output, ApplicationError>(
+	fn run_in_transaction<'connection, 'transaction, Operation, OperationFuture, Output, ApplicationError>(
 		&'connection mut self,
 		operation: Operation,
 	) -> impl Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send
 	where
-		Output: Send,
-		ApplicationError: Send,
-		Operation: FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'connection;
+		'connection: 'transaction,
+		Output: Send + 'static,
+		ApplicationError: Send + 'static,
+		Operation: FnMut(&mut Transaction<'transaction>) -> OperationFuture + Send,
+		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'transaction;
 }
 
 impl<T> ConnectionTransactionExtension for T
 where
 	T: Connection,
 {
-	async fn run_in_transaction<'connection, Operation, OperationFuture, Output, ApplicationError>(
+	async fn run_in_transaction<'connection, 'transaction, Operation, OperationFuture, Output, ApplicationError>(
 		&'connection mut self,
 		mut operation: Operation,
 	) -> Result<Output, TransactionError<ApplicationError>>
 	where
-		Output: Send,
-		ApplicationError: Send,
-		Operation: FnMut(&mut Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'connection,
+		'connection: 'transaction,
+		Output: Send + 'static,
+		ApplicationError: Send + 'static,
+		Operation: FnMut(&mut Transaction<'transaction>) -> OperationFuture + Send,
+		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send + 'transaction,
 	{
 		const MAXIMUM_ATTEMPTS: usize = 5;
 		for attempt in 1..=MAXIMUM_ATTEMPTS {
 			let mut transaction = self.begin_transaction().await?;
+			let result = operation(&mut transaction).await;
 			let serialization_error = match operation(&mut transaction).await {
 				Ok(output) => {
 					transaction.commit().await?;
