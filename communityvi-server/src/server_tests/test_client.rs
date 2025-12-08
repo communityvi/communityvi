@@ -4,7 +4,7 @@ use std::net::{Ipv6Addr, SocketAddr, SocketAddrV6};
 use std::time::Duration;
 
 pub struct TestClient {
-	server_handle: axum_server::Handle,
+	server_handle: axum_server::Handle<SocketAddr>,
 	client: reqwest::Client,
 	server_address: SocketAddr,
 }
