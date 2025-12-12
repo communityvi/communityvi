@@ -68,6 +68,7 @@ unicode_skeleton = "0.1"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+generic-tests = "0.1"
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
 
