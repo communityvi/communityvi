@@ -1,6 +1,18 @@
 use crate::database::sqlite::{SqliteDatabase, SqliteRepository};
-use crate::database::{Connection, Database, Repository};
+use crate::database::{Connection, Database, Repository, TestFactory};
 use std::sync::Arc;
+
+pub struct SqliteTestFactory;
+
+impl TestFactory for SqliteTestFactory {
+	async fn connection() -> Box<dyn Connection> {
+		connection().await
+	}
+
+	fn repository() -> Box<dyn Repository> {
+		Box::new(SqliteRepository)
+	}
+}
 
 pub async fn connection() -> Box<dyn Connection> {
 	database()

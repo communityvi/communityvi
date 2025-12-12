@@ -35,3 +35,9 @@ pub trait Repository: UserRepository + RoomRepository + ChatRepository + Send + 
 }
 
 assert_obj_safe!(Repository);
+
+#[cfg(test)]
+pub trait TestFactory {
+	async fn connection() -> Box<dyn Connection>;
+	fn repository() -> Box<dyn Repository>;
+}
