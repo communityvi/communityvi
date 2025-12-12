@@ -1,5 +1,5 @@
+use crate::types::uuid::Uuid;
 use sqlx::FromRow;
-use uuid::Uuid;
 
 #[derive(FromRow, Clone, Debug, PartialEq, Eq)]
 pub struct User {

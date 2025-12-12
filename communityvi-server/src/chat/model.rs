@@ -1,6 +1,6 @@
+use crate::types::uuid::Uuid;
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
-use uuid::Uuid;
 
 #[derive(FromRow, Clone, Debug, PartialEq, Eq)]
 pub struct ChatMessage {

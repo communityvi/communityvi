@@ -1,11 +1,11 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use crate::user::model::User;
 use crate::user::repository::UserRepository;
 use std::sync::Arc;
 use thiserror::Error;
 use unicode_skeleton::UnicodeSkeleton;
-use uuid::Uuid;
 
 pub mod model;
 pub mod repository;

@@ -1,9 +1,9 @@
 use crate::chat::model;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 #[async_trait]
 pub trait ChatRepository: Send + Sync + 'static {

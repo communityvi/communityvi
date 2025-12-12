@@ -3,10 +3,10 @@ use crate::chat::model::ChatMessage;
 use crate::chat::repository::ChatRepository;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::query_as;
-use uuid::Uuid;
 
 #[async_trait]
 impl ChatRepository for SqliteRepository {
