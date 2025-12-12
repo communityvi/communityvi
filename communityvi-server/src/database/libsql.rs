@@ -1,17 +1,23 @@
-use crate::database::{Connection, Database};
+use crate::database::{Connection, Database, Repository};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use deadpool::managed::{Object, PoolError};
 use std::any::Any;
 use std::ops::DerefMut;
 
+mod chat;
 mod migration;
 mod pool;
+mod room;
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;
+mod user;
 
+use crate::chat::repository::ChatRepository;
 use crate::database::error::DatabaseError;
 use crate::database::libsql::pool::LibSqlManager;
+use crate::room::repository::RoomRepository;
+use crate::user::repository::UserRepository;
 pub use pool::LibSqlPool;
 
 #[async_trait]
@@ -47,7 +53,6 @@ impl From<PoolError<libsql::Error>> for DatabaseError {
 impl From<libsql::Error> for DatabaseError {
 	fn from(error: libsql::Error) -> Self {
 		use libsql::Error::*;
-		// TODO: Actually map these errors correctly, we need tests for that
 		match error {
 			ToSqlConversionFailure(_) => Self::Encode(error.into()),
 			QueryReturnedNoRows => Self::NotFound(error.into()),
@@ -55,7 +60,15 @@ impl From<libsql::Error> for DatabaseError {
 			ConnectionFailed(_) | InvalidUTF8Path | InvalidParserState(_) | InvalidTlsConfiguration(_) => {
 				Self::Connection(error.into())
 			}
-			_ => Self::Database(error.into()),
+			// https://sqlite.org/rescode.html
+			SqliteFailure(code, message) if [2067, 1555].contains(&code) => Self::UniqueViolation(anyhow!("{message}")),
+			SqliteFailure(787, message) => Self::ForeignKeyViolation(anyhow!("{message}")),
+			SqliteFailure(code, message) if [275, 531, 3091, 1043, 1299, 2835, 2579, 1811].contains(&code) => {
+				Self::OtherConstraintViolation(anyhow!("{message}"))
+			}
+			SqliteFailure(773, message) => Self::Timeout(anyhow!("{message}")),
+			SqliteFailure(3338, message) => Self::Connection(anyhow!("{message}")),
+			_ => Self::Database(dbg!(error).into()),
 		}
 	}
 }
@@ -68,4 +81,22 @@ fn libsql_connection(connection: &mut dyn Connection) -> Result<&mut libsql::Con
 		.downcast_mut::<Object<LibSqlManager>>()
 		.map(DerefMut::deref_mut)
 		.ok_or_else(|| DatabaseError::DatabaseMismatch(anyhow!("Expected LibSql connection, got {type_name}")))
+}
+
+#[cfg_attr(not(test), expect(unused, reason = "Will be used later"))]
+#[derive(Default, Clone, Copy)]
+pub struct LibSqlRepository;
+
+impl Repository for LibSqlRepository {
+	fn user(&self) -> &dyn UserRepository {
+		self
+	}
+
+	fn room(&self) -> &dyn RoomRepository {
+		unimplemented!()
+	}
+
+	fn chat(&self) -> &dyn ChatRepository {
+		unimplemented!()
+	}
 }
