@@ -3,11 +3,11 @@ use crate::database::Connection;
 use crate::database::error::DatabaseError;
 use crate::room::model::Room;
 use crate::room::repository::RoomRepository;
+use crate::types::uuid::Uuid;
 use crate::user::model::User;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use sqlx::{FromRow, query, query_as};
-use uuid::Uuid;
 
 #[async_trait]
 impl RoomRepository for SqliteRepository {

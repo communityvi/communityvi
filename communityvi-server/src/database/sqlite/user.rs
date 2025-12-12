@@ -1,11 +1,11 @@
 use super::{SqliteRepository, sqlite_connection};
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use crate::user::model::User;
 use crate::user::repository::UserRepository;
 use async_trait::async_trait;
 use sqlx::{query, query_as};
-use uuid::Uuid;
 
 #[async_trait]
 impl UserRepository for SqliteRepository {
