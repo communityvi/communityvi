@@ -5,6 +5,9 @@ use crate::user::model;
 use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
 
+#[cfg(test)]
+mod tests;
+
 #[async_trait]
 pub trait UserRepository: Send + Sync + 'static {
 	async fn get(&self, connection: &mut dyn Connection, user_uuid: Uuid)
