@@ -16,6 +16,7 @@ mod room;
 mod server;
 #[cfg(test)]
 mod server_tests;
+mod types;
 mod user;
 mod utils;
 

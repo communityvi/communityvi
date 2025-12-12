@@ -1,10 +1,10 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
 use crate::room::model;
+use crate::types::uuid::Uuid;
 use crate::user::model::User;
 use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
-use uuid::Uuid;
 
 #[async_trait]
 pub trait RoomRepository: Send + Sync + 'static {
