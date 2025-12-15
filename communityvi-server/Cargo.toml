@@ -41,6 +41,7 @@ hex = "0.4"
 humantime-serde = "1"
 http-body-util = "0.1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
+libsql = { version = "0.9", default-features = false, features = ["core"] }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
@@ -51,7 +52,7 @@ rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "uuid", "migrate", "chrono", "macros"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite-unbundled", "uuid", "migrate", "chrono", "macros"] }
 static_assertions = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "parking_lot", "macros", "sync"] }
