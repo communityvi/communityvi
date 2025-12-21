@@ -93,10 +93,10 @@ impl Repository for LibSqlRepository {
 	}
 
 	fn room(&self) -> &dyn RoomRepository {
-		unimplemented!()
+		self
 	}
 
 	fn chat(&self) -> &dyn ChatRepository {
-		unimplemented!()
+		self
 	}
 }
