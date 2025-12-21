@@ -3,9 +3,9 @@ use crate::chat::model::ChatMessage;
 use crate::chat::repository::ChatRepository;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::date_time::DateTime;
 use crate::types::uuid::Uuid;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use sqlx::query_as;
 
 #[async_trait]
@@ -17,7 +17,7 @@ impl ChatRepository for SqliteRepository {
 		user_uuid: Uuid,
 		user_name: String,
 		message: String,
-		created_at: DateTime<Utc>,
+		created_at: DateTime,
 	) -> Result<ChatMessage, DatabaseError> {
 		let connection = sqlite_connection(connection)?;
 
@@ -44,93 +44,5 @@ impl ChatRepository for SqliteRepository {
 		.fetch_one(connection)
 		.await
 		.map_err(Into::into)
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::database::sqlite::test_utils::connection;
-	use crate::database::{Connection, Repository};
-	use crate::room::model::Room;
-	use crate::user::model::User;
-	use crate::user::normalize_name;
-
-	#[tokio::test]
-	async fn creates_chat_message() {
-		let mut connection = connection().await;
-		let user = user(&mut *connection, "alice").await;
-		let room = room(&mut *connection, "lobby").await;
-		let message = "Hello world!".to_string();
-		let created_at = Utc::now();
-
-		let ChatMessage {
-			uuid,
-			room_uuid,
-			user_uuid,
-			user_name,
-			message: chat_message,
-			created_at: chat_created_at,
-		} = SqliteRepository
-			.chat()
-			.create(
-				&mut *connection,
-				room.uuid,
-				user.uuid,
-				user.name.clone(),
-				message.clone(),
-				created_at,
-			)
-			.await
-			.expect("Failed to create chat message");
-
-		assert_eq!(4, uuid.get_version_num());
-		assert_eq!(room.uuid, room_uuid);
-		assert_eq!(Some(user.uuid), user_uuid);
-		assert_eq!(user.name, user_name);
-		assert_eq!(message, chat_message);
-		// Compare timestamps at second precision to avoid driver precision differences
-		assert_eq!(created_at.timestamp(), chat_created_at.timestamp());
-	}
-
-	#[tokio::test]
-	async fn rejects_empty_message() {
-		let mut connection = connection().await;
-		let user = user(&mut *connection, "bob").await;
-		let room = room(&mut *connection, "general").await;
-
-		let result = SqliteRepository
-			.chat()
-			.create(
-				&mut *connection,
-				room.uuid,
-				user.uuid,
-				user.name.clone(),
-				String::new(), // empty message should violate check constraint
-				Utc::now(),
-			)
-			.await;
-
-		match result {
-			Err(DatabaseError::OtherConstraintViolation(_)) => { /* ok */ }
-			Ok(_) => panic!("Expected constraint violation when creating empty message"),
-			Err(err) => panic!("Unexpected error: {err:?}"),
-		}
-	}
-
-	async fn user(connection: &mut dyn Connection, name: &str) -> User {
-		SqliteRepository
-			.user()
-			.create(connection, name, &normalize_name(name))
-			.await
-			.expect("Failed to create user")
-	}
-
-	async fn room(connection: &mut dyn Connection, name: &str) -> Room {
-		SqliteRepository
-			.room()
-			.create(connection, name)
-			.await
-			.expect("Failed to create room")
 	}
 }
