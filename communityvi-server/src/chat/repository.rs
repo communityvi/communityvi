@@ -1,9 +1,12 @@
 use crate::chat::model;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::date_time::DateTime;
+use crate::types::uuid::Uuid;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use uuid::Uuid;
+
+#[cfg(test)]
+mod tests;
 
 #[async_trait]
 pub trait ChatRepository: Send + Sync + 'static {
@@ -14,6 +17,6 @@ pub trait ChatRepository: Send + Sync + 'static {
 		user_uuid: Uuid,
 		user_name: String,
 		message: String,
-		created_at: DateTime<Utc>,
+		created_at: DateTime,
 	) -> Result<model::ChatMessage, DatabaseError>;
 }

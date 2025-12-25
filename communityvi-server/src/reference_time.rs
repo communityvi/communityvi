@@ -67,7 +67,7 @@ mod test {
 		clock_mock.increment(Duration::from_millis(1));
 		let final_time = reference_timer.reference_time();
 
-		let elapsed = final_time - initial_time;
+		let elapsed = final_time.checked_sub(initial_time).unwrap();
 		assert_eq!(
 			Duration::from_millis(1),
 			elapsed,

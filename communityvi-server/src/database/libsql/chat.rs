@@ -1,15 +1,15 @@
-use super::{SqliteRepository, sqlite_connection};
 use crate::chat::model::ChatMessage;
 use crate::chat::repository::ChatRepository;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::database::libsql::{LibSqlRepository, libsql_connection};
 use crate::types::date_time::DateTime;
 use crate::types::uuid::Uuid;
+use anyhow::anyhow;
 use async_trait::async_trait;
-use sqlx::query_as;
 
 #[async_trait]
-impl ChatRepository for SqliteRepository {
+impl ChatRepository for LibSqlRepository {
 	async fn create(
 		&self,
 		connection: &mut dyn Connection,
@@ -19,11 +19,12 @@ impl ChatRepository for SqliteRepository {
 		message: String,
 		created_at: DateTime,
 	) -> Result<ChatMessage, DatabaseError> {
-		let connection = sqlite_connection(connection)?;
+		let connection = libsql_connection(connection)?;
 
 		let uuid = Uuid::new_v4();
-		query_as(
-			"INSERT INTO chat_message(
+		let mut rows = connection
+			.query(
+				"INSERT INTO chat_message(
 				uuid, room_uuid, user_uuid, user_name, message, created_at
 			) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
 			RETURNING
@@ -34,15 +35,14 @@ impl ChatRepository for SqliteRepository {
 				message,
 				created_at
 			",
-		)
-		.bind(uuid)
-		.bind(room_uuid)
-		.bind(user_uuid)
-		.bind(user_name)
-		.bind(message)
-		.bind(created_at)
-		.fetch_one(connection)
-		.await
-		.map_err(Into::into)
+				(uuid, room_uuid, user_uuid, user_name, message, created_at),
+			)
+			.await?;
+
+		rows.next()
+			.await?
+			.ok_or_else(|| DatabaseError::NotFound(anyhow!("not found")))?
+			.try_into()
+			.map_err(DatabaseError::Decode)
 	}
 }
