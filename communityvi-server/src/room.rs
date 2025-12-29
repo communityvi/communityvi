@@ -7,13 +7,13 @@ use crate::room::error::RoomError;
 use crate::room::medium::{Medium, VersionedMedium};
 use crate::room::session_id::SessionId;
 use crate::room::session_repository::SessionRepository;
+use crate::types::uuid::Uuid;
 use crate::user::UserService;
 use chrono::Duration;
 use js_int::UInt;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use uuid::Uuid;
 
 pub mod client;
 pub mod error;

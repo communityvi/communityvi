@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
 use std::any::{Any, type_name};
 
+pub mod libsql;
 pub mod sqlite;
 
 pub mod error;
@@ -34,3 +35,9 @@ pub trait Repository: UserRepository + RoomRepository + ChatRepository + Send + 
 }
 
 assert_obj_safe!(Repository);
+
+#[cfg(test)]
+pub trait TestFactory {
+	async fn connection() -> Box<dyn Connection>;
+	fn repository() -> Box<dyn Repository>;
+}
