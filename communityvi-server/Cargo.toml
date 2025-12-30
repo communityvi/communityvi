@@ -67,7 +67,7 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 rand = "0.9"
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
 
 [build-dependencies]
 npm_rs = "1.0"
