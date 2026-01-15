@@ -31,7 +31,7 @@
 		"eslint-plugin-svelte": "^3.0.0",
 		"globals": "^17.0.0",
 		"jsdom": "^27.0.0",
-		"prettier": "~3.7.0",
+		"prettier": "~3.8.0",
 		"prettier-plugin-svelte": "^3.2.6",
 		"sass": "^1.49",
 		"svelte": "^5.0.0",
