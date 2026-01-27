@@ -1,4 +1,4 @@
-#![allow(clippy::empty_enum)] // TypedBuilder
+#![allow(clippy::empty_enums)] // TypedBuilder
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
