@@ -1,7 +1,7 @@
 # communityvi
-communityvi (name subject to change) is a backend and frontend for consuming media together over the network, inspired by [syncplay](https://syncplay.pl) and [togethertube](https://togethertube.com/).
+communityvi (name subject to change) is a backend and frontend for consuming media together over the network, inspired by [syncplay](https://syncplay.pl) and togethertube (may it rest in peace).
 
-It is currently still under heavy development. We're lacking mostly in frontend design, UX and layout.
+It is currently still under development. We're lacking mostly in frontend design, UX and layout.
 
 ## TL;DR: I just want to try it out
 
@@ -41,12 +41,12 @@ Features that are currently implemented:
 Although we have a first working prototype that can (and has) already been used to watch videos together, there's still a lot to do.
 
 This roadmap provides our current, preliminary plan which is subject to change:
-1. Converting request/response style websocket requests to HTTP requests, see #233
-2. Support streaming sites in the backend
+1. Persistence across backend restarts
+2. Converting request/response style websocket requests to HTTP requests, see #233
+3. Support streaming sites in the backend
 	1. Provide a working YouTube implementation.
 	2. Add support for at least one other streaming site
-3. Support multiple rooms
-4. Persistence across backend restarts
+4. Support multiple rooms
 5. Authentication and permission system
 
 ## Contributing
@@ -60,7 +60,7 @@ If you plan to contribute, please open an issue with your intentions first, to r
 
 There are several things we don't have a good answer for yet, if you do, feel free to open a GitHub issue:
 
-### [The Name](https://youtu.be/nmQxzBHmWjs?t=495)
+### [The Name](https://www.youtube.com/watch?v=Fwq699GN-Y8&t=496s)
 The current name "communityvi" is a combination of "community" and "TV" but it isn't a very good name.
 Not only because we as project founders don't even get its spelling right most of the time.
 
