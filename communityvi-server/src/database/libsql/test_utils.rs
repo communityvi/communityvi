@@ -37,3 +37,7 @@ pub async fn database() -> Arc<dyn Database> {
 
 	Arc::new(pool)
 }
+
+pub fn repository() -> Arc<dyn Repository> {
+	Arc::new(LibSqlRepository)
+}
