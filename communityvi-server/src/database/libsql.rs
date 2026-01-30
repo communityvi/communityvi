@@ -1,5 +1,5 @@
 use crate::database::{Connection, Database, Repository};
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use deadpool::managed::{Object, PoolError};
 use std::any::Any;
@@ -19,6 +19,18 @@ use crate::database::libsql::pool::LibSqlManager;
 use crate::room::repository::RoomRepository;
 use crate::user::repository::UserRepository;
 pub use pool::LibSqlPool;
+
+pub async fn create_pool(path: impl AsRef<std::path::Path>) -> anyhow::Result<LibSqlPool> {
+	let database = libsql::Builder::new_local(path)
+		.build()
+		.await
+		.context("Failed to build libsql database")?;
+	let manager = LibSqlManager::new(database);
+
+	LibSqlPool::builder(manager)
+		.build()
+		.context("Failed to build libsql pool")
+}
 
 #[async_trait]
 impl Database for LibSqlPool {
@@ -83,7 +95,6 @@ fn libsql_connection(connection: &mut dyn Connection) -> Result<&mut libsql::Con
 		.ok_or_else(|| DatabaseError::DatabaseMismatch(anyhow!("Expected LibSql connection, got {type_name}")))
 }
 
-#[cfg_attr(not(test), expect(unused, reason = "Will be used later"))]
 #[derive(Default, Clone, Copy)]
 pub struct LibSqlRepository;
 
