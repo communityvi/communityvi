@@ -3,7 +3,6 @@ mod room_tests {
 	use crate::database::Repository;
 	use crate::database::error::DatabaseError;
 	use crate::database::libsql::test_utils::LibSqlTestFactory;
-	use crate::database::sqlite::test_utils::SqliteTestFactory;
 	use crate::database::{Connection, TestFactory};
 	use crate::room::model::Room;
 	use crate::types::uuid::Uuid;
@@ -364,8 +363,6 @@ mod room_tests {
 		assert_eq!(expected.as_slice(), &users);
 	}
 
-	#[instantiate_tests(<SqliteTestFactory>)]
-	mod sqlite {}
 	#[instantiate_tests(<LibSqlTestFactory>)]
 	mod libsql {}
 }

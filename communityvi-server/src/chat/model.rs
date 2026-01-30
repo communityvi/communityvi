@@ -1,8 +1,7 @@
 use crate::types::date_time::DateTime;
 use crate::types::uuid::Uuid;
-use sqlx::FromRow;
 
-#[derive(FromRow, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChatMessage {
 	pub uuid: Uuid,
 	pub room_uuid: Uuid,

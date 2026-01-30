@@ -7,7 +7,6 @@ use static_assertions::assert_obj_safe;
 use std::any::{Any, type_name};
 
 pub mod libsql;
-pub mod sqlite;
 
 pub mod error;
 

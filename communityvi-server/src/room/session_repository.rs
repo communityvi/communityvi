@@ -62,7 +62,7 @@ impl SessionRepository {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{connection, repository};
+	use crate::database::libsql::test_utils::{connection, repository};
 	use crate::user::UserService;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 

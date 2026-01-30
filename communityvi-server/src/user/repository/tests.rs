@@ -3,7 +3,6 @@ mod user_tests {
 	use crate::database::TestFactory;
 	use crate::database::error::DatabaseError;
 	use crate::database::libsql::test_utils::LibSqlTestFactory;
-	use crate::database::sqlite::test_utils::SqliteTestFactory;
 	use crate::types::uuid::Uuid;
 	use crate::user::model::User;
 	use crate::user::normalize_name;
@@ -146,8 +145,6 @@ mod user_tests {
 		assert!(fetched_user.is_none());
 	}
 
-	#[instantiate_tests(<SqliteTestFactory>)]
-	mod sqlite {}
 	#[instantiate_tests(<LibSqlTestFactory>)]
 	mod libsql {}
 }

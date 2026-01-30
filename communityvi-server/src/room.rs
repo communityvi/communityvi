@@ -186,7 +186,7 @@ impl Room {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{database, repository};
+	use crate::database::libsql::test_utils::{database, repository};
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use chrono::Duration;

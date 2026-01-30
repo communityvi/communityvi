@@ -413,7 +413,7 @@ async fn handle_pause_request(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{database, repository};
+	use crate::database::libsql::test_utils::{database, repository};
 	use crate::lifecycle::{handle_messages, handle_request, register_client};
 	use crate::message::client_request::{MediumRequest, PauseRequest};
 	use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, MediumBroadcast};

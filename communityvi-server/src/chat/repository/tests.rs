@@ -3,7 +3,6 @@ mod chat_tests {
 	use crate::chat::model::ChatMessage;
 	use crate::database::error::DatabaseError;
 	use crate::database::libsql::test_utils::LibSqlTestFactory;
-	use crate::database::sqlite::test_utils::SqliteTestFactory;
 	use crate::database::{Connection, Repository, TestFactory};
 	use crate::room::model::Room;
 	use crate::user::model::User;
@@ -92,8 +91,6 @@ mod chat_tests {
 			.expect("Failed to create room")
 	}
 
-	#[instantiate_tests(<SqliteTestFactory>)]
-	mod sqlite {}
 	#[instantiate_tests(<LibSqlTestFactory>)]
 	mod libsql {}
 }

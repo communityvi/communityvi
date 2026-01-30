@@ -72,7 +72,7 @@ pub enum UserCreationError {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{connection, repository};
+	use crate::database::libsql::test_utils::{connection, repository};
 
 	#[test]
 	fn should_normalize_unicode_strings() {
