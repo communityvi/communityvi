@@ -63,7 +63,7 @@
 {/if}
 
 {#if videoUrl !== undefined}
-<Player {videoUrl} />
+<Player {videoUrl} {registeredClient} />
 {/if}
 
 {#if registeredClient !== undefined}
