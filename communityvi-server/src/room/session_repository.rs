@@ -62,14 +62,14 @@ impl SessionRepository {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{connection, repository};
+	use crate::database::test::{DefaultTestFactory, TestFactory};
 	use crate::user::UserService;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 
 	#[tokio::test]
 	async fn add_should_return_empty_list_when_adding_to_an_empty_list() {
 		let user_repository = user_repository();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let mut session_repository = SessionRepository::with_limit(10);
 		let jake = user_repository
 			.create_user("Jake", connection.as_mut())
@@ -85,7 +85,7 @@ mod test {
 	#[tokio::test]
 	async fn add_should_return_list_of_existing_clients() {
 		let user_repository = user_repository();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let mut session_repository = SessionRepository::with_limit(10);
 		let jake = user_repository
 			.create_user("Jake", connection.as_mut())
@@ -114,7 +114,7 @@ mod test {
 	#[tokio::test]
 	async fn should_track_if_there_are_any_clients_left() {
 		let user_repository = user_repository();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
 		let ferris = user_repository
 			.create_user("Ferris", connection.as_mut())
@@ -154,7 +154,7 @@ mod test {
 	#[tokio::test]
 	async fn should_allow_adding_clients_up_to_limit() {
 		let user_repository = user_repository();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
 		for count in 1..=2 {
 			let user = user_repository
@@ -172,7 +172,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_allow_adding_more_clients_than_limit() {
 		let user_repository = user_repository();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let mut session_repository = SessionRepository::with_limit(2);
 		for count in 1..=2 {
 			let user = user_repository
@@ -196,7 +196,7 @@ mod test {
 	}
 
 	fn user_repository() -> UserService {
-		let repository = repository();
+		let repository = DefaultTestFactory::repository();
 		UserService::new(repository)
 	}
 }

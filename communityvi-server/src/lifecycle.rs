@@ -413,7 +413,8 @@ async fn handle_pause_request(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{database, repository};
+	use crate::database::test::DefaultTestFactory;
+	use crate::database::test::TestFactory;
 	use crate::lifecycle::{handle_messages, handle_request, register_client};
 	use crate::message::client_request::{MediumRequest, PauseRequest};
 	use crate::message::outgoing::broadcast_message::{BroadcastMessage, ChatBroadcast, MediumBroadcast};
@@ -1159,8 +1160,8 @@ mod test {
 	}
 
 	async fn room(reference_timer: ReferenceTimer, room_size_limit: usize) -> Room {
-		let database = database().await;
-		let test_room = repository()
+		let database = DefaultTestFactory::database().await;
+		let test_room = DefaultTestFactory::repository()
 			.room()
 			.create(
 				database.connection().await.expect("Database connection").as_mut(),
@@ -1169,7 +1170,7 @@ mod test {
 			.await
 			.expect("Could not create test room");
 
-		let repository = repository();
+		let repository = DefaultTestFactory::repository();
 		let user_service = UserService::new(repository.clone());
 		Room::new(
 			test_room.uuid,

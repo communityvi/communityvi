@@ -1,11 +1,11 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use crate::user::model::User;
 use crate::user::repository::UserRepository;
 use std::sync::Arc;
 use thiserror::Error;
 use unicode_skeleton::UnicodeSkeleton;
-use uuid::Uuid;
 
 pub mod model;
 pub mod repository;
@@ -72,7 +72,7 @@ pub enum UserCreationError {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::sqlite::test_utils::{connection, repository};
+	use crate::database::test::{DefaultTestFactory, TestFactory};
 
 	#[test]
 	fn should_normalize_unicode_strings() {
@@ -109,7 +109,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_create_with_empty_name() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 
 		let result = user_service.create_user("", connection.as_mut()).await;
 
@@ -119,7 +119,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_create_with_blank_name() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 
 		let result = user_service.create_user("  	 ", connection.as_mut()).await;
 
@@ -129,7 +129,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_create_two_users_with_the_same_name() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 
 		user_service
 			.create_user("Anorak  ", connection.as_mut())
@@ -143,7 +143,7 @@ mod test {
 	#[tokio::test]
 	async fn should_allow_creating_user_with_the_same_name_after_first_has_been_removed() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let name = "牧瀬 紅莉栖";
 
 		let user = user_service
@@ -164,7 +164,7 @@ mod test {
 	#[tokio::test]
 	async fn should_allow_creating_users_with_name_no_longer_than_256_bytes() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let long_name = String::from_utf8(vec![0x41u8; 256]).unwrap();
 
 		user_service
@@ -176,7 +176,7 @@ mod test {
 	#[tokio::test]
 	async fn should_not_allow_creating_users_with_name_longer_than_256_bytes() {
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 		let too_long_name = String::from_utf8(vec![0x41u8; 257]).unwrap();
 
 		let result = user_service.create_user(&too_long_name, connection.as_mut()).await;
@@ -189,7 +189,7 @@ mod test {
 		const NAME: &str = "Thomas";
 
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 
 		let user = user_service
 			.create_user(NAME, connection.as_mut())
@@ -209,7 +209,7 @@ mod test {
 		const NAME: &str = "Thomas";
 
 		let user_service = user_service();
-		let mut connection = connection().await;
+		let mut connection = DefaultTestFactory::connection().await;
 
 		user_service
 			.create_user(NAME, connection.as_mut())
@@ -234,7 +234,7 @@ mod test {
 	}
 
 	fn user_service() -> UserService {
-		let repository = repository();
+		let repository = DefaultTestFactory::repository();
 		UserService::new(repository)
 	}
 }

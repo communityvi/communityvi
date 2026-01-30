@@ -1,9 +1,12 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
+use crate::types::uuid::Uuid;
 use crate::user::model;
 use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
-use uuid::Uuid;
+
+#[cfg(test)]
+mod tests;
 
 #[async_trait]
 pub trait UserRepository: Send + Sync + 'static {

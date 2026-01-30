@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use static_assertions::assert_obj_safe;
 use std::any::{Any, type_name};
 
-pub mod sqlite;
+pub mod libsql;
 
 pub mod error;
 
@@ -34,3 +34,17 @@ pub trait Repository: UserRepository + RoomRepository + ChatRepository + Send + 
 }
 
 assert_obj_safe!(Repository);
+
+#[cfg(test)]
+pub(crate) mod test {
+	use crate::database::{Connection, Database, Repository};
+	use std::sync::Arc;
+
+	pub type DefaultTestFactory = crate::database::libsql::test_utils::LibSqlTestFactory;
+
+	pub trait TestFactory {
+		async fn connection() -> Box<dyn Connection>;
+		async fn database() -> Arc<dyn Database>;
+		fn repository() -> Arc<dyn Repository>;
+	}
+}
