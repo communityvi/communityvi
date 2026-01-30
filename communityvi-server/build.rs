@@ -34,7 +34,7 @@ fn bundle_frontend() -> Result<(), Box<dyn std::error::Error>> {
 	let exit_status = NpmEnv::default()
 		.set_path(frontend_path)
 		.init_env()
-		.install(None)
+		.custom("ci", None)
 		.run("build")
 		.exec()?;
 	if !exit_status.success() {
@@ -54,7 +54,7 @@ fn bundle_stoplight_elements() -> Result<(), Box<dyn std::error::Error>> {
 	let exit_status = NpmEnv::default()
 		.set_path(stoplight_elements_path)
 		.init_env()
-		.install(None)
+		.custom("ci", None)
 		.exec()?;
 	if !exit_status.success() {
 		return Err("Npm install of stoplight elements failed".into());
