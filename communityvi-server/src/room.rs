@@ -186,7 +186,7 @@ impl Room {
 #[allow(clippy::non_ascii_literal)]
 mod test {
 	use super::*;
-	use crate::database::libsql::test_utils::{database, repository};
+	use crate::database::test::{DefaultTestFactory, TestFactory};
 	use crate::room::medium::fixed_length::FixedLengthMedium;
 	use crate::utils::fake_message_sender::FakeMessageSender;
 	use chrono::Duration;
@@ -283,13 +283,13 @@ mod test {
 	}
 
 	async fn room(room_size_limit: usize) -> Room {
-		let repository = repository();
+		let repository = DefaultTestFactory::repository();
 		let user_service = UserService::new(repository.clone());
 		Room::new(
 			Uuid::new_v4(),
 			ReferenceTimer::default(),
 			room_size_limit,
-			database().await,
+			DefaultTestFactory::database().await,
 			user_service,
 			repository,
 		)

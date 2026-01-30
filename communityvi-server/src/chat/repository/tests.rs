@@ -3,7 +3,8 @@ mod chat_tests {
 	use crate::chat::model::ChatMessage;
 	use crate::database::error::DatabaseError;
 	use crate::database::libsql::test_utils::LibSqlTestFactory;
-	use crate::database::{Connection, Repository, TestFactory};
+	use crate::database::test::TestFactory;
+	use crate::database::{Connection, Repository};
 	use crate::room::model::Room;
 	use crate::user::model::User;
 	use crate::user::normalize_name;

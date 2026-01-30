@@ -36,7 +36,15 @@ pub trait Repository: UserRepository + RoomRepository + ChatRepository + Send + 
 assert_obj_safe!(Repository);
 
 #[cfg(test)]
-pub trait TestFactory {
-	async fn connection() -> Box<dyn Connection>;
-	fn repository() -> Box<dyn Repository>;
+pub(crate) mod test {
+	use crate::database::{Connection, Database, Repository};
+	use std::sync::Arc;
+
+	pub type DefaultTestFactory = crate::database::libsql::test_utils::LibSqlTestFactory;
+
+	pub trait TestFactory {
+		async fn connection() -> Box<dyn Connection>;
+		async fn database() -> Arc<dyn Database>;
+		fn repository() -> Arc<dyn Repository>;
+	}
 }
