@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 #[folder = "$CARGO_MANIFEST_DIR/migrations"]
 struct Migrations;
 
-pub async fn run_migrations(connection: &mut dyn Connection) -> Result<(), DatabaseError> {
+pub async fn run_migrations(connection: &dyn Connection) -> Result<(), DatabaseError> {
 	let connection = libsql_connection(connection)?;
 	let migrations = Migrations::iter()
 		.filter_map(|file_name| Migrations::get(&file_name).map(|file| (file_name, file)))
