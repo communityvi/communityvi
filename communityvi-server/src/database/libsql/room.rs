@@ -12,7 +12,7 @@ use libsql::{Row, Value};
 
 #[async_trait]
 impl RoomRepository for LibSqlRepository {
-	async fn get(&self, connection: &mut dyn Connection, room_uuid: Uuid) -> Result<Option<Room>, DatabaseError> {
+	async fn get(&self, connection: &dyn Connection, room_uuid: Uuid) -> Result<Option<Room>, DatabaseError> {
 		let connection = libsql_connection(connection)?;
 
 		let mut rows = connection
@@ -31,7 +31,7 @@ impl RoomRepository for LibSqlRepository {
 		Ok(Some(row.try_into().map_err(DatabaseError::Decode)?))
 	}
 
-	async fn create(&self, connection: &mut dyn Connection, name: &str) -> Result<Room, DatabaseError> {
+	async fn create(&self, connection: &dyn Connection, name: &str) -> Result<Room, DatabaseError> {
 		let connection = libsql_connection(connection)?;
 
 		let uuid = Uuid::new_v4();
@@ -53,7 +53,7 @@ impl RoomRepository for LibSqlRepository {
 			.map_err(DatabaseError::Decode)
 	}
 
-	async fn remove(&self, connection: &mut dyn Connection, room_uuid: Uuid) -> Result<(), DatabaseError> {
+	async fn remove(&self, connection: &dyn Connection, room_uuid: Uuid) -> Result<(), DatabaseError> {
 		let connection = libsql_connection(connection)?;
 
 		connection
@@ -63,11 +63,7 @@ impl RoomRepository for LibSqlRepository {
 		Ok(())
 	}
 
-	async fn get_all_users(
-		&self,
-		connection: &mut dyn Connection,
-		room_uuid: Uuid,
-	) -> Result<Vec<User>, DatabaseError> {
+	async fn get_all_users(&self, connection: &dyn Connection, room_uuid: Uuid) -> Result<Vec<User>, DatabaseError> {
 		struct OptionalUser {
 			uuid: Option<Uuid>,
 			name: Option<String>,
@@ -146,7 +142,7 @@ impl RoomRepository for LibSqlRepository {
 
 	async fn add_user(
 		&self,
-		connection: &mut dyn Connection,
+		connection: &dyn Connection,
 		room_uuid: Uuid,
 		user_uuid: Uuid,
 	) -> Result<(), DatabaseError> {
@@ -163,7 +159,7 @@ impl RoomRepository for LibSqlRepository {
 
 	async fn remove_user(
 		&self,
-		connection: &mut dyn Connection,
+		connection: &dyn Connection,
 		room_uuid: Uuid,
 		user_uuid: Uuid,
 	) -> Result<(), DatabaseError> {

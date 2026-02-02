@@ -3,7 +3,7 @@ use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use deadpool::managed::{Object, PoolError};
 use std::any::Any;
-use std::ops::DerefMut;
+use std::ops::Deref;
 
 mod chat;
 mod migration;
@@ -85,13 +85,13 @@ impl From<libsql::Error> for DatabaseError {
 	}
 }
 
-fn libsql_connection(connection: &mut dyn Connection) -> Result<&mut libsql::Connection, DatabaseError> {
+fn libsql_connection(connection: &dyn Connection) -> Result<&libsql::Connection, DatabaseError> {
 	let type_name = connection.type_name();
 
-	let connection: &mut dyn Any = connection;
+	let connection: &dyn Any = connection;
 	connection
-		.downcast_mut::<Object<LibSqlManager>>()
-		.map(DerefMut::deref_mut)
+		.downcast_ref::<Object<LibSqlManager>>()
+		.map(Deref::deref)
 		.ok_or_else(|| DatabaseError::DatabaseMismatch(anyhow!("Expected LibSql connection, got {type_name}")))
 }
 
