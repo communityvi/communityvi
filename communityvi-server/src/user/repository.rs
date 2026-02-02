@@ -10,11 +10,10 @@ mod tests;
 
 #[async_trait]
 pub trait UserRepository: Send + Sync + 'static {
-	async fn get(&self, connection: &mut dyn Connection, user_uuid: Uuid)
-	-> Result<Option<model::User>, DatabaseError>;
+	async fn get(&self, connection: &dyn Connection, user_uuid: Uuid) -> Result<Option<model::User>, DatabaseError>;
 	async fn create(
 		&self,
-		connection: &mut dyn Connection,
+		connection: &dyn Connection,
 		name: &str,
 		normalized_name: &str,
 	) -> Result<model::User, DatabaseError>;
