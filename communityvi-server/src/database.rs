@@ -1,5 +1,6 @@
 use crate::chat::repository::ChatRepository;
 use crate::database::error::DatabaseError;
+use crate::database::transaction::Transaction;
 use crate::room::repository::RoomRepository;
 use crate::user::repository::UserRepository;
 use async_trait::async_trait;
@@ -26,7 +27,9 @@ pub trait Connection: Any + Send + Sync {
 		type_name::<Self>()
 	}
 
-	// async fn begin_transaction<'connection>(&'connection mut self) -> Result<Transaction<'connection>, DatabaseError>;
+	async fn begin_transaction<'connection>(
+		&'connection mut self,
+	) -> Result<Box<dyn Transaction<'connection>>, DatabaseError>;
 }
 
 assert_obj_safe!(Connection);
