@@ -12,7 +12,7 @@ mod tests;
 pub trait ChatRepository: Send + Sync + 'static {
 	async fn create(
 		&self,
-		connection: &mut dyn Connection,
+		connection: &dyn Connection,
 		room_uuid: Uuid,
 		user_uuid: Uuid,
 		user_name: String,

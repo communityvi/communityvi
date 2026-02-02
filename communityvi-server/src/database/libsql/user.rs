@@ -9,7 +9,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 impl UserRepository for LibSqlRepository {
-	async fn get(&self, connection: &mut dyn Connection, user_uuid: Uuid) -> Result<Option<User>, DatabaseError> {
+	async fn get(&self, connection: &dyn Connection, user_uuid: Uuid) -> Result<Option<User>, DatabaseError> {
 		let connection = libsql_connection(connection)?;
 
 		let mut rows = connection
@@ -30,7 +30,7 @@ impl UserRepository for LibSqlRepository {
 
 	async fn create(
 		&self,
-		connection: &mut dyn Connection,
+		connection: &dyn Connection,
 		name: &str,
 		normalized_name: &str,
 	) -> Result<User, DatabaseError> {
