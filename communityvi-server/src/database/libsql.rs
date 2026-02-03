@@ -54,7 +54,7 @@ impl Database for LibSqlPool {
 impl Connection for Object<LibSqlManager> {
 	async fn begin_transaction<'connection>(
 		&'connection mut self,
-	) -> Result<Box<dyn Transaction<'connection>>, DatabaseError> {
+	) -> Result<Box<dyn Transaction + 'connection>, DatabaseError> {
 		self.deref_mut().begin_transaction().await
 	}
 }
@@ -63,11 +63,11 @@ impl Connection for Object<LibSqlManager> {
 impl Connection for libsql::Connection {
 	async fn begin_transaction<'connection>(
 		&'connection mut self,
-	) -> Result<Box<dyn Transaction<'connection>>, DatabaseError> {
+	) -> Result<Box<dyn Transaction + 'connection>, DatabaseError> {
 		// TODO: Figure out which transaction behavior to use, default is DEFERRED.
 		self.transaction()
 			.await
-			.map(|transaction| Box::new(transaction) as Box<dyn Transaction<'connection>>)
+			.map(|transaction| Box::new(transaction) as Box<dyn Transaction + 'connection>)
 			.map_err(Into::into)
 	}
 }
@@ -140,17 +140,17 @@ impl Repository for LibSqlRepository {
 }
 
 #[async_trait]
-impl Transaction<'_> for libsql::Transaction {
+impl Transaction for libsql::Transaction {
 	fn as_connection(&self) -> &dyn Connection {
 		self.deref()
 	}
 
 	async fn commit(self: Box<Self>) -> Result<(), DatabaseError> {
-		self.commit().await.map_err(Into::into)
+		(*self).commit().await.map_err(Into::into)
 	}
 
 	async fn rollback(self: Box<Self>) -> Result<(), DatabaseError> {
-		self.rollback().await.map_err(Into::into)
+		(*self).rollback().await.map_err(Into::into)
 	}
 }
 
@@ -166,15 +166,17 @@ mod tests {
 	#[tokio::test]
 	async fn commits_transaction() {
 		let database = database().await;
-		let connection = database.connection().await.expect("Failed to get database connection");
+		let mut connection = database.connection().await.expect("Failed to get database connection");
 		let test_number = 42;
 
 		connection
-			.run_in_transaction(async move |transaction| {
-				TestRepository
-					.create(transaction.as_connection(), test_number)
-					.await
-					.map_err(TransactionError::<()>::from)
+			.run_in_transaction(|transaction| {
+				Box::pin(async move {
+					TestRepository
+						.create(transaction.as_connection(), test_number)
+						.await
+						.map_err(TransactionError::<()>::from)
+				})
 			})
 			.await
 			.expect("Failed to write value in transaction");
