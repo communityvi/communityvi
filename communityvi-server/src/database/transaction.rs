@@ -1,7 +1,9 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
 use async_trait::async_trait;
+use futures_util::future::BoxFuture;
 use static_assertions::assert_obj_safe;
+use std::future::Future;
 use tracing::warn;
 
 #[derive(Debug, thiserror::Error)]
@@ -24,27 +26,27 @@ fn rollback_reason_string(reason: Option<&str>) -> String {
 }
 
 pub trait ConnectionTransactionExtension {
-	fn run_in_transaction<Operation, OperationFuture, Output, ApplicationError>(
+	fn run_in_transaction<Operation, Output, ApplicationError>(
 		&mut self,
 		operation: Operation,
 	) -> impl Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send
 	where
 		Output: Send,
 		ApplicationError: Send,
-		Operation: for<'connection> FnMut(&dyn Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send;
+		Operation: for<'tx> FnMut(&'tx dyn Transaction) -> BoxFuture<'tx, Result<Output, TransactionError<ApplicationError>>>
+			+ Send;
 }
 
-impl ConnectionTransactionExtension for Box<dyn Connection> {
-	async fn run_in_transaction<Operation, OperationFuture, Output, ApplicationError>(
+impl<C: Connection + ?Sized> ConnectionTransactionExtension for C {
+	async fn run_in_transaction<Operation, Output, ApplicationError>(
 		&mut self,
 		mut operation: Operation,
 	) -> Result<Output, TransactionError<ApplicationError>>
 	where
 		Output: Send,
 		ApplicationError: Send,
-		Operation: for<'connection> FnMut(&dyn Transaction<'connection>) -> OperationFuture + Send,
-		OperationFuture: Future<Output = Result<Output, TransactionError<ApplicationError>>> + Send,
+		Operation: for<'tx> FnMut(&'tx dyn Transaction) -> BoxFuture<'tx, Result<Output, TransactionError<ApplicationError>>>
+			+ Send,
 	{
 		const MAXIMUM_ATTEMPTS: usize = 5;
 		for attempt in 1..=MAXIMUM_ATTEMPTS {
@@ -79,7 +81,7 @@ impl ConnectionTransactionExtension for Box<dyn Connection> {
 }
 
 #[async_trait]
-pub trait Transaction<'connection>: Send + Sync {
+pub trait Transaction: Send + Sync {
 	fn type_name(&self) -> &'static str {
 		std::any::type_name::<Self>()
 	}
@@ -90,4 +92,4 @@ pub trait Transaction<'connection>: Send + Sync {
 	async fn rollback(self: Box<Self>) -> Result<(), DatabaseError>;
 }
 
-assert_obj_safe!(Transaction<'_>);
+assert_obj_safe!(Transaction);

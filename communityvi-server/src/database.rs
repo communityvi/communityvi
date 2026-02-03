@@ -29,7 +29,7 @@ pub trait Connection: Any + Send + Sync {
 
 	async fn begin_transaction<'connection>(
 		&'connection mut self,
-	) -> Result<Box<dyn Transaction<'connection>>, DatabaseError>;
+	) -> Result<Box<dyn Transaction + 'connection>, DatabaseError>;
 }
 
 assert_obj_safe!(Connection);
