@@ -22,8 +22,8 @@
 		"@fortawesome/fontawesome-free": "^7.0.0",
 		"@sveltejs/adapter-static": "^3.0.0",
 		"@sveltejs/kit": "^2.5.27",
-		"@sveltejs/vite-plugin-svelte": "^6.0.0",
-		"@types/node": "^24.0.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@types/node": "^25.0.0",
 		"@vitest/coverage-v8": "^4.0.0",
 		"bulma": "^1.0.0",
 		"eslint": "^10.0.0",
@@ -40,7 +40,7 @@
 		"tslib": "^2.3",
 		"typescript": "^6.0.0",
 		"typescript-eslint": "^8.32.1",
-		"vite": "^7.0.0",
+		"vite": "^8.0.0",
 		"vitest": "^4.0.0",
 		"vitest-mock-extended": "^4.0.0"
 	}
