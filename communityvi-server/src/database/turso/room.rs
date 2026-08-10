@@ -1,6 +1,6 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
-use crate::database::libsql::{LibSqlRepository, libsql_connection};
+use crate::database::turso::{TursoRepository, turso_connection};
 use crate::room::model::Room;
 use crate::room::repository::RoomRepository;
 use crate::types::uuid::Uuid;
@@ -8,12 +8,12 @@ use crate::user::model::User;
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use futures_util::{StreamExt, TryStreamExt, stream};
-use libsql::{Row, Value};
+use turso::{Row, Value};
 
 #[async_trait]
-impl RoomRepository for LibSqlRepository {
+impl RoomRepository for TursoRepository {
 	async fn get(&self, connection: &dyn Connection, room_uuid: Uuid) -> Result<Option<Room>, DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let mut rows = connection
 			.query(
@@ -32,7 +32,7 @@ impl RoomRepository for LibSqlRepository {
 	}
 
 	async fn create(&self, connection: &dyn Connection, name: &str) -> Result<Room, DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let uuid = Uuid::new_v4();
 		let mut rows = connection
@@ -54,7 +54,7 @@ impl RoomRepository for LibSqlRepository {
 	}
 
 	async fn remove(&self, connection: &dyn Connection, room_uuid: Uuid) -> Result<(), DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		connection
 			.execute(r"DELETE FROM room WHERE uuid = ?1", [room_uuid])
@@ -94,7 +94,7 @@ impl RoomRepository for LibSqlRepository {
 			}
 		}
 
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let mut rows = connection
 			.query(
@@ -146,7 +146,7 @@ impl RoomRepository for LibSqlRepository {
 		room_uuid: Uuid,
 		user_uuid: Uuid,
 	) -> Result<(), DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		connection
 			.execute(
@@ -163,7 +163,7 @@ impl RoomRepository for LibSqlRepository {
 		room_uuid: Uuid,
 		user_uuid: Uuid,
 	) -> Result<(), DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		connection
 			.execute(

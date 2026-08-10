@@ -1,5 +1,5 @@
 use crate::configuration::Configuration;
-use crate::database::libsql::{LibSqlRepository, create_pool};
+use crate::database::turso::{TursoRepository, create_pool};
 use crate::database::{Database, Repository};
 use crate::reference_time::ReferenceTimer;
 use crate::user::UserService;
@@ -25,7 +25,7 @@ impl ApplicationContext {
 		pool.migrate().await?;
 
 		let database = Arc::new(pool);
-		let repository = Arc::new(LibSqlRepository);
+		let repository = Arc::new(TursoRepository);
 
 		let user_service = UserService::new(repository.clone());
 

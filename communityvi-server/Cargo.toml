@@ -42,7 +42,6 @@ hex = "0.4"
 humantime-serde = "1"
 http-body-util = "0.1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
-libsql = { version = "0.9", default-features = false, features = ["core"] }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
@@ -64,6 +63,7 @@ tower-service = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 typed-builder = "0.23"
+turso = { version = "0.7", default-features = false }
 unicode_skeleton = "0.1"
 uuid = { version = "1", features = ["v4"] }
 

@@ -2,14 +2,14 @@ use crate::chat::model::ChatMessage;
 use crate::chat::repository::ChatRepository;
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
-use crate::database::libsql::{LibSqlRepository, libsql_connection};
+use crate::database::turso::{TursoRepository, turso_connection};
 use crate::types::date_time::DateTime;
 use crate::types::uuid::Uuid;
 use anyhow::anyhow;
 use async_trait::async_trait;
 
 #[async_trait]
-impl ChatRepository for LibSqlRepository {
+impl ChatRepository for TursoRepository {
 	async fn create(
 		&self,
 		connection: &dyn Connection,
@@ -19,7 +19,7 @@ impl ChatRepository for LibSqlRepository {
 		message: String,
 		created_at: DateTime,
 	) -> Result<ChatMessage, DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let uuid = Uuid::new_v4();
 		let mut rows = connection

@@ -1,4 +1,4 @@
-use super::{LibSqlRepository, libsql_connection};
+use super::{TursoRepository, turso_connection};
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
 use crate::types::uuid::Uuid;
@@ -8,9 +8,9 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 
 #[async_trait]
-impl UserRepository for LibSqlRepository {
+impl UserRepository for TursoRepository {
 	async fn get(&self, connection: &dyn Connection, user_uuid: Uuid) -> Result<Option<User>, DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let mut rows = connection
 			.query(
@@ -34,7 +34,7 @@ impl UserRepository for LibSqlRepository {
 		name: &str,
 		normalized_name: &str,
 	) -> Result<User, DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		let uuid = Uuid::new_v4();
 		let mut rows = connection
@@ -56,7 +56,7 @@ impl UserRepository for LibSqlRepository {
 	}
 
 	async fn remove(&self, connection: &mut dyn Connection, user_uuid: Uuid) -> Result<(), DatabaseError> {
-		let connection = libsql_connection(connection)?;
+		let connection = turso_connection(connection)?;
 
 		connection
 			.execute(r"DELETE FROM user WHERE uuid = ?1", [user_uuid])

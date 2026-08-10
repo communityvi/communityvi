@@ -7,10 +7,10 @@ pub struct Room {
 	pub medium_uuid: Option<Uuid>,
 }
 
-impl TryFrom<libsql::Row> for Room {
+impl TryFrom<turso::Row> for Room {
 	type Error = anyhow::Error;
 
-	fn try_from(row: libsql::Row) -> Result<Self, Self::Error> {
+	fn try_from(row: turso::Row) -> Result<Self, Self::Error> {
 		let uuid = row.get_value(0)?;
 		let name = row.get(1)?;
 		let medium_uuid = row.get_value(2)?;

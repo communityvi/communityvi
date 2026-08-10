@@ -15,29 +15,30 @@ mod user;
 
 use crate::chat::repository::ChatRepository;
 use crate::database::error::DatabaseError;
-use crate::database::libsql::pool::LibSqlManager;
 use crate::database::transaction::Transaction;
+use crate::database::turso::pool::TursoManager;
 use crate::room::repository::RoomRepository;
 use crate::user::repository::UserRepository;
-pub use pool::LibSqlPool;
+pub use pool::TursoPool;
 
-pub async fn create_pool(path: impl AsRef<std::path::Path>) -> anyhow::Result<LibSqlPool> {
-	let database = libsql::Builder::new_local(path)
+pub async fn create_pool(path: impl AsRef<std::path::Path>) -> anyhow::Result<TursoPool> {
+	let path = path.as_ref().to_str().context("Database path is not valid UTF-8")?;
+	let database = turso::Builder::new_local(path)
 		.build()
 		.await
-		.context("Failed to build libsql database")?;
-	let manager = LibSqlManager::new(database);
+		.context("Failed to build turso database")?;
+	let manager = TursoManager::new(database);
 
-	LibSqlPool::builder(manager)
+	TursoPool::builder(manager)
 		.build()
-		.context("Failed to build libsql pool")
+		.context("Failed to build turso pool")
 }
 
 #[async_trait]
-impl Database for LibSqlPool {
+impl Database for TursoPool {
 	async fn migrate(&mut self) -> Result<(), DatabaseError> {
-		let connection = self.connection().await?;
-		migration::run_migrations(connection.as_ref()).await?;
+		let mut connection = self.connection().await?;
+		migration::run_migrations(connection.as_mut()).await?;
 
 		Ok(())
 	}
@@ -51,7 +52,7 @@ impl Database for LibSqlPool {
 }
 
 #[async_trait]
-impl Connection for Object<LibSqlManager> {
+impl Connection for Object<TursoManager> {
 	async fn begin_transaction<'connection>(
 		&'connection mut self,
 	) -> Result<Box<dyn Transaction + 'connection>, DatabaseError> {
@@ -60,7 +61,7 @@ impl Connection for Object<LibSqlManager> {
 }
 
 #[async_trait]
-impl Connection for libsql::Connection {
+impl Connection for turso::Connection {
 	async fn begin_transaction<'connection>(
 		&'connection mut self,
 	) -> Result<Box<dyn Transaction + 'connection>, DatabaseError> {
@@ -72,8 +73,8 @@ impl Connection for libsql::Connection {
 	}
 }
 
-impl From<PoolError<libsql::Error>> for DatabaseError {
-	fn from(pool_error: PoolError<libsql::Error>) -> Self {
+impl From<PoolError<turso::Error>> for DatabaseError {
+	fn from(pool_error: PoolError<turso::Error>) -> Self {
 		use PoolError::*;
 		match pool_error {
 			Timeout(_) => Self::Timeout(pool_error.into()),
@@ -83,49 +84,77 @@ impl From<PoolError<libsql::Error>> for DatabaseError {
 	}
 }
 
-impl From<libsql::Error> for DatabaseError {
-	fn from(error: libsql::Error) -> Self {
-		use libsql::Error::*;
+impl From<turso::Error> for DatabaseError {
+	fn from(error: turso::Error) -> Self {
+		use turso::Error::*;
 		match error {
 			ToSqlConversionFailure(_) => Self::Encode(error.into()),
 			QueryReturnedNoRows => Self::NotFound(error.into()),
-			InvalidColumnIndex | InvalidColumnType => Self::Decode(error.into()),
-			ConnectionFailed(_) | InvalidUTF8Path | InvalidParserState(_) | InvalidTlsConfiguration(_) => {
-				Self::Connection(error.into())
+			ConversionFailure(_) => Self::Decode(error.into()),
+			Busy(_) => Self::Timeout(error.into()),
+			BusySnapshot(_) => Self::TransactionSerialization(error.into()),
+			Constraint(ref message) => classify_constraint_violation(&message.clone(), error),
+			IoError(..) => Self::Connection(error.into()),
+			Corrupt(_) | NotAdb(_) | Error(_) | Misuse(_) | Interrupt(_) | Readonly(_) | DatabaseFull(_) => {
+				Self::Database(error.into())
 			}
-			// https://sqlite.org/rescode.html
-			SqliteFailure(code, message) if [2067, 1555].contains(&code) => Self::UniqueViolation(anyhow!("{message}")),
-			SqliteFailure(787, message) => Self::ForeignKeyViolation(anyhow!("{message}")),
-			SqliteFailure(code, message) if [275, 531, 3091, 1043, 1299, 2835, 2579, 1811].contains(&code) => {
-				Self::OtherConstraintViolation(anyhow!("{message}"))
-			}
-			SqliteFailure(773, message) => Self::Timeout(anyhow!("{message}")),
-			SqliteFailure(3338, message) => Self::Connection(anyhow!("{message}")),
-			_ => Self::Database(dbg!(error).into()),
 		}
 	}
 }
 
-fn libsql_connection(connection: &dyn Connection) -> Result<&libsql::Connection, DatabaseError> {
+fn classify_constraint_violation(message: &str, error: turso::Error) -> DatabaseError {
+	if message.contains("UNIQUE constraint failed") || message.contains("PRIMARY KEY constraint failed") {
+		DatabaseError::UniqueViolation(error.into())
+	} else if message.contains("FOREIGN KEY constraint failed") {
+		DatabaseError::ForeignKeyViolation(error.into())
+	} else {
+		DatabaseError::OtherConstraintViolation(error.into())
+	}
+}
+
+fn turso_connection(connection: &dyn Connection) -> Result<&turso::Connection, DatabaseError> {
 	let type_name = connection.type_name();
 
 	let connection: &dyn Any = connection;
-	if let Some(connection) = connection.downcast_ref::<Object<LibSqlManager>>().map(Deref::deref) {
+	if let Some(connection) = connection.downcast_ref::<Object<TursoManager>>().map(Deref::deref) {
 		return Ok(connection);
 	}
-	if let Some(connection) = connection.downcast_ref::<libsql::Connection>() {
+	if let Some(connection) = connection.downcast_ref::<turso::Connection>() {
 		return Ok(connection);
 	}
 
 	Err(DatabaseError::DatabaseMismatch(anyhow!(
-		"Expected LibSql connection, got {type_name}"
+		"Expected Turso connection, got {type_name}"
+	)))
+}
+
+fn turso_connection_mut(connection: &mut dyn Connection) -> Result<&mut turso::Connection, DatabaseError> {
+	let type_name = connection.type_name();
+
+	// `downcast_mut` can't be chained directly: a failed first attempt would still hold
+	// `connection` mutably borrowed for the second, so check the type with `is` first.
+	let connection: &mut dyn Any = connection;
+	if connection.is::<Object<TursoManager>>() {
+		return Ok(connection
+			.downcast_mut::<Object<TursoManager>>()
+			.unwrap_or_else(|| unreachable!("just checked with `is`"))
+			.deref_mut());
+	}
+	if connection.is::<turso::Connection>() {
+		return Ok(connection
+			.downcast_mut::<turso::Connection>()
+			.unwrap_or_else(|| unreachable!("just checked with `is`")));
+	}
+
+	Err(DatabaseError::DatabaseMismatch(anyhow!(
+		"Expected Turso connection, got {type_name}"
 	)))
 }
 
 #[derive(Default, Clone, Copy)]
-pub struct LibSqlRepository;
+pub struct TursoRepository;
 
-impl Repository for LibSqlRepository {
+impl Repository for TursoRepository {
 	fn user(&self) -> &dyn UserRepository {
 		self
 	}
@@ -140,7 +169,7 @@ impl Repository for LibSqlRepository {
 }
 
 #[async_trait]
-impl Transaction for libsql::Transaction {
+impl Transaction for turso::transaction::Transaction<'_> {
 	fn as_connection(&self) -> &dyn Connection {
 		self.deref()
 	}
@@ -158,9 +187,9 @@ impl Transaction for libsql::Transaction {
 mod tests {
 	use super::*;
 	use crate::database::Database;
-	use crate::database::libsql::test_utils::LibSqlTestFactory;
 	use crate::database::test::TestFactory;
 	use crate::database::transaction::{ConnectionTransactionExtension, TransactionError};
+	use crate::database::turso::test_utils::TursoTestFactory;
 	use std::sync::Arc;
 
 	#[tokio::test]
@@ -193,7 +222,7 @@ mod tests {
 
 	impl TestRepository {
 		async fn get(&self, connection: &dyn Connection, number: i32) -> Result<Option<i32>, DatabaseError> {
-			let connection = libsql_connection(connection)?;
+			let connection = turso_connection(connection)?;
 
 			let mut rows = connection
 				.query("SELECT number FROM test WHERE number = ?1", [number])
@@ -209,7 +238,7 @@ mod tests {
 		}
 
 		async fn create(&self, connection: &dyn Connection, number: i32) -> Result<(), DatabaseError> {
-			let connection = libsql_connection(connection)?;
+			let connection = turso_connection(connection)?;
 
 			connection
 				.execute("INSERT INTO test (number) VALUES(?1)", [number])
@@ -220,9 +249,9 @@ mod tests {
 	}
 
 	async fn database() -> Arc<dyn Database> {
-		let database = LibSqlTestFactory::database().await;
+		let database = TursoTestFactory::database().await;
 		let connection = database.connection().await.expect("Failed to get database connection");
-		let connection = libsql_connection(connection.as_ref()).expect("Failed to get concrete database connection");
+		let connection = turso_connection(connection.as_ref()).expect("Failed to get concrete database connection");
 
 		connection
 			.execute_batch(TEST_SCHEMA)

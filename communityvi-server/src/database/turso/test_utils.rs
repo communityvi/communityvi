@@ -1,12 +1,12 @@
-use crate::database::libsql::pool::LibSqlManager;
-use crate::database::libsql::{LibSqlPool, LibSqlRepository};
 use crate::database::test::TestFactory;
+use crate::database::turso::pool::TursoManager;
+use crate::database::turso::{TursoPool, TursoRepository};
 use crate::database::{Connection, Database, Repository};
 use std::sync::Arc;
 
-pub struct LibSqlTestFactory;
+pub struct TursoTestFactory;
 
-impl TestFactory for LibSqlTestFactory {
+impl TestFactory for TursoTestFactory {
 	async fn connection() -> Box<dyn Connection> {
 		Self::database()
 			.await
@@ -16,14 +16,12 @@ impl TestFactory for LibSqlTestFactory {
 	}
 
 	async fn database() -> Arc<dyn Database> {
-		let database = libsql::Builder::new_local(":memory:")
+		let database = turso::Builder::new_local(":memory:")
 			.build()
 			.await
-			.expect("Failed to build libsql database");
-		let manager = LibSqlManager::new(database);
-		let mut pool = LibSqlPool::builder(manager)
-			.build()
-			.expect("Failed to build libsql pool");
+			.expect("Failed to build turso database");
+		let manager = TursoManager::new(database);
+		let mut pool = TursoPool::builder(manager).build().expect("Failed to build turso pool");
 
 		pool.migrate().await.expect("Failed to migrate database");
 
@@ -31,6 +29,6 @@ impl TestFactory for LibSqlTestFactory {
 	}
 
 	fn repository() -> Arc<dyn Repository> {
-		Arc::new(LibSqlRepository)
+		Arc::new(TursoRepository)
 	}
 }

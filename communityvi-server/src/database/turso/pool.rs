@@ -1,23 +1,25 @@
 use deadpool::managed::{Manager, Metrics, Object, Pool, RecycleError, RecycleResult};
 
-pub type LibSqlPool = Pool<LibSqlManager, Object<LibSqlManager>>;
+pub type TursoPool = Pool<TursoManager, Object<TursoManager>>;
 
-pub struct LibSqlManager {
-	database: libsql::Database,
+pub struct TursoManager {
+	database: turso::Database,
 }
 
-impl LibSqlManager {
-	pub fn new(database: libsql::Database) -> Self {
+impl TursoManager {
+	pub fn new(database: turso::Database) -> Self {
 		Self { database }
 	}
 }
 
-impl Manager for LibSqlManager {
-	type Type = libsql::Connection;
-	type Error = libsql::Error;
+impl Manager for TursoManager {
+	type Type = turso::Connection;
+	type Error = turso::Error;
 
 	async fn create(&self) -> Result<Self::Type, Self::Error> {
-		self.database.connect()
+		let connection = self.database.connect()?;
+		connection.pragma_update("foreign_keys", "ON").await?;
+		Ok(connection)
 	}
 
 	async fn recycle(&self, connection: &mut Self::Type, _metrics: &Metrics) -> RecycleResult<Self::Error> {
@@ -45,14 +47,12 @@ mod tests {
 
 	#[tokio::test]
 	async fn get_connection() {
-		let database = libsql::Builder::new_local(":memory:")
+		let database = turso::Builder::new_local(":memory:")
 			.build()
 			.await
-			.expect("Failed to build libsql database");
-		let manager = LibSqlManager::new(database);
-		let pool = LibSqlPool::builder(manager)
-			.build()
-			.expect("Failed to build libsql pool");
+			.expect("Failed to build turso database");
+		let manager = TursoManager::new(database);
+		let pool = TursoPool::builder(manager).build().expect("Failed to build turso pool");
 
 		let connection = pool.get().await.expect("Failed to get connection from pool");
 

@@ -1,8 +1,8 @@
 #[generic_tests::define(attrs(tokio::test))]
 mod user_tests {
 	use crate::database::error::DatabaseError;
-	use crate::database::libsql::test_utils::LibSqlTestFactory;
 	use crate::database::test::TestFactory;
+	use crate::database::turso::test_utils::TursoTestFactory;
 	use crate::types::uuid::Uuid;
 	use crate::user::model::User;
 	use crate::user::normalize_name;
@@ -145,6 +145,6 @@ mod user_tests {
 		assert!(fetched_user.is_none());
 	}
 
-	#[instantiate_tests(<LibSqlTestFactory>)]
-	mod libsql {}
+	#[instantiate_tests(<TursoTestFactory>)]
+	mod turso {}
 }

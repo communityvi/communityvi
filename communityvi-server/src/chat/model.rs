@@ -11,10 +11,10 @@ pub struct ChatMessage {
 	pub created_at: DateTime,
 }
 
-impl TryFrom<libsql::Row> for ChatMessage {
+impl TryFrom<turso::Row> for ChatMessage {
 	type Error = anyhow::Error;
 
-	fn try_from(row: libsql::Row) -> Result<Self, Self::Error> {
+	fn try_from(row: turso::Row) -> Result<Self, Self::Error> {
 		let uuid = row.get_value(0)?;
 		let room_uuid = row.get_value(1)?;
 		let user_uuid = row.get_value(2)?;

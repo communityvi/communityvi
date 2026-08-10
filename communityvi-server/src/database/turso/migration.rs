@@ -1,6 +1,6 @@
 use crate::database::Connection;
 use crate::database::error::DatabaseError;
-use crate::database::libsql::libsql_connection;
+use crate::database::turso::turso_connection_mut;
 use rust_embed::RustEmbed;
 use std::collections::BTreeMap;
 
@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 #[folder = "$CARGO_MANIFEST_DIR/migrations"]
 struct Migrations;
 
-pub async fn run_migrations(connection: &dyn Connection) -> Result<(), DatabaseError> {
-	let connection = libsql_connection(connection)?;
+pub async fn run_migrations(connection: &mut dyn Connection) -> Result<(), DatabaseError> {
+	let connection = turso_connection_mut(connection)?;
 	let migrations = Migrations::iter()
 		.filter_map(|file_name| Migrations::get(&file_name).map(|file| (file_name, file)))
 		.collect::<BTreeMap<_, _>>();

@@ -16,17 +16,17 @@ use chrono::Utc;
 )]
 pub struct DateTime(chrono::DateTime<Utc>);
 
-impl From<DateTime> for libsql::Value {
-	fn from(date_time: DateTime) -> libsql::Value {
-		libsql::Value::Text(date_time.to_rfc3339())
+impl From<DateTime> for turso::Value {
+	fn from(date_time: DateTime) -> turso::Value {
+		turso::Value::Text(date_time.to_rfc3339())
 	}
 }
 
-impl TryFrom<libsql::Value> for DateTime {
+impl TryFrom<turso::Value> for DateTime {
 	type Error = anyhow::Error;
 
-	fn try_from(value: libsql::Value) -> anyhow::Result<Self> {
-		let libsql::Value::Text(text) = value else {
+	fn try_from(value: turso::Value) -> anyhow::Result<Self> {
+		let turso::Value::Text(text) = value else {
 			return Err(anyhow!("Expected text value"));
 		};
 

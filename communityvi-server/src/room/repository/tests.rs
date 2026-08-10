@@ -3,8 +3,8 @@ mod room_tests {
 	use crate::database::Connection;
 	use crate::database::Repository;
 	use crate::database::error::DatabaseError;
-	use crate::database::libsql::test_utils::LibSqlTestFactory;
 	use crate::database::test::TestFactory;
+	use crate::database::turso::test_utils::TursoTestFactory;
 	use crate::room::model::Room;
 	use crate::types::uuid::Uuid;
 	use crate::user::model::User;
@@ -364,6 +364,6 @@ mod room_tests {
 		assert_eq!(expected.as_slice(), &users);
 	}
 
-	#[instantiate_tests(<LibSqlTestFactory>)]
-	mod libsql {}
+	#[instantiate_tests(<TursoTestFactory>)]
+	mod turso {}
 }

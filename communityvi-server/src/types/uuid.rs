@@ -20,16 +20,16 @@ impl Uuid {
 	}
 }
 
-impl From<Uuid> for libsql::Value {
-	fn from(Uuid(uuid): Uuid) -> libsql::Value {
-		libsql::Value::Text(uuid.to_string())
+impl From<Uuid> for turso::Value {
+	fn from(Uuid(uuid): Uuid) -> turso::Value {
+		turso::Value::Text(uuid.to_string())
 	}
 }
 
-impl TryFrom<libsql::Value> for Uuid {
+impl TryFrom<turso::Value> for Uuid {
 	type Error = anyhow::Error;
-	fn try_from(value: libsql::Value) -> anyhow::Result<Self> {
-		let libsql::Value::Text(text) = value else {
+	fn try_from(value: turso::Value) -> anyhow::Result<Self> {
+		let turso::Value::Text(text) = value else {
 			return Err(anyhow!("Expected text value"));
 		};
 
