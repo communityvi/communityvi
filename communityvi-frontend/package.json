@@ -24,7 +24,7 @@
 		"@sveltejs/kit": "^2.5.27",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/node": "^25.0.0",
-		"@vitest/coverage-v8": "^4.0.0",
+		"@vitest/coverage-v8": "^5.0.0",
 		"bulma": "^1.0.0",
 		"eslint": "^10.0.0",
 		"eslint-config-prettier": "^10.0.0",
@@ -41,7 +41,7 @@
 		"typescript": "^6.0.0",
 		"typescript-eslint": "^8.32.1",
 		"vite": "^8.0.0",
-		"vitest": "^4.0.0",
+		"vitest": "^5.0.0",
 		"vitest-mock-extended": "^5.0.0"
 	}
 }
