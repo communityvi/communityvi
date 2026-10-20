@@ -42,7 +42,7 @@ hex = "0.4"
 humantime-serde = "1"
 http-body-util = "0.1"
 js_int = { version = "0.2", features = ["serde", "float_deserialize"] }
-libsql = { version = "0.9", default-features = false, features = ["core"] }
+libsql = { version = "0.10", default-features = false, features = ["core"] }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
