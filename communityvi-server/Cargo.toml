@@ -46,7 +46,7 @@ libsql = { version = "0.10", default-features = false, features = ["core"] }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 nonzero_ext = "0.3"
-parking_lot = "0.12"
+parking_lot = "0.13"
 pin-project = "1"
 quanta = "0.13"
 rust-embed = { version = "8", features = ["interpolate-folder-path"] }
